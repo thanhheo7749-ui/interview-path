@@ -83,6 +83,25 @@
       "keyFiles": []
     }
   },
-  "hotPaths": [],
+  "hotPaths": [
+    {
+      "path": "SpeakCV/src/backend/app/ai_service.py",
+      "accessCount": 4,
+      "lastAccessed": 1778912458195,
+      "type": "file"
+    },
+    {
+      "path": "SpeakCV/.env",
+      "accessCount": 2,
+      "lastAccessed": 1778912616238,
+      "type": "file"
+    },
+    {
+      "path": "SpeakCV/src/backend/app/routers/interview.py",
+      "accessCount": 1,
+      "lastAccessed": 1778912176512,
+      "type": "file"
+    }
+  ],
   "userDirectives": []
 }
