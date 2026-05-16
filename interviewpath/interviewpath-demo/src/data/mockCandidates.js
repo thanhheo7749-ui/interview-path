@@ -1,6 +1,7 @@
 export const stages = [
   'Shortlisted',
   'Practice Sent',
+  'AI Practice',
   'Scheduled',
   'Technical Round',
   'Culture Round',

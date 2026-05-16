@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import ReactFlow, {
   Background,
   Controls,
@@ -55,15 +55,55 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+const getInitialState = () => {
+  try {
+    const saved = localStorage.getItem('n8nWorkflowState');
+    if (saved) return JSON.parse(saved);
+  } catch (e) {
+    console.error(e);
+  }
+  return null;
+};
+
 function N8nWorkflowPage() {
-  const [nodes, setNodes, onNodesChange] = useNodesState(toReactFlowNodes());
-  const [edges, setEdges, onEdgesChange] = useEdgesState(toReactFlowEdges());
-  const [selectedNodeId, setSelectedNodeId] = useState(null);
-  const [logs, setLogs] = useState([]);
-  const [currentStepIndex, setCurrentStepIndex] = useState(-1);
-  const [completedEdgeIds, setCompletedEdgeIds] = useState([]);
+  const initialState = useRef(getInitialState()).current;
+  const initStepIndex = initialState?.currentStepIndex ?? -1;
+  const initCompletedEdges = initialState?.completedEdgeIds || [];
+  const initSelectedNodeId = initialState?.selectedNodeId || null;
+  const initLogs = initialState?.logs || [];
+
+  const initialNodes = useMemo(() => {
+    const baseNodes = toReactFlowNodes();
+    return baseNodes.map((node, i) => {
+      let status = workflowStatuses.waiting;
+      if (initStepIndex !== -1) {
+        if (i < initStepIndex) status = workflowStatuses.success;
+        else if (i === initStepIndex) status = initStepIndex >= mockWorkflowNodes.length ? workflowStatuses.success : workflowStatuses.running;
+      }
+      return { ...node, data: { ...node.data, status } };
+    });
+  }, [initStepIndex]);
+
+  const initialEdges = useMemo(() => {
+    const outgoingEdgeId = initStepIndex !== -1 ? (edgeIds[initStepIndex] || null) : null;
+    return toReactFlowEdges(initCompletedEdges, outgoingEdgeId);
+  }, [initStepIndex, initCompletedEdges]);
+
+  const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
+  const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
+  const [selectedNodeId, setSelectedNodeId] = useState(initSelectedNodeId);
+  const [logs, setLogs] = useState(initLogs);
+  const [currentStepIndex, setCurrentStepIndex] = useState(initStepIndex);
+  const [completedEdgeIds, setCompletedEdgeIds] = useState(initCompletedEdges);
   const [isAutoRunning, setIsAutoRunning] = useState(false);
   const runTokenRef = useRef(0);
+
+  useEffect(() => {
+    localStorage.setItem(
+      'n8nWorkflowState',
+      JSON.stringify({ selectedNodeId, logs, currentStepIndex, completedEdgeIds })
+    );
+  }, [selectedNodeId, logs, currentStepIndex, completedEdgeIds]);
 
   const nodeTypes = useMemo(() => ({ n8nNode: N8nNode }), []);
   const fitViewOptions = useMemo(() => ({ padding: 0.04, maxZoom: 0.76 }), []);
