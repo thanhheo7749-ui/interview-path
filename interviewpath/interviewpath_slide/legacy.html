@@ -1,0 +1,784 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>InterviewPath - Pitch Deck</title>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --bg-color: #ffffff;
+            --bg-secondary: #f8fafc;
+            --text-main: #0f172a;
+            --text-muted: #64748b;
+            --accent-blue: #2563eb;
+            --accent-green: #059669;
+            --accent-purple: #7c3aed;
+            --dark: #0f172a;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Plus Jakarta Sans', sans-serif; }
+        
+        body { 
+            background-color: #e2e8f0; 
+            color: var(--text-main); 
+            display: flex; 
+            justify-content: center; 
+            align-items: center; 
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* Presentation Container */
+        #deck-container {
+            width: 1280px;
+            height: 720px;
+            position: relative;
+            background-color: var(--bg-color);
+            box-shadow: 0 25px 50px -12px rgba(0,0,0,0.15);
+            border-radius: 16px;
+            overflow: hidden;
+        }
+
+        /* Slide Styles */
+        .slide {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            padding: 60px 80px;
+            display: flex;
+            flex-direction: column;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.5s ease-in-out, visibility 0.5s;
+            background: var(--bg-color);
+        }
+        .slide.active {
+            opacity: 1;
+            visibility: visible;
+            z-index: 10;
+        }
+
+        /* Typography */
+        h1, h2, h3 { font-weight: 800; letter-spacing: -0.02em; }
+        .slide-number { position: absolute; bottom: 40px; right: 40px; color: var(--text-muted); font-weight: 600; font-size: 18px; }
+        .tag { display: inline-block; padding: 8px 16px; background: rgba(37, 99, 235, 0.1); color: var(--accent-blue); border-radius: 50px; font-weight: 600; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 20px; }
+        .tag-purple { background: rgba(124, 58, 237, 0.1); color: var(--accent-purple); }
+        .tag-green { background: rgba(5, 150, 105, 0.1); color: var(--accent-green); }
+        
+        /* Layouts */
+        .center-layout { justify-content: center; align-items: center; text-align: center; }
+        .title-main { font-size: 72px; margin-bottom: 20px; background: linear-gradient(135deg, #2563eb, #7c3aed); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .subtitle { font-size: 28px; color: var(--text-muted); font-weight: 400; line-height: 1.4; }
+        
+        .header-layout { margin-bottom: 30px; }
+        .slide-title { font-size: 48px; color: var(--text-main); margin-bottom: 10px; }
+
+        /* Diagram Containers */
+        .diagram-container { flex-grow: 1; display: flex; justify-content: center; align-items: center; background: var(--bg-secondary); border-radius: 20px; border: 1px solid #e2e8f0; padding: 20px; min-height: 0; overflow: hidden; }
+        
+        /* Grids */
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 60px; height: 100%; }
+        
+        .minimal-box { display: flex; flex-direction: column; justify-content: center; }
+        .minimal-box i { font-size: 50px; color: var(--accent-blue); margin-bottom: 20px; }
+        .minimal-box h3 { font-size: 32px; margin-bottom: 15px; color: var(--text-main); }
+        .minimal-box p { font-size: 20px; color: var(--text-muted); line-height: 1.6; font-weight: 400; }
+
+        /* Terminology Cards */
+        .term-card { background: var(--bg-secondary); padding: 30px; border-radius: 16px; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); }
+        .term-title { font-size: 28px; font-weight: 700; margin-bottom: 10px; display: flex; align-items: center; gap: 15px; }
+        .term-desc { font-size: 18px; color: var(--text-muted); line-height: 1.5; }
+
+        /* Custom Journey Timeline (Slide 5) */
+        .journey-container { display: flex; justify-content: space-between; width: 100%; position: relative; padding: 20px 0; }
+        .journey-container::before { content: ''; position: absolute; top: 60px; left: 55px; right: 55px; height: 4px; background: #e2e8f0; z-index: 0; transform: translateY(-50%); }
+        .j-node { display: flex; flex-direction: column; align-items: center; z-index: 1; width: 110px; position: relative; }
+        .j-node .icon-box { width: 80px; height: 80px; background: white; border: 3px solid #cbd5e1; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 30px; color: #64748b; margin-bottom: 15px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); transition: all 0.3s; position: relative; z-index: 5; }
+        .j-node .step-num { position: absolute; top: -5px; right: -5px; background: var(--text-main); color: white; width: 26px; height: 26px; border-radius: 50%; font-size: 14px; display: flex; align-items: center; justify-content: center; font-weight: bold; border: 2px solid white; z-index: 6; }
+        .j-node.active .icon-box { border-color: var(--accent-blue); color: var(--accent-blue); }
+        .j-node.active .step-num { background: var(--accent-blue); }
+        .j-node.highlight .icon-box { border-color: var(--accent-purple); color: var(--accent-purple); background: #fbf7ff; box-shadow: 0 0 0 6px rgba(124,58,237,0.1); }
+        .j-node.highlight .step-num { background: var(--accent-purple); }
+        .j-node.success .icon-box { border-color: var(--accent-green); color: var(--accent-green); background: #f0fdf4; box-shadow: 0 0 0 6px rgba(5,150,105,0.1); }
+        .j-node.success .step-num { background: var(--accent-green); }
+        .j-node .step-text { font-size: 15px; font-weight: 700; text-align: center; color: var(--text-main); line-height: 1.3; }
+
+        /* N8N ANIMATIONS FOR SLIDE 5 & 6 */
+        @keyframes flow-dash { to { stroke-dashoffset: -20; } }
+        .n8n-flow-slow { stroke-dasharray: 5, 5; animation: flow-dash 1s linear infinite; }
+        .n8n-flow-fast { stroke-dasharray: 8, 8; animation: flow-dash 0.6s linear infinite; }
+        
+        @keyframes pulse-glow {
+            0% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.4); }
+            70% { box-shadow: 0 0 0 20px rgba(59, 130, 246, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
+        }
+        .ai-brain-pulse { animation: pulse-glow 2s infinite; }
+        
+        .journey-container::after { 
+            content: ''; position: absolute; top: 60px; left: 55px; right: 55px; height: 4px; 
+            background: linear-gradient(90deg, var(--accent-blue) 0%, var(--accent-blue) 50%, transparent 50%, transparent 100%); 
+            background-size: 20px 4px; animation: h-flow 0.8s linear infinite; z-index: 0; opacity: 0.5; transform: translateY(-50%);
+        }
+        @keyframes h-flow { from { background-position: 0 0; } to { background-position: 20px 0; } }
+
+        .term-card-label > div {
+            background: white; border: 1px solid #e2e8f0; padding: 5px 10px; border-radius: 8px; font-size: 11px; font-weight: 800; display: flex; align-items: center; gap: 5px; box-shadow: 0 4px 10px rgba(0,0,0,0.08); white-space: nowrap;
+        }
+
+        /* NEW LIGHT THEME AI COMMAND CENTER (SLIDE 6) */
+        .ai-step-box { background: white; border: 1px solid #e2e8f0; border-radius: 12px; padding: 12px 16px; display: flex; align-items: center; gap: 12px; font-weight: 700; font-size: 14px; color: var(--text-main); box-shadow: 0 2px 5px rgba(0,0,0,0.02); transition: transform 0.2s; width: 100%; }
+        .ai-step-box i { font-size: 20px; width: 24px; text-align: center; }
+        
+        .light-brain-core { background: #f8fafc; border: 2px solid #cbd5e1; border-radius: 24px; padding: 35px 25px; width: 500px; position: relative; box-shadow: 0 15px 35px rgba(15,23,42,0.05); display: flex; flex-direction: column; align-items: center; z-index: 10; }
+        .brain-module-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 25px; width: 100%; position: relative; margin-top: 20px; }
+        
+        .brain-module { background: white; border-radius: 12px; padding: 16px; box-shadow: 0 6px 12px rgba(0,0,0,0.04); border: 1px solid #e2e8f0; display: flex; flex-direction: column; gap: 6px; z-index: 10; position: relative; }
+        .brain-module h4 { font-size: 15px; font-weight: 800; display: flex; align-items: center; gap: 8px; }
+        .brain-module p { font-size: 13px; color: var(--text-muted); line-height: 1.4; }
+        
+        .light-orb { width: 85px; height: 85px; background: linear-gradient(135deg, #3b82f6, #8b5cf6); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 36px; color: white; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 5; box-shadow: 0 0 25px rgba(59,130,246,0.4); border: 3px solid white; }
+        
+        .flow-arrow-animated { font-size: 28px; animation: flowRight 1s infinite; display: flex; flex-direction: column; gap: 15px; align-items: center; justify-content: center; }
+        @keyframes flowRight { 0% { transform: translateX(0); opacity: 0.4; } 50% { opacity: 1; } 100% { transform: translateX(10px); opacity: 0.4; } }
+
+        /* HR Dashboard Mockup (Slide 7) */
+        .hr-dash { background: #f8fafc; border-radius: 12px; border: 1px solid #cbd5e1; overflow: hidden; display: flex; flex-direction: column; height: 100%; box-shadow: 0 10px 30px -5px rgba(0,0,0,0.1); width: 100%; }
+        .hr-dash-header { background: white; padding: 15px 20px; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; }
+        .hr-dots { display: flex; gap: 6px; }
+        .hr-dot { width: 10px; height: 10px; border-radius: 50%; background: #e2e8f0; }
+        .hr-dot:nth-child(1) { background: #ef4444; }
+        .hr-dot:nth-child(2) { background: #f59e0b; }
+        .hr-dot:nth-child(3) { background: #10b981; }
+        .hr-dash-title { font-weight: 700; color: #475569; font-size: 14px; }
+        .hr-board { display: flex; gap: 10px; padding: 15px; flex-grow: 1; background: #f1f5f9; }
+        .hr-col { flex: 1; background: #e2e8f0; border-radius: 8px; padding: 10px; display: flex; flex-direction: column; gap: 10px; }
+        .hr-col-title { font-size: 10px; font-weight: 800; color: #475569; text-transform: uppercase; margin-bottom: 5px; display: flex; justify-content: space-between; letter-spacing: 0.5px;}
+        .hr-card { background: white; padding: 12px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); border: 1px solid #e2e8f0; position: relative; }
+        .hr-card-title { font-weight: 800; font-size: 14px; color: #0f172a; margin-bottom: 2px; }
+        .hr-card-sub { font-size: 10px; color: #64748b; margin-bottom: 10px; display: flex; align-items: center; gap: 5px; }
+        .hr-badge { display: inline-block; padding: 4px 8px; border-radius: 4px; font-size: 9px; font-weight: 700; }
+        .hr-badge.match { background: #fffbeb; color: #b45309; border: 1px solid #fde68a; }
+        .hr-badge.sched { background: #eef2ff; color: #4338ca; border: 1px solid #c7d2fe; }
+        .hr-badge.progress { background: #fff7ed; color: #c2410c; border: 1px solid #ffedd5; }
+        .hr-badge.hired { background: #f3e8ff; color: #7e22ce; border: 1px solid #e9d5ff; }
+        .hr-badge.pool { background: #f1f5f9; color: #475569; border: 1px solid #e2e8f0; }
+
+        /* Gemini Interactive UI Elements */
+        .ai-demo-container { display: flex; flex-direction: column; gap: 15px; width: 100%; height: 100%; background: white; border-radius: 12px; padding: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); border: 1px solid #e2e8f0; overflow-y: auto; }
+        .ai-question-box { background: #f8fafc; padding: 15px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 16px; font-weight: 600; color: var(--text-main); }
+        .ai-input { width: 100%; padding: 15px; border: 2px solid #e2e8f0; border-radius: 8px; font-size: 16px; font-family: inherit; resize: none; outline: none; transition: border-color 0.3s; }
+        .ai-input:focus { border-color: var(--accent-purple); }
+        .ai-btn { background: linear-gradient(135deg, var(--accent-blue), var(--accent-purple)); color: white; border: none; padding: 12px 24px; border-radius: 8px; font-size: 16px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; transition: opacity 0.3s, transform 0.1s; }
+        
+        .ai-result { display: none; flex-direction: column; gap: 15px; margin-top: 10px; animation: fadeIn 0.5s ease-in-out; }
+        
+        .loader { display: none; align-items: center; justify-content: center; gap: 10px; color: var(--accent-purple); font-weight: 600; margin-top: 10px; }
+        .spinner { width: 20px; height: 20px; border: 3px solid rgba(124, 58, 237, 0.3); border-radius: 50%; border-top-color: var(--accent-purple); animation: spin 1s ease-in-out infinite; }
+        
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* Q&A Assistant UI */
+        .qa-container { margin-top: 40px; width: 100%; max-width: 800px; display: flex; flex-direction: column; gap: 15px; z-index: 20; }
+        .qa-input-wrapper { display: flex; gap: 10px; }
+        .qa-input { flex-grow: 1; padding: 15px 20px; border-radius: 50px; border: 2px solid #e2e8f0; font-size: 16px; outline: none; }
+        .qa-input:focus { border-color: var(--accent-blue); }
+        .qa-btn { border-radius: 50px; padding: 0 30px; }
+        .qa-result-box { display: none; background: white; border-radius: 16px; padding: 25px; text-align: left; box-shadow: 0 10px 30px rgba(0,0,0,0.1); border: 1px solid #e2e8f0; font-size: 18px; line-height: 1.6; color: var(--text-main); }
+
+        /* VS Comparison Cards (Slide 9) */
+        .vs-container { display: flex; gap: 40px; margin-top: 10px; align-items: stretch; flex-grow: 1; }
+        .vs-col { flex: 1; border-radius: 16px; padding: 35px 30px; display: flex; flex-direction: column; gap: 25px; position: relative; }
+        .vs-col.generic { background: #f8fafc; border: 1px solid #cbd5e1; }
+        .vs-col.interviewpath { background: #f0fdf4; border: 2px solid var(--accent-green); box-shadow: 0 10px 30px rgba(5,150,105,0.08); }
+        .vs-col.interviewpath::before { content: 'OUR ADVANTAGE'; position: absolute; top: -14px; left: 50%; transform: translateX(-50%); background: var(--accent-green); color: white; padding: 6px 16px; border-radius: 20px; font-weight: 800; font-size: 12px; letter-spacing: 1.5px; }
+        .vs-title { font-size: 28px; font-weight: 800; margin-bottom: 10px; text-align: center; }
+        .vs-col.generic .vs-title { color: #64748b; }
+        .vs-col.interviewpath .vs-title { color: var(--accent-green); }
+        .vs-item { display: flex; gap: 15px; align-items: flex-start; font-size: 18px; line-height: 1.4; }
+        .vs-col.generic .vs-item { color: #64748b; }
+        .vs-col.generic .vs-item i { color: #94a3b8; font-size: 22px; margin-top: 2px; }
+        .vs-col.interviewpath .vs-item { color: var(--text-main); font-weight: 600; }
+        .vs-col.interviewpath .vs-item i { color: var(--accent-green); font-size: 22px; margin-top: 2px; }
+        .vs-badge-center { display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 24px; color: #cbd5e1; }
+
+        .interactive-element { cursor: default; }
+    </style>
+</head>
+<body>
+
+    <div id="deck-container">
+        
+        <!-- SLIDE 1: TITLE -->
+        <div class="slide active center-layout" id="slide-1">
+            <div class="tag">AI Recruitment Platform</div>
+            <h1 class="title-main">InterviewPath</h1>
+            <p class="subtitle" style="max-width: 800px;">AI Talent Memory Platform<br>from CV Screening to Employee Onboarding.</p>
+            <div class="slide-number">01</div>
+        </div>
+
+        <!-- SLIDE 2: THE PROBLEM -->
+        <div class="slide" id="slide-2">
+            <div class="header-layout">
+                <div class="tag">The Problem</div>
+                <h2 class="slide-title">Recruitment is Fragmented</h2>
+            </div>
+            <div class="grid-2">
+                <div class="minimal-box">
+                    <i class="fa-solid fa-users-slash text-red-500" style="color: #ef4444;"></i>
+                    <h3>For HR Teams</h3>
+                    <p>CVs are reviewed manually. Interview scheduling requires endless back-and-forth emails. Feedback from multiple rounds is scattered, and valuable candidate history is lost.</p>
+                </div>
+                <div class="minimal-box">
+                    <i class="fa-solid fa-user-injured" style="color: #f59e0b;"></i>
+                    <h3>For Candidates</h3>
+                    <p>They don't know if they truly fit the job. They are unprepared for specific corporate cultures, receive zero feedback after failing, and cannot track their own progress.</p>
+                </div>
+            </div>
+            <div class="slide-number">02</div>
+        </div>
+
+        <!-- SLIDE 3: THE KEY INSIGHT -->
+        <div class="slide" id="slide-3">
+            <div class="header-layout">
+                <div class="tag tag-purple">Key Insight</div>
+                <h2 class="slide-title">The Missing Memory Layer</h2>
+            </div>
+            <div class="center-layout" style="height: 100%; display: flex; flex-direction: column; justify-content: center; max-width: 950px; margin: 0 auto;">
+                <h3 style="font-size: 42px; color: var(--accent-blue); line-height: 1.4; margin-bottom: 30px;">
+                    "Hiring should not be based on a single CV or interview.<br>It requires an <span style="color: var(--accent-purple);">AI Candidate Passport</span>."
+                </h3>
+                <p style="font-size: 20px; color: var(--text-muted); line-height: 1.6; font-weight: 400; text-align: left; background: var(--bg-secondary); padding: 30px; border-radius: 16px; border: 1px solid #e2e8f0;">
+                    <strong style="color: var(--accent-purple); font-size: 22px;">Breakthrough:</strong> InterviewPath creates a <strong>Candidate Digital Twin</strong> — a living AI profile that remembers each candidate’s skills, interview answers, culture-fit signals, feedback history, and readiness progress.
+                </p>
+            </div>
+            <div class="slide-number">03</div>
+        </div>
+
+        <!-- SLIDE 4: THE SOLUTION -->
+        <div class="slide" id="slide-4">
+            <div class="header-layout">
+                <div class="tag">The Solution</div>
+                <h2 class="slide-title">InterviewPath Platform</h2>
+                <p style="font-size: 22px; color: var(--text-muted);">A unified AI Recruitment Journey Platform driven by two core engines.</p>
+            </div>
+            <div class="grid-2" style="gap: 40px; align-items: center;">
+                <div class="term-card">
+                    <div class="term-title" style="color: var(--accent-blue);">
+                        <i class="fa-solid fa-gears"></i> Workflow Automator (n8n)
+                    </div>
+                    <p class="term-desc">Controls the entire lifecycle automatically: from receiving CVs, sending practice links, scheduling calendar invites, to moving profiles from applicant to employee record.</p>
+                </div>
+                <div class="term-card">
+                    <div class="term-title" style="color: var(--accent-purple);">
+                        <i class="fa-solid fa-brain"></i> Company Hiring Brain (RAG)
+                    </div>
+                    <p class="term-desc">Stores company culture, rubrics, and technical requirements. Generates personalized interview coaching, evaluates culture fit, and provides detailed candidate readiness reports.</p>
+                </div>
+            </div>
+            <div class="slide-number">04</div>
+        </div>
+
+        <!-- SLIDE 5: FULL JOURNEY FLOW (ANIMATED + RE-ORDERED) -->
+        <div class="slide" id="slide-5">
+            <div class="header-layout" style="margin-bottom: 20px;">
+                <div class="tag" style="background: rgba(15, 23, 42, 0.1); color: var(--text-main);">The Core Flow</div>
+                <h2 class="slide-title">From CV to Employee</h2>
+                <p style="font-size: 18px; color: var(--text-muted);">How the AI Orchestrator manages the seamless recruitment journey.</p>
+            </div>
+            
+            <div class="diagram-container" style="background: transparent; border: none; padding: 0; position: relative; height: 460px; display: flex; align-items: flex-end;">
+                <!-- CENTRAL AI HUB (Orchestrator) -->
+                <div style="position: absolute; top: 0; left: 50%; transform: translateX(-50%); z-index: 20; display: flex; flex-direction: column; align-items: center; width: 100%;">
+                    <div class="ai-brain-pulse" style="background: #0f172a; color: white; padding: 18px 45px; border-radius: 50px; font-size: 24px; font-weight: 800; box-shadow: 0 10px 30px rgba(0,0,0,0.2); border: 2px solid #3b82f6; display: flex; align-items: center; gap: 15px;">
+                        <i class="fa-solid fa-brain" style="color: #60a5fa; font-size: 28px;"></i> AI Orchestrator
+                    </div>
+                    <div style="background: white; border: 1px solid #e2e8f0; padding: 6px 25px; border-radius: 20px; font-size: 14px; font-weight: 700; color: var(--accent-purple); margin-top: -12px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); z-index: 21;">
+                        Continuously coordinates, evaluates, and stores memory
+                    </div>
+                </div>
+
+                <!-- SVG CONNECTIONS (N8N Animations) -->
+                <svg style="position: absolute; top: 80px; left: 55px; right: 55px; width: calc(100% - 110px); height: 250px; z-index: 1;" viewBox="0 0 1000 250" preserveAspectRatio="none">
+                    <defs>
+                        <linearGradient id="lineGrad" x1="0%" y1="0%" x2="0%" y2="100%"><stop offset="0%" stop-color="#3b82f6" stop-opacity="0.8"/><stop offset="100%" stop-color="#cbd5e1" stop-opacity="0.2"/></linearGradient>
+                        <linearGradient id="lineGradHighlight" x1="0%" y1="0%" x2="0%" y2="100%"><stop offset="0%" stop-color="#7c3aed" stop-opacity="0.8"/><stop offset="100%" stop-color="#cbd5e1" stop-opacity="0.2"/></linearGradient>
+                    </defs>
+                    <path d="M 500 0 C 500 40, 143 40, 143 70 L 143 250" stroke="url(#lineGrad)" stroke-width="2" fill="none" class="n8n-flow-slow" />
+                    <path d="M 500 0 C 500 80, 286 80, 286 130 L 286 250" stroke="url(#lineGradHighlight)" stroke-width="3" fill="none" class="n8n-flow-fast" />
+                    <path d="M 500 0 C 500 40, 429 40, 429 70 L 429 250" stroke="url(#lineGradHighlight)" stroke-width="3" fill="none" class="n8n-flow-fast" />
+                    <path d="M 500 0 C 500 80, 571 80, 571 130 L 571 250" stroke="url(#lineGrad)" stroke-width="2" fill="none" class="n8n-flow-slow" />
+                    <path d="M 500 0 C 500 40, 714 40, 714 70 L 714 250" stroke="url(#lineGradHighlight)" stroke-width="3" fill="none" class="n8n-flow-fast" />
+                    <path d="M 500 0 C 500 80, 1000 80, 1000 130 L 1000 250" stroke="#059669" stroke-width="2" fill="none" class="n8n-flow-slow" />
+                </svg>
+
+                <!-- LABELS (ZIG-ZAG) -->
+                <div style="position: absolute; top: 80px; left: 55px; right: 55px; height: 250px; z-index: 15;">
+                    <div style="position: absolute; top: 70px; left: 14.28%; transform: translate(-50%, -50%);" class="term-card-label">
+                        <div style="color: #475569;"><i class="fa-solid fa-filter text-blue-500"></i> Reads CV</div>
+                    </div>
+                    <div style="position: absolute; top: 130px; left: 28.57%; transform: translate(-50%, -50%);" class="term-card-label">
+                        <div style="color: var(--accent-purple);"><i class="fa-solid fa-id-card-clip"></i> Creates Passport</div>
+                    </div>
+                    <div style="position: absolute; top: 70px; left: 42.85%; transform: translate(-50%, -50%);" class="term-card-label">
+                        <div style="color: var(--accent-purple);"><i class="fa-solid fa-wand-magic-sparkles"></i> Coaches</div>
+                    </div>
+                    <div style="position: absolute; top: 130px; left: 57.14%; transform: translate(-50%, -50%);" class="term-card-label">
+                        <div style="color: #475569;"><i class="fa-regular fa-calendar-check text-blue-500"></i> Schedules</div>
+                    </div>
+                    <div style="position: absolute; top: 70px; left: 71.42%; transform: translate(-50%, -50%);" class="term-card-label">
+                        <div style="color: var(--accent-purple);"><i class="fa-solid fa-magnifying-glass-chart"></i> Evaluates Fit</div>
+                    </div>
+                    <div style="position: absolute; top: 130px; left: 100%; transform: translate(-50%, -50%);" class="term-card-label">
+                        <div style="color: var(--accent-green);"><i class="fa-solid fa-database"></i> Saves Memory</div>
+                    </div>
+                </div>
+
+                <!-- NODES -->
+                <div class="journey-container" style="width: 100%; z-index: 10; padding: 0;">
+                    <div class="j-node active">
+                        <div class="icon-box"><i class="fa-solid fa-file-pdf"></i><div class="step-num">1</div></div>
+                        <div class="step-text">CV<br>Submission</div>
+                    </div>
+                    <div class="j-node active">
+                        <div class="icon-box"><i class="fa-solid fa-robot"></i><div class="step-num">2</div></div>
+                        <div class="step-text">AI CV<br>Screening</div>
+                    </div>
+                    <div class="j-node highlight">
+                        <div class="icon-box"><i class="fa-solid fa-id-card"></i><div class="step-num">3</div></div>
+                        <div class="step-text">Passport<br>Created</div>
+                    </div>
+                    <div class="j-node highlight">
+                        <div class="icon-box"><i class="fa-regular fa-comments"></i><div class="step-num">4</div></div>
+                        <div class="step-text">AI Interview<br>Practice</div>
+                    </div>
+                    <div class="j-node active">
+                        <div class="icon-box"><i class="fa-solid fa-calendar-check"></i><div class="step-num">5</div></div>
+                        <div class="step-text">Auto<br>Scheduling</div>
+                    </div>
+                    <div class="j-node highlight">
+                        <div class="icon-box"><i class="fa-solid fa-layer-group"></i><div class="step-num">6</div></div>
+                        <div class="step-text">Multi-round<br>Evaluation</div>
+                    </div>
+                    <div class="j-node active">
+                        <div class="icon-box"><i class="fa-solid fa-handshake"></i><div class="step-num">7</div></div>
+                        <div class="step-text">Hiring<br>Decision</div>
+                    </div>
+                    <div class="j-node success">
+                        <div class="icon-box"><i class="fa-solid fa-users-viewfinder"></i><div class="step-num">8</div></div>
+                        <div class="step-text">Employee /<br>Talent Pool</div>
+                    </div>
+                </div>
+            </div>
+            <div class="slide-number">05</div>
+        </div>
+
+        <!-- SLIDE 6: AI COMMAND CENTER (LIGHT & CLEAR THEME) -->
+        <div class="slide" id="slide-6">
+            <div class="header-layout" style="margin-bottom: 5px; text-align: center;">
+                <h2 class="slide-title" style="font-size: 44px; margin-bottom: 5px; border: none; padding: 0;">How InterviewPath AI Thinks</h2>
+                <p style="font-size: 16px; color: var(--text-muted); font-weight: 700; text-transform: uppercase; letter-spacing: 2px;">Retrieve → Reason → Respond → Remember</p>
+            </div>
+            
+            <div class="diagram-container" style="background: transparent; border: none; padding: 0; margin-top: 10px; flex-direction: column; justify-content: center;">
+                
+                <div style="display: flex; justify-content: center; align-items: center; gap: 30px; width: 100%;">
+                    
+                    <!-- 1. INPUTS -->
+                    <div style="display: flex; flex-direction: column; gap: 14px; width: 240px;">
+                        <div style="text-align: center; color: var(--text-muted); font-size: 13px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 5px;">1. Raw Signals</div>
+                        
+                        <div class="ai-step-box" style="border-left: 5px solid var(--accent-blue);">
+                            <i class="fa-solid fa-file-pdf text-blue-500"></i> Candidate CV
+                        </div>
+                        <div class="ai-step-box" style="border-left: 5px solid var(--accent-blue);">
+                            <i class="fa-solid fa-briefcase text-blue-500"></i> Job Description
+                        </div>
+                        <div class="ai-step-box" style="border-left: 5px solid var(--accent-blue);">
+                            <i class="fa-solid fa-building text-blue-500"></i> Company Culture
+                        </div>
+                        <div class="ai-step-box" style="border-left: 5px solid var(--accent-blue);">
+                            <i class="fa-solid fa-clipboard-user text-blue-500"></i> HR Feedback
+                        </div>
+                    </div>
+
+                    <!-- ARROW 1 -->
+                    <div class="flow-arrow-animated text-blue-400">
+                        <i class="fa-solid fa-angles-right"></i>
+                        <i class="fa-solid fa-angles-right"></i>
+                    </div>
+
+                    <!-- 2. AI BRAIN -->
+                    <div class="light-brain-core">
+                        <div style="color: var(--dark); font-size: 16px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase;">
+                            <i class="fa-solid fa-microchip text-blue-500"></i> AI Recruitment Brain
+                        </div>
+                        
+                        <div class="brain-module-grid">
+                            <div class="brain-module" style="border-top: 4px solid #3b82f6;">
+                                <h4 style="color: #3b82f6;"><i class="fa-solid fa-gears"></i> n8n Automation</h4>
+                                <p>Runs workflow & rules</p>
+                            </div>
+                            <div class="brain-module" style="border-top: 4px solid #a855f7;">
+                                <h4 style="color: #a855f7;"><i class="fa-solid fa-database"></i> RAG Retrieval</h4>
+                                <p>Finds company memory</p>
+                            </div>
+                            
+                            <!-- Central Pulsing Brain -->
+                            <div class="light-orb ai-brain-pulse">
+                                <i class="fa-solid fa-brain"></i>
+                            </div>
+
+                            <div class="brain-module" style="border-top: 4px solid #f59e0b;">
+                                <h4 style="color: #f59e0b;"><i class="fa-solid fa-network-wired"></i> Graph Layer</h4>
+                                <p>Connects candidate fit</p>
+                            </div>
+                            <div class="brain-module" style="border-top: 4px solid #10b981;">
+                                <h4 style="color: #10b981;"><i class="fa-solid fa-comment-dots"></i> LLM Coach</h4>
+                                <p>Generates natural feedback</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ARROW 2 -->
+                    <div class="flow-arrow-animated text-green-400">
+                        <i class="fa-solid fa-angles-right"></i>
+                        <i class="fa-solid fa-angles-right"></i>
+                    </div>
+
+                    <!-- 3. OUTPUTS -->
+                    <div style="display: flex; flex-direction: column; gap: 14px; width: 240px;">
+                        <div style="text-align: center; color: var(--accent-green); font-size: 13px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 5px;">3. Smart Results</div>
+                        
+                        <div class="ai-step-box" style="border-left: 5px solid var(--accent-green);">
+                            <i class="fa-solid fa-bolt text-green-500"></i> Match Score
+                        </div>
+                        <div class="ai-step-box" style="border-left: 5px solid var(--accent-green);">
+                            <i class="fa-solid fa-clipboard-question text-green-500"></i> Custom Questions
+                        </div>
+                        <div class="ai-step-box" style="border-left: 5px solid var(--accent-green);">
+                            <i class="fa-solid fa-chart-line text-green-500"></i> Readiness Report
+                        </div>
+                        <div class="ai-step-box" style="border-left: 5px solid var(--accent-purple); background: #fdf4ff;">
+                            <i class="fa-solid fa-id-card text-purple-600"></i> Candidate Passport
+                        </div>
+                    </div>
+
+                </div>
+
+                <!-- 4. MEMORY LOOP -->
+                <div style="margin-top: 40px; background: white; border: 2px dashed #d8b4fe; color: #7e22ce; padding: 15px 35px; border-radius: 50px; font-size: 16px; font-weight: 800; display: flex; align-items: center; gap: 12px; box-shadow: 0 10px 20px rgba(126,34,206,0.08);">
+                    <i class="fa-solid fa-rotate-left fa-spin-pulse"></i> 
+                    <span>4. Talent Memory Loop: AI remembers everything to improve the next decision.</span>
+                </div>
+
+            </div>
+            <div class="slide-number">06</div>
+        </div>
+
+        <!-- SLIDE 7: HR DASHBOARD -->
+        <div class="slide" id="slide-7">
+            <div class="header-layout">
+                <div class="tag tag-green">HR Experience</div>
+                <h2 class="slide-title">Empowering the Recruiter</h2>
+            </div>
+            <div class="grid-2" style="grid-template-columns: 1fr 1.5fr; align-items: center;">
+                <div style="display: flex; flex-direction: column; gap: 30px;">
+                    <div>
+                        <h3 style="font-size: 24px; color: var(--accent-blue); margin-bottom: 8px; display: flex; align-items: center; gap: 10px;">
+                            <i class="fa-solid fa-filter"></i> 1. AI CV Screening
+                        </h3>
+                        <p style="font-size: 16px; color: var(--text-muted);">Automatically extracts CV info, compares it with the JD, and generates a ranked candidate shortlist.</p>
+                    </div>
+                    <div>
+                        <h3 style="font-size: 24px; color: var(--accent-blue); margin-bottom: 8px; display: flex; align-items: center; gap: 10px;">
+                            <i class="fa-regular fa-calendar-check"></i> 2. Auto Scheduling
+                        </h3>
+                        <p style="font-size: 16px; color: var(--text-muted);">Syncs with Google Calendar. n8n sends automated interview invitations and reminders without back-and-forth emails.</p>
+                    </div>
+                    <div>
+                        <h3 style="font-size: 24px; color: var(--accent-blue); margin-bottom: 8px; display: flex; align-items: center; gap: 10px;">
+                            <i class="fa-solid fa-database"></i> 3. AI Talent Memory
+                        </h3>
+                        <p style="font-size: 16px; color: var(--text-muted);">Creates a Candidate Passport. Stores evaluation scores and reuses strong candidates for future roles instead of losing them.</p>
+                    </div>
+                </div>
+                <div class="diagram-container" style="padding: 0; background: transparent; border: none;">
+                    <div class="hr-dash">
+                        <div class="hr-dash-header">
+                            <div class="hr-dots"><div class="hr-dot"></div><div class="hr-dot"></div><div class="hr-dot"></div></div>
+                            <div class="hr-dash-title">InterviewPath HR Workspace</div>
+                            <div><i class="fa-solid fa-bars text-slate-400"></i></div>
+                        </div>
+                        <div class="hr-board">
+                            <div class="hr-col">
+                                <div class="hr-col-title">Shortlisted <span>1</span></div>
+                                <div class="hr-card">
+                                    <div class="hr-card-title">Le Thi B</div>
+                                    <div class="hr-card-sub"><i class="fa-solid fa-pen-nib text-slate-400"></i> UI/UX Designer</div>
+                                    <div class="hr-badge match">⚡ Match: 75%</div>
+                                </div>
+                            </div>
+                            <div class="hr-col">
+                                <div class="hr-col-title">Scheduled <span>1</span></div>
+                                <div class="hr-card">
+                                    <div class="hr-card-title">Tran Van C</div>
+                                    <div class="hr-card-sub"><i class="fa-solid fa-video text-slate-400"></i> Culture Round</div>
+                                    <div class="hr-badge sched"><i class="fa-regular fa-clock"></i> Tomorrow, 10 AM</div>
+                                </div>
+                            </div>
+                            <div class="hr-col">
+                                <div class="hr-col-title">Technical <span>1</span></div>
+                                <div class="hr-card">
+                                    <div class="hr-card-title">Nguyen Van A</div>
+                                    <div class="hr-card-sub"><i class="fa-solid fa-code text-slate-400"></i> Backend Dev</div>
+                                    <div class="hr-badge progress"><i class="fa-solid fa-spinner"></i> In Progress</div>
+                                </div>
+                            </div>
+                            <div class="hr-col">
+                                <div class="hr-col-title">Hired / Pool <span>2</span></div>
+                                <div class="hr-card">
+                                    <div class="hr-card-title">Pham Dao D</div>
+                                    <div class="hr-card-sub"><i class="fa-solid fa-check-double text-slate-400"></i> Passed All</div>
+                                    <div class="hr-badge hired"><i class="fa-solid fa-file-export"></i> Profile Saved</div>
+                                </div>
+                                <div class="hr-card" style="margin-top: 10px;">
+                                    <div class="hr-card-title">Le Minh E</div>
+                                    <div class="hr-card-sub"><i class="fa-solid fa-bookmark text-slate-400"></i> Fit for Q3 Role</div>
+                                    <div class="hr-badge pool"><i class="fa-solid fa-id-card"></i> Passport to Pool</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="slide-number">07</div>
+        </div>
+
+        <!-- SLIDE 8: LIVE DEMO (WITH FALLBACK) -->
+        <div class="slide" id="slide-8">
+            <div class="header-layout" style="margin-bottom: 20px;">
+                <div class="tag tag-purple">Live Demo</div>
+                <h2 class="slide-title">See Gemini AI In Action</h2>
+                <p style="font-size: 18px; color: var(--text-muted);">Try the "Polish & Shadow" feature live. Enter an unstructured answer below.</p>
+            </div>
+            <div class="grid-2" style="grid-template-columns: 1fr 1.5fr;">
+                <div class="minimal-box" style="justify-content: flex-start; padding-top: 20px;">
+                    <h3 style="font-size: 24px; color: var(--accent-purple); margin-bottom: 5px;">AI Practice Link</h3>
+                    <p style="font-size: 16px; margin-bottom: 20px;">Candidates receive an automated link to practice before the real interview.</p>
+                    
+                    <h3 style="font-size: 24px; color: var(--accent-purple); margin-bottom: 5px;">Company-Specific</h3>
+                    <p style="font-size: 16px; margin-bottom: 20px;">AI generates scenarios based on their CV and company culture.</p>
+                    
+                    <h3 style="font-size: 24px; color: var(--accent-purple); margin-bottom: 5px;">Constructive Feedback</h3>
+                    <p style="font-size: 16px;">AI improves English grammar, clarity, answer structure, and professional tone.</p>
+                </div>
+                
+                <div class="diagram-container interactive-element" style="background: transparent; border: none; padding: 0;">
+                    <div class="ai-demo-container">
+                        <div class="ai-question-box">
+                            <i class="fa-solid fa-briefcase"></i> Role: Backend Engineer<br><br>
+                            <span style="color: var(--text-muted); font-size: 14px; font-weight: 400;">Interviewer asks:</span><br>
+                            "Tell me about a time you handled deadline pressure."
+                        </div>
+                        
+                        <textarea id="demo-input" class="ai-input" rows="3" placeholder="Type a raw, imperfect answer here... (e.g., 'I try my best and ask friend when I stuck')"></textarea>
+                        
+                        <button id="btn-polish" class="ai-btn">
+                            ✨ Polish My Answer
+                        </button>
+                        
+                        <div id="demo-loader" class="loader">
+                            <div class="spinner"></div> AI is analyzing and polishing...
+                        </div>
+
+                        <div id="demo-result" class="ai-result">
+                            <div class="ai-feedback">
+                                <div class="ai-feedback-title"><i class="fa-solid fa-triangle-exclamation"></i> Coach Feedback</div>
+                                <div id="demo-feedback-text"></div>
+                            </div>
+                            <div class="ai-polished">
+                                <div class="ai-polished-title"><i class="fa-solid fa-wand-magic-sparkles"></i> Polished Answer (Ready for Shadowing)</div>
+                                <div id="demo-polished-text"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="slide-number">08</div>
+        </div>
+
+        <!-- SLIDE 9: WHY THIS WINS -->
+        <div class="slide" id="slide-9">
+            <div class="header-layout" style="margin-bottom: 15px;">
+                <div class="tag tag-green">Competitive Advantage</div>
+                <h2 class="slide-title">Why This Wins</h2>
+                <p style="font-size: 18px; color: var(--text-muted);">Not just interview practice — a talent memory layer for the whole hiring journey.</p>
+            </div>
+            
+            <div class="vs-container">
+                <div class="vs-col generic">
+                    <div class="vs-title">Generic AI Coach</div>
+                    <div class="vs-item"><i class="fa-solid fa-xmark"></i> <div>Random, generic questions</div></div>
+                    <div class="vs-item"><i class="fa-solid fa-xmark"></i> <div>One-time feedback</div></div>
+                    <div class="vs-item"><i class="fa-solid fa-xmark"></i> <div>Only the candidate practises</div></div>
+                    <div class="vs-item"><i class="fa-solid fa-xmark"></i> <div>Session ends, data is lost</div></div>
+                    <div class="vs-item"><i class="fa-solid fa-xmark"></i> <div>No talent reuse</div></div>
+                </div>
+                
+                <div class="vs-badge-center">VS</div>
+
+                <div class="vs-col interviewpath">
+                    <div class="vs-title">InterviewPath</div>
+                    <div class="vs-item"><i class="fa-solid fa-check"></i> <div>Company-specific questions (RAG)</div></div>
+                    <div class="vs-item"><i class="fa-solid fa-check"></i> <div>Long-term candidate memory</div></div>
+                    <div class="vs-item"><i class="fa-solid fa-check"></i> <div>Complete HR + Candidate journey</div></div>
+                    <div class="vs-item"><i class="fa-solid fa-check"></i> <div>Candidate Passport grows over time</div></div>
+                    <div class="vs-item"><i class="fa-solid fa-check"></i> <div>Talent Pool for future roles</div></div>
+                </div>
+            </div>
+            
+            <div class="slide-number">09</div>
+        </div>
+
+        <!-- SLIDE 10: ENDING & AI Q&A (WITH FALLBACK) -->
+        <div class="slide center-layout" id="slide-10">
+            <h1 class="title-main" style="font-size: 70px; margin-bottom: 10px;">InterviewPath</h1>
+            <p style="font-size: 28px; font-weight: 600; color: var(--accent-blue); margin-bottom: 10px;">The AI Talent Memory Platform.</p>
+            <p style="font-size: 24px; font-weight: 600; color: var(--accent-green); margin-bottom: 40px;">Turn every application into a living Candidate Digital Twin.</p>
+            
+            <div class="qa-container interactive-element">
+                <div style="font-weight: 700; color: var(--text-muted); margin-bottom: 5px; text-transform: uppercase; letter-spacing: 1px; font-size: 14px;">Judge Q&A Session</div>
+                <div class="qa-input-wrapper">
+                    <input type="text" id="qa-input" class="qa-input" placeholder="Ask the AI Co-founder a question about our business...">
+                    <button id="btn-qa" class="ai-btn qa-btn">✨ Ask AI</button>
+                </div>
+                <div id="qa-loader" class="loader">
+                    <div class="spinner"></div> Thinking...
+                </div>
+                <div id="qa-result" class="qa-result-box"></div>
+            </div>
+
+            <div class="slide-number">10</div>
+        </div>
+
+    </div>
+
+    <script>
+        // --- GEMINI API INTEGRATION ---
+        const apiKey = ""; // Set by environment at runtime
+
+        async function callGeminiAPI(prompt, systemInstruction, useJsonFormat = false) {
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+            const payload = {
+                contents: [{ parts: [{ text: prompt }] }],
+                systemInstruction: { parts: [{ text: systemInstruction }] }
+            };
+
+            if (useJsonFormat) {
+                payload.generationConfig = {
+                    responseMimeType: "application/json",
+                    responseSchema: {
+                        type: "OBJECT",
+                        properties: {
+                            feedback: { type: "STRING" },
+                            polishedAnswer: { type: "STRING" }
+                        }
+                    }
+                };
+            }
+
+            try {
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                if (!response.ok) throw new Error(`API Error: ${response.status}`);
+                const data = await response.json();
+                const textContent = data.candidates[0]?.content?.parts[0]?.text;
+                return useJsonFormat ? JSON.parse(textContent) : textContent;
+            } catch (error) { return null; }
+        }
+
+        // Feature 1: Slide 8 - Polish Answer Demo (with Fallback)
+        document.getElementById('btn-polish').addEventListener('click', async () => {
+            const inputField = document.getElementById('demo-input');
+            const rawAnswer = inputField.value.trim();
+            const resultBox = document.getElementById('demo-result');
+            const loader = document.getElementById('demo-loader');
+            if (!rawAnswer) return;
+            
+            resultBox.style.display = 'none';
+            loader.style.display = 'flex';
+            document.getElementById('btn-polish').disabled = true;
+
+            const systemPrompt = "You are a Recruiter coach. Review answer and rewrite professionally using STAR method. Return JSON.";
+            const result = await callGeminiAPI(`Answer: ${rawAnswer}`, systemPrompt, true);
+            
+            document.getElementById('btn-polish').disabled = false;
+            loader.style.display = 'none';
+            resultBox.style.display = 'flex';
+
+            if (result) {
+                document.getElementById('demo-feedback-text').textContent = "💡 " + result.feedback;
+                document.getElementById('demo-polished-text').textContent = "✨ " + result.polishedAnswer;
+            } else {
+                document.getElementById('demo-feedback-text').textContent =
+                    "💡 Your answer is understandable, but it is too general. Use the STAR method to explain the situation, task, action, and result more clearly.";
+                document.getElementById('demo-polished-text').textContent =
+                    "✨ In my previous project, our team had a tight deadline before the final demo. I reviewed the backend API, tested each endpoint, and coordinated with the frontend member to fix integration issues. As a result, we completed the demo on time and delivered a stable feature.";
+            }
+        });
+
+        // Feature 2: Slide 10 - Judge Q&A Assistant (with Fallback)
+        document.getElementById('btn-qa').addEventListener('click', async () => {
+            const inputField = document.getElementById('qa-input');
+            const question = inputField.value.trim();
+            const resultBox = document.getElementById('qa-result');
+            const loader = document.getElementById('qa-loader');
+            if (!question) return;
+            
+            resultBox.style.display = 'none';
+            loader.style.display = 'flex';
+            document.getElementById('btn-qa').disabled = true;
+
+            const systemPrompt = "You are the AI Co-founder of InterviewPath. Answer judge concisely in 2 sentences.";
+            const answer = await callGeminiAPI(question, systemPrompt, false);
+            
+            document.getElementById('btn-qa').disabled = false;
+            loader.style.display = 'none';
+            resultBox.style.display = 'block';
+            
+            document.getElementById('qa-result').textContent = answer || 
+                "InterviewPath is different because it does not stop at interview practice. It creates an AI Candidate Passport that stores candidate readiness, feedback, and hiring history across the full recruitment journey.";
+        });
+
+        // --- SLIDE NAVIGATION LOGIC ---
+        let currentSlide = 1;
+        const totalSlides = 10;
+
+        function updateSlides() {
+            document.querySelectorAll('.slide').forEach((slide, index) => {
+                slide.classList.toggle('active', index + 1 === currentSlide);
+            });
+        }
+
+        function nextSlide() { if (currentSlide < totalSlides) { currentSlide++; updateSlides(); } }
+        function prevSlide() { if (currentSlide > 1) { currentSlide--; updateSlides(); } }
+
+        document.addEventListener('keydown', (e) => {
+            if (e.target.tagName === 'TEXTAREA' || e.target.tagName === 'INPUT') return; 
+            if (e.key === 'ArrowRight' || e.key === ' ') nextSlide();
+            if (e.key === 'ArrowLeft') prevSlide();
+        });
+
+        document.getElementById('deck-container').addEventListener('click', function(e) {
+            if (e.target.closest('.interactive-element')) return;
+            const rect = this.getBoundingClientRect();
+            if (e.clientX - rect.left > rect.width / 2) nextSlide(); else prevSlide();
+        });
+    </script>
+</body>
+</html>

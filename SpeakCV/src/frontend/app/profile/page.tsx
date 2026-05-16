@@ -1,0 +1,698 @@
+/*
+ * Copyright (c) 2026 SpeakCV Team
+ * This project is licensed under the MIT License.
+ * See the LICENSE file in the project root for more information.
+ */
+
+"use client";
+import { useEffect, useState } from "react";
+import {
+  getMyProfile,
+  updateProfileInfo,
+  addExperience,
+  deleteExperience,
+  getHistory,
+  extractCVText,
+  parseMasterCV,
+} from "@/services/api";
+import { ReportModal } from "@/components/Modals";
+import {
+  Save,
+  Plus,
+  Trash2,
+  Briefcase,
+  User,
+  Loader2,
+  Link as LinkIcon,
+  Mail,
+  ArrowLeft,
+  Camera,
+} from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useAuth } from "@/context/AuthContext";
+
+export default function ProfilePage() {
+  const { user } = useAuth();
+  const router = useRouter();
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [cvInputMode, setCvInputMode] = useState<"upload" | "paste">("upload");
+  const [extractingCv, setExtractingCv] = useState(false);
+  const [parsingCv, setParsingCv] = useState(false);
+  const [masterCvParseError, setMasterCvParseError] = useState<string | null>(null);
+
+  // General data
+  const [info, setInfo] = useState<any>({});
+  const [exps, setExps] = useState<any[]>([]);
+  const [histories, setHistories] = useState<any[]>([]);
+  const [showReport, setShowReport] = useState(false);
+  const [selectedReport, setSelectedReport] = useState<any>(null);
+
+  // Add experience form
+  const [newExp, setNewExp] = useState({
+    company_name: "",
+    position: "",
+    start_date: "",
+    description: "",
+  });
+
+  // Load data when page opens
+  useEffect(() => {
+    const token = sessionStorage.getItem("token");
+    if (!token) {
+      router.push("/login");
+      return;
+    }
+
+    Promise.all([getMyProfile(), getHistory()])
+      .then(([data, historyData]) => {
+        setInfo({ ...data.info, full_name: data.full_name, email: data.email });
+        setExps(data.experiences || []);
+        setHistories(historyData.histories || []);
+      })
+      .catch(() => alert("Lỗi tải dữ liệu!"))
+      .finally(() => setLoading(false));
+  }, [router]);
+
+  // COMPRESS AND SAVE AVATAR IMAGE
+  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        // Compress image to max 300x300 for lightweight database storage
+        const canvas = document.createElement("canvas");
+        const MAX_SIZE = 300;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > MAX_SIZE) {
+            height *= MAX_SIZE / width;
+            width = MAX_SIZE;
+          }
+        } else {
+          if (height > MAX_SIZE) {
+            width *= MAX_SIZE / height;
+            height = MAX_SIZE;
+          }
+        }
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        ctx?.drawImage(img, 0, 0, width, height);
+
+        // Convert image to Base64 string
+        const base64Url = canvas.toDataURL("image/jpeg", 0.8);
+        setInfo({ ...info, avatar: base64Url });
+      };
+      img.src = event.target?.result as string;
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleSaveInfo = async () => {
+    setSaving(true);
+    try {
+      await updateProfileInfo(info);
+      if (info.full_name) sessionStorage.setItem("userName", info.full_name);
+      alert("🎉 Đã lưu thông tin thành công!");
+      window.location.reload();
+    } catch {
+      alert("❌ Có lỗi xảy ra khi lưu thông tin!");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleParseMasterCvText = async () => {
+    const rawText = (info.master_cv_text || "").trim();
+    if (!rawText) return;
+
+    setParsingCv(true);
+    setMasterCvParseError(null);
+    try {
+      const parsed = await parseMasterCV(rawText);
+      setInfo((prev: any) => ({
+        ...prev,
+        master_cv_structured: parsed.cv_data || null,
+      }));
+    } catch {
+      setInfo((prev: any) => ({
+        ...prev,
+        master_cv_structured: null,
+      }));
+      setMasterCvParseError(
+        "Không thể chuẩn hóa CV này thành dữ liệu có cấu trúc.",
+      );
+    } finally {
+      setParsingCv(false);
+    }
+  };
+
+  const handleMasterCvUpload = async (
+    e: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setExtractingCv(true);
+    setMasterCvParseError(null);
+    try {
+      const raw = await extractCVText(file);
+      const rawText = raw.extracted_text || "";
+
+      setInfo((prev: any) => ({
+        ...prev,
+        master_cv_text: rawText,
+      }));
+
+      if (!rawText.trim()) {
+        setInfo((prev: any) => ({
+          ...prev,
+          master_cv_structured: null,
+        }));
+        setMasterCvParseError("Không tìm thấy nội dung CV để chuẩn hóa.");
+        return;
+      }
+
+      setParsingCv(true);
+      const parsed = await parseMasterCV(rawText);
+      setInfo((prev: any) => ({
+        ...prev,
+        master_cv_text: rawText,
+        master_cv_structured: parsed.cv_data || null,
+      }));
+    } catch {
+      setInfo((prev: any) => ({
+        ...prev,
+        master_cv_structured: null,
+      }));
+      setMasterCvParseError(
+        "Không thể chuẩn hóa CV này thành dữ liệu có cấu trúc.",
+      );
+    } finally {
+      setExtractingCv(false);
+      setParsingCv(false);
+      e.target.value = "";
+    }
+  };
+
+  // Add experience handler
+  const handleAddExp = async () => {
+    if (!newExp.company_name || !newExp.position)
+      return alert("Vui lòng điền đủ Tên công ty và Vị trí!");
+    try {
+      await addExperience(newExp);
+      const data = await getMyProfile();
+      setExps(data.experiences);
+      setNewExp({
+        company_name: "",
+        position: "",
+        start_date: "",
+        description: "",
+      });
+    } catch {
+      alert("Lỗi khi thêm kinh nghiệm!");
+    }
+  };
+
+  // Delete experience handler
+  const handleDeleteExp = async (id: number) => {
+    if (!confirm("Bạn có chắc chắn muốn xóa kinh nghiệm này?")) return;
+    try {
+      await deleteExperience(id);
+      setExps(exps.filter((e) => e.id !== id));
+    } catch {
+      alert("Lỗi khi xóa!");
+    }
+  };
+
+  if (loading)
+    return (
+      <div className="h-screen flex items-center justify-center bg-theme-secondary text-theme-text gap-3">
+        <Loader2 className="animate-spin text-blue-500" size={32} /> Đang tải dữ
+        liệu...
+      </div>
+    );
+
+  return (
+    <div className="min-h-screen bg-theme-secondary text-theme-text pt-10 pb-10 px-4">
+      <div className="max-w-4xl mx-auto space-y-8">
+        {/* --- HEADER WITH EXIT BUTTON --- */}
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-end border-b border-theme-border pb-4 gap-4">
+          <div>
+            <h1 className="text-3xl font-bold">Hồ sơ của tôi</h1>
+            <p className="text-theme-text-secondary mt-2">
+              Dữ liệu này sẽ được dùng để tự động tạo CV cho bạn.
+            </p>
+          </div>
+
+          {/* BACK TO HOME BUTTON */}
+          <button
+            onClick={() => router.push("/interview")}
+            className="flex items-center gap-2 px-4 py-2 bg-theme-surface hover:bg-theme-surface text-slate-300 hover:text-theme-text rounded-xl transition-all font-medium"
+          >
+            <ArrowLeft size={18} /> Quay lại Trang chủ
+          </button>
+        </div>
+
+        {/* --- SECTION 1: PERSONAL INFO --- */}
+        <div className="bg-theme-primary p-6 md:p-8 rounded-3xl border border-theme-border shadow-xl">
+          {/* AVATAR SECTION */}
+          <div className="flex flex-col md:flex-row items-center gap-6 mb-8 pb-8 border-b border-theme-border">
+            <div className="relative w-32 h-32 rounded-full border-4 border-theme-border overflow-hidden bg-theme-surface group cursor-pointer flex-shrink-0 shadow-lg">
+              {info.avatar ? (
+                <img
+                  src={info.avatar}
+                  alt="Avatar"
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <User className="w-full h-full p-6 text-theme-muted" />
+              )}
+              {/* Overlay on hover */}
+              <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                <Camera className="text-theme-text mb-1" size={24} />
+                <span className="text-xs font-bold text-theme-text">Đổi ảnh</span>
+              </div>
+              {/* Hidden file input for avatar upload */}
+              <input
+                type="file"
+                accept="image/*"
+                className="absolute inset-0 opacity-0 cursor-pointer"
+                onChange={handleAvatarChange}
+              />
+            </div>
+            <div className="text-center md:text-left">
+              <h2 className="text-2xl font-bold text-theme-text">
+                {info.full_name || "Chưa cập nhật tên"}
+              </h2>
+              <p className="text-blue-400 mt-1">{info.email}</p>
+              <p className="text-theme-text-secondary text-sm mt-2">
+                Định dạng JPEG, PNG. Tối đa 2MB.
+              </p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Existing input fields */}
+            <div>
+              <label className="text-theme-text-secondary text-sm font-bold uppercase">
+                Họ và tên
+              </label>
+              <input
+                className="w-full bg-theme-secondary border border-theme-border focus:border-blue-600 outline-none p-3 rounded-xl mt-2"
+                value={info.full_name || ""}
+                onChange={(e) =>
+                  setInfo({ ...info, full_name: e.target.value })
+                }
+              />
+            </div>
+            <div>
+              <label className="text-theme-text-secondary text-sm font-bold uppercase flex items-center gap-1">
+                Email{" "}
+                <span className="text-red-400/80 text-xs lowercase font-normal">
+                  (Không thể thay đổi)
+                </span>
+              </label>
+              <div className="relative mt-2">
+                <input
+                  disabled
+                  className="w-full bg-theme-surface/50 border border-theme-border/50 text-theme-muted p-3 pl-10 rounded-xl cursor-not-allowed"
+                  value={info.email || ""}
+                />
+                <Mail
+                  className="absolute left-3 top-3.5 text-theme-muted"
+                  size={18}
+                />
+              </div>
+            </div>
+            <div>
+              <label className="text-theme-text-secondary text-sm font-bold uppercase">
+                Số điện thoại
+              </label>
+              <input
+                className="w-full bg-theme-secondary border border-theme-border focus:border-blue-600 outline-none p-3 rounded-xl mt-2"
+                value={info.phone || ""}
+                onChange={(e) => setInfo({ ...info, phone: e.target.value })}
+              />
+            </div>
+            <div>
+              <label className="text-theme-text-secondary text-sm font-bold uppercase">
+                Địa chỉ
+              </label>
+              <input
+                className="w-full bg-theme-secondary border border-theme-border focus:border-blue-600 outline-none p-3 rounded-xl mt-2"
+                value={info.address || ""}
+                onChange={(e) => setInfo({ ...info, address: e.target.value })}
+              />
+            </div>
+            <div>
+              <label className="text-theme-text-secondary text-sm font-bold uppercase flex items-center gap-1">
+                <LinkIcon size={14} /> LinkedIn URL
+              </label>
+              <input
+                className="w-full bg-theme-secondary border border-theme-border focus:border-blue-600 outline-none p-3 rounded-xl mt-2"
+                value={info.linkedin || ""}
+                onChange={(e) => setInfo({ ...info, linkedin: e.target.value })}
+              />
+            </div>
+            <div>
+              <label className="text-theme-text-secondary text-sm font-bold uppercase flex items-center gap-1">
+                <LinkIcon size={14} /> Github URL
+              </label>
+              <input
+                className="w-full bg-theme-secondary border border-theme-border focus:border-blue-600 outline-none p-3 rounded-xl mt-2"
+                value={info.github || ""}
+                onChange={(e) => setInfo({ ...info, github: e.target.value })}
+              />
+            </div>
+            <div className="md:col-span-2">
+              <label className="text-theme-text-secondary text-sm font-bold uppercase">
+                Giới thiệu bản thân (Summary)
+              </label>
+              <textarea
+                className="w-full bg-theme-secondary border border-theme-border focus:border-blue-600 outline-none p-3 rounded-xl mt-2 h-28 custom-scrollbar"
+                value={info.summary || ""}
+                onChange={(e) => setInfo({ ...info, summary: e.target.value })}
+              />
+            </div>
+            <div className="md:col-span-2">
+              <label className="text-theme-text-secondary text-sm font-bold uppercase">
+                Kỹ năng cốt lõi
+              </label>
+              <input
+                className="w-full bg-theme-secondary border border-theme-border focus:border-blue-600 outline-none p-3 rounded-xl mt-2"
+                value={info.skills || ""}
+                onChange={(e) => setInfo({ ...info, skills: e.target.value })}
+              />
+            </div>
+          </div>
+
+          <div className="mt-8 flex justify-end">
+            <button
+              onClick={handleSaveInfo}
+              disabled={saving}
+              className="bg-blue-600 hover:bg-blue-700 px-8 py-3 rounded-xl font-bold flex gap-2 items-center transition-all active:scale-95"
+            >
+              {saving ? (
+                <Loader2 className="animate-spin" size={20} />
+              ) : (
+                <Save size={20} />
+              )}{" "}
+              {saving ? "Đang lưu..." : "Lưu Hồ Sơ"}
+            </button>
+          </div>
+        </div>
+
+        {/* --- SECTION 2: MASTER CV --- */}
+        <div className="bg-theme-primary p-6 md:p-8 rounded-3xl border border-theme-border shadow-xl">
+          <div className="flex items-center justify-between gap-4 mb-6">
+            <div>
+              <h2 className="text-xl font-bold text-white">Master CV</h2>
+              <p className="text-theme-text-secondary text-sm mt-2">
+                CV này sẽ được dùng làm nguồn context mặc định cho interview.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex gap-3 mb-4">
+            <button
+              type="button"
+              onClick={() => setCvInputMode("upload")}
+              className={`px-4 py-2 rounded-xl font-bold transition-colors ${
+                cvInputMode === "upload"
+                  ? "bg-blue-600 text-white"
+                  : "bg-theme-secondary text-theme-text-secondary"
+              }`}
+            >
+              Upload file
+            </button>
+            <button
+              type="button"
+              onClick={() => setCvInputMode("paste")}
+              className={`px-4 py-2 rounded-xl font-bold transition-colors ${
+                cvInputMode === "paste"
+                  ? "bg-blue-600 text-white"
+                  : "bg-theme-secondary text-theme-text-secondary"
+              }`}
+            >
+              Paste text
+            </button>
+          </div>
+
+          {cvInputMode === "upload" && (
+            <div className="mb-4">
+              <input
+                type="file"
+                accept=".pdf,.doc,.docx"
+                onChange={handleMasterCvUpload}
+                disabled={extractingCv}
+                className="block w-full text-sm text-theme-text-secondary file:mr-4 file:rounded-xl file:border-0 file:bg-blue-600 file:px-4 file:py-2 file:font-bold file:text-white hover:file:bg-blue-700 disabled:opacity-60"
+              />
+              <p className="text-xs text-theme-text-secondary mt-2">
+                PDF hoặc DOCX. Nội dung sẽ được trích xuất thành text trước khi lưu.
+              </p>
+            </div>
+          )}
+
+          <textarea
+            className="w-full bg-theme-secondary border border-theme-border focus:border-blue-600 outline-none p-3 rounded-xl mt-2 h-48 custom-scrollbar"
+            value={info.master_cv_text || ""}
+            onChange={(e) =>
+              setInfo({
+                ...info,
+                master_cv_text: e.target.value,
+                master_cv_structured: null,
+              })
+            }
+            placeholder="Dán CV text vào đây hoặc upload file để tự động trích xuất..."
+          />
+
+          {cvInputMode === "paste" && (
+            <div className="mt-4 flex justify-end">
+              <button
+                type="button"
+                onClick={handleParseMasterCvText}
+                disabled={parsingCv || !info.master_cv_text?.trim()}
+                className="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-900/40 disabled:text-slate-400 px-4 py-2 rounded-xl font-bold flex items-center gap-2 transition-all"
+              >
+                {parsingCv ? (
+                  <Loader2 className="animate-spin" size={18} />
+                ) : (
+                  <Save size={18} />
+                )}
+                {parsingCv ? "Đang chuẩn hóa CV..." : "Phân tích CV đã dán"}
+              </button>
+            </div>
+          )}
+
+          {masterCvParseError && (
+            <div className="mt-4 rounded-2xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-300">
+              {masterCvParseError}
+            </div>
+          )}
+
+          {info.master_cv_structured && (
+            <div className="mt-4 rounded-2xl border border-theme-border bg-theme-secondary/50 p-4 space-y-2">
+              <div className="text-sm font-bold text-white">
+                Structured CV Summary
+              </div>
+              <div className="text-sm text-theme-text-secondary">
+                {info.master_cv_structured.personal_info?.name ||
+                  "Unnamed profile"}
+                {info.master_cv_structured.personal_info?.title
+                  ? ` — ${info.master_cv_structured.personal_info.title}`
+                  : ""}
+              </div>
+              <div className="text-sm text-theme-text-secondary">
+                Top skills: {(info.master_cv_structured.skills || [])
+                  .slice(0, 5)
+                  .join(", ") || "None detected"}
+              </div>
+              <div className="text-sm text-theme-text-secondary">
+                Experience items: {(info.master_cv_structured.experience || []).length} · Projects: {(info.master_cv_structured.projects || []).length}
+              </div>
+            </div>
+          )}
+
+          <div className="mt-3 text-sm text-theme-text-secondary">
+            {extractingCv
+              ? "Đang trích xuất nội dung CV..."
+              : parsingCv
+                ? "Đang chuẩn hóa CV thành dữ liệu có cấu trúc..."
+                : info.master_cv_structured
+                  ? "Master CV đã được chuẩn hóa. Nhấn Lưu Hồ Sơ để lưu cả bản raw và structured."
+                  : info.master_cv_text
+                    ? "Đã có raw CV text. Hãy phân tích để tạo structured CV trước khi lưu."
+                    : "Chưa có Master CV nào được lưu."}
+          </div>
+        </div>
+
+        {/* --- SECTION 3: WORK EXPERIENCE --- */}
+        <div className="bg-theme-primary p-6 md:p-8 rounded-3xl border border-theme-border shadow-xl">
+          <h2 className="text-xl font-bold mb-6 flex items-center gap-2 text-yellow-400">
+            <Briefcase /> Kinh nghiệm làm việc
+          </h2>
+
+          <div className="space-y-4 mb-8">
+            {exps.length === 0 && (
+              <div className="p-8 border-2 border-dashed border-theme-border rounded-2xl text-center text-theme-muted">
+                Bạn chưa cập nhật kinh nghiệm làm việc nào.
+              </div>
+            )}
+            {exps.map((exp: any) => (
+              <div
+                key={exp.id}
+                className="bg-theme-secondary p-5 rounded-2xl border border-theme-border flex justify-between items-start group hover:border-theme-border transition-colors"
+              >
+                <div>
+                  <h3 className="font-bold text-lg text-theme-text">
+                    {exp.position}
+                  </h3>
+                  <p className="text-blue-400 font-medium">
+                    {exp.company_name}
+                  </p>
+                  <p className="text-xs text-theme-muted mt-1 uppercase font-bold tracking-wider">
+                    {exp.start_date} tới {exp.end_date || "Hiện tại"}
+                  </p>
+                  <p className="text-sm text-slate-300 mt-3 whitespace-pre-line leading-relaxed">
+                    {exp.description}
+                  </p>
+                </div>
+                <button
+                  onClick={() => handleDeleteExp(exp.id)}
+                  className="text-theme-muted hover:text-red-500 p-2 hover:bg-red-500/10 rounded-lg transition-colors"
+                  title="Xóa kinh nghiệm này"
+                >
+                  <Trash2 size={20} />
+                </button>
+              </div>
+            ))}
+          </div>
+
+          <div className="border-t border-theme-border pt-8 mt-8">
+            <h3 className="font-bold mb-4 text-sm uppercase text-theme-muted">
+              Thêm kinh nghiệm mới
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+              <input
+                className="bg-theme-secondary border border-theme-border focus:border-yellow-500 outline-none p-3 rounded-xl transition-colors"
+                placeholder="Tên công ty"
+                value={newExp.company_name}
+                onChange={(e) =>
+                  setNewExp({ ...newExp, company_name: e.target.value })
+                }
+              />
+              <input
+                className="bg-theme-secondary border border-theme-border focus:border-yellow-500 outline-none p-3 rounded-xl transition-colors"
+                placeholder="Vị trí / Chức danh"
+                value={newExp.position}
+                onChange={(e) =>
+                  setNewExp({ ...newExp, position: e.target.value })
+                }
+              />
+              <input
+                type="date"
+                className="bg-theme-secondary border border-theme-border focus:border-yellow-500 outline-none p-3 rounded-xl transition-colors text-theme-text-secondary"
+                value={newExp.start_date}
+                onChange={(e) =>
+                  setNewExp({ ...newExp, start_date: e.target.value })
+                }
+              />
+            </div>
+            <textarea
+              className="w-full bg-theme-secondary border border-theme-border focus:border-yellow-500 outline-none p-3 rounded-xl mb-4 h-24 custom-scrollbar transition-colors"
+              placeholder="Mô tả công việc và thành tựu của bạn..."
+              value={newExp.description}
+              onChange={(e) =>
+                setNewExp({ ...newExp, description: e.target.value })
+              }
+            />
+
+            <button
+              onClick={handleAddExp}
+              className="w-full py-4 border-2 border-dashed border-theme-border hover:border-yellow-500 hover:text-yellow-400 hover:bg-yellow-500/5 rounded-xl flex justify-center items-center gap-2 font-bold transition-all"
+            >
+              <Plus size={20} /> Thêm Kinh Nghiệm Này
+            </button>
+          </div>
+        </div>
+
+        {/* --- SECTION 3: INTERVIEW HISTORY --- */}
+        <div className="bg-theme-primary p-6 md:p-8 rounded-3xl border border-theme-border shadow-xl">
+          <h2 className="text-xl font-bold mb-6 flex items-center gap-2 text-emerald-400">
+            <span className="text-xl">📊</span> Lịch sử phỏng vấn
+          </h2>
+
+          <div className="space-y-4">
+            {histories.length === 0 ? (
+              <div className="p-8 border-2 border-dashed border-theme-border rounded-2xl text-center text-theme-muted">
+                Chưa có bài phỏng vấn nào. Hãy bắt đầu ngay!
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {histories.map((h: any) => (
+                  <div
+                    key={h.id}
+                    onClick={() => {
+                      setSelectedReport(h);
+                      setShowReport(true);
+                    }}
+                    className="bg-theme-secondary p-5 rounded-2xl border border-theme-border flex justify-between items-center group hover:border-blue-500/50 hover:bg-theme-surface transition-all cursor-pointer shadow-sm relative overflow-hidden"
+                  >
+                    <div
+                      className="absolute top-0 left-0 w-1 h-full"
+                      style={{
+                        backgroundColor:
+                          h.score >= 8
+                            ? "#10b981"
+                            : h.score >= 5
+                              ? "#eab308"
+                              : "#ef4444",
+                      }}
+                    ></div>
+                    <div className="pl-3">
+                      <h3 className="font-bold text-theme-text mb-1 group-hover:text-blue-400 transition-colors">
+                        {h.title || h.position || "Phỏng vấn tự do"}
+                      </h3>
+                      <p className="text-xs text-theme-muted flex items-center gap-1">
+                        {new Date(h.created_at).toLocaleDateString("vi-VN", {
+                          day: "2-digit",
+                          month: "2-digit",
+                          year: "numeric",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </p>
+                    </div>
+                    <div
+                      className={`text-xl font-black px-3 py-1.5 rounded-lg border ${h.score >= 8 ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" : h.score >= 5 ? "bg-yellow-500/10 text-yellow-400 border-yellow-500/20" : "bg-red-500/10 text-red-400 border-red-500/20"}`}
+                    >
+                      {h.score}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <ReportModal
+        show={showReport}
+        onClose={() => setShowReport(false)}
+        result={selectedReport}
+        hasHistory={selectedReport?.details?.length > 0}
+        onRetry={() => {
+          setShowReport(false);
+          router.push("/interview");
+        }}
+      />
+    </div>
+  );
+}

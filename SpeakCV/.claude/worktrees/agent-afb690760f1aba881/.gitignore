@@ -1,0 +1,80 @@
+# ===== Python =====
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+venv/
+.venv/
+env/
+.env/
+bin/
+lib/
+include/
+*.log
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+
+# ===== Node.js / Next.js =====
+node_modules/
+.next/
+out/
+.pnp
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
+coverage/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+*.tsbuildinfo
+next-env.d.ts
+
+# ===== Environment / Secrets =====
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+!.env.example
+!src/backend/.env.example
+*.pem
+*.key
+*.cert
+
+# ===== Docker =====
+db_data/
+mysql_data/
+postgres_data/
+
+# ===== IDE / Editors =====
+.vscode/
+!.vscode/extensions.json
+.idea/
+*.swp
+*.swo
+*~
+.project
+.settings/
+.classpath
+
+# ===== OS =====
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# ===== Misc =====
+.omc/
+.agent/
+temp_*
+sample_cvs/DejaVuSans*.ttf
