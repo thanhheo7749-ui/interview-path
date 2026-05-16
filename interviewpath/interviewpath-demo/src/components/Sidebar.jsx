@@ -65,7 +65,7 @@ function Sidebar() {
         <button
           type="button"
           onClick={() =>
-            window.open("http://localhost:3000/interview", "_blank")
+            window.open("http://localhost:3000/login", "_blank")
           }
           className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-3 py-3 text-sm font-bold text-white shadow-card transition hover:bg-blue-700"
         >
