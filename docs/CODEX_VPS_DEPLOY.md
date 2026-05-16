@@ -4,11 +4,17 @@ Use this file on the VPS after cloning the private GitHub repository.
 
 ## Target Routing
 
-The production stack is configured for one root domain plus two subdomains:
+The production stack runs in direct-port mode by default, so it can be copied to a VPS and started without DNS first:
 
-- `https://PRIMARY_DOMAIN` serves `interviewpath-demo` as the main UI.
-- `https://SPEAKCV_DOMAIN` serves the SpeakCV Next.js frontend.
-- `https://API_DOMAIN` serves the SpeakCV FastAPI backend.
+- `http://VPS_PUBLIC_IP:5173` serves `interviewpath-demo` as the main UI.
+- `http://VPS_PUBLIC_IP:3000` serves the SpeakCV Next.js frontend.
+- `http://VPS_PUBLIC_IP:8000/docs` serves the SpeakCV FastAPI docs.
+
+Optional HTTPS/domain mode is still available by setting `ENABLE_PROXY=1` and filling these values:
+
+- `https://PRIMARY_DOMAIN` serves `interviewpath-demo`.
+- `https://SPEAKCV_DOMAIN` serves the SpeakCV frontend.
+- `https://API_DOMAIN` serves the FastAPI backend.
 
 Recommended DNS records:
 
@@ -22,9 +28,10 @@ If the DNS provider uses `@` for the root domain, point it to the VPS public IP.
 
 ## Files Used
 
-- `.env.production` - production domains, database URL, JWT/admin settings.
+- `.env` - root-level VPS env file with build/runtime keys.
 - `docker-compose.prod.yml` - production Docker Compose stack.
 - `deploy/Caddyfile` - HTTPS reverse proxy routing.
+- `scripts/sync-vps-env.sh` - copies usable keys from `SpeakCV/.env` into `.env`.
 - `scripts/vps-deploy.sh` - validation plus build/start command.
 - `interviewpath/interviewpath-demo/Dockerfile.prod` - static production image for the main UI.
 
@@ -47,39 +54,40 @@ cd interview-path
 
 ## Configure Production Env
 
-Edit `.env.production` and replace all placeholder values:
+The root `.env` is generated with the needed keys:
 
 ```bash
-nano .env.production
+bash scripts/sync-vps-env.sh
 ```
 
-Minimum required changes:
+By default it sets:
 
 ```txt
+ENABLE_PROXY=0
+PUBLIC_HOST=auto
+INTERVIEWPATH_PORT=5173
+SPEAKCV_FRONTEND_PORT=3000
+SPEAKCV_BACKEND_PORT=8000
+```
+
+`PUBLIC_HOST=auto` lets `scripts/vps-deploy.sh` detect the VPS public IP and generate the build URLs before Docker Compose runs.
+
+To use domain/HTTPS mode, edit `.env`:
+
+```txt
+ENABLE_PROXY=1
 PRIMARY_DOMAIN=yourdomain.com
 SPEAKCV_DOMAIN=speakcv.yourdomain.com
 API_DOMAIN=api.yourdomain.com
-
-VITE_SPEAKCV_URL=https://speakcv.yourdomain.com
-NEXT_PUBLIC_API_URL=https://api.yourdomain.com
-CORS_ORIGINS=https://yourdomain.com,https://speakcv.yourdomain.com
-VNPAY_RETURN_URL=https://speakcv.yourdomain.com/upgrade/success
-
-MYSQL_ROOT_PASSWORD=<strong-mysql-password>
-DATABASE_URL=mysql+pymysql://root:<strong-mysql-password>@db:3306/speakcv
-SECRET_KEY=<strong-random-secret>
-ADMIN_PASSWORD=<strong-admin-password>
 ```
 
-Keep `DATABASE_URL` and `MYSQL_ROOT_PASSWORD` in sync.
-
-If Google login is used, set:
+If Google login is used, set this before deploy:
 
 ```txt
 NEXT_PUBLIC_GOOGLE_CLIENT_ID=<google-client-id>
 ```
 
-The production compose file also loads `SpeakCV/.env`, so existing AI provider keys from the private repository are still passed to the backend.
+The production compose file reads `.env` only. It no longer depends on `SpeakCV/.env` being present on the VPS.
 
 ## Deploy
 
@@ -90,6 +98,18 @@ bash scripts/vps-deploy.sh
 ```
 
 The script validates required values, renders the Compose config, builds images, starts containers, and prints the service URLs.
+
+Build without starting containers:
+
+```bash
+bash scripts/vps-deploy.sh build
+```
+
+Validate Compose only:
+
+```bash
+bash scripts/vps-deploy.sh config
+```
 
 Equivalent Make command:
 
@@ -102,21 +122,21 @@ make prod-deploy
 Check containers:
 
 ```bash
-docker compose --env-file .env.production -f docker-compose.prod.yml ps
+docker compose --env-file .env -f docker-compose.prod.yml ps
 ```
 
 Open:
 
 ```txt
-https://yourdomain.com
-https://speakcv.yourdomain.com
-https://api.yourdomain.com/docs
+http://VPS_PUBLIC_IP:5173
+http://VPS_PUBLIC_IP:3000
+http://VPS_PUBLIC_IP:8000/docs
 ```
 
 From the InterviewPath sidebar, the Candidate Interview Link should open:
 
 ```txt
-https://speakcv.yourdomain.com/login
+http://VPS_PUBLIC_IP:3000/login
 ```
 
 ## Update Deployment
@@ -144,9 +164,8 @@ make prod-down
 
 If asked to deploy autonomously:
 
-1. Read `.env.production`.
-2. Replace `example.com` and `change-this-*` placeholders with the real VPS/domain values provided by the user.
-3. Confirm DNS records point to the VPS public IP.
-4. Run `bash scripts/vps-deploy.sh`.
-5. Verify with `docker compose --env-file .env.production -f docker-compose.prod.yml ps`.
-6. Report the three URLs and any failing container logs.
+1. Read `.env`.
+2. Run `bash scripts/sync-vps-env.sh` if keys need to be refreshed from `SpeakCV/.env`.
+3. Run `bash scripts/vps-deploy.sh`.
+4. Verify with `docker compose --env-file .omx/generated/vps.env -f docker-compose.prod.yml ps`.
+5. Report the three URLs and any failing container logs.

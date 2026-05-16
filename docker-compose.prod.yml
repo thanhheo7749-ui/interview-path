@@ -4,6 +4,8 @@ services:
   caddy:
     image: caddy:2-alpine
     container_name: interviewpath_caddy
+    profiles:
+      - proxy
     restart: unless-stopped
     depends_on:
       - interviewpath-demo
@@ -29,6 +31,8 @@ services:
         VITE_SPEAKCV_URL: ${VITE_SPEAKCV_URL}
     container_name: interviewpath_demo
     restart: unless-stopped
+    ports:
+      - "${INTERVIEWPATH_PORT:-5173}:80"
     expose:
       - "80"
 
@@ -44,6 +48,8 @@ services:
       NODE_ENV: production
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
       NEXT_PUBLIC_GOOGLE_CLIENT_ID: ${NEXT_PUBLIC_GOOGLE_CLIENT_ID:-}
+    ports:
+      - "${SPEAKCV_FRONTEND_PORT:-3000}:3000"
     expose:
       - "3000"
     depends_on:
@@ -57,8 +63,9 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     env_file:
-      - ./SpeakCV/.env
-      - ./.env.production
+      - ./.env
+    ports:
+      - "${SPEAKCV_BACKEND_PORT:-8000}:8000"
     expose:
       - "8000"
     depends_on:
