@@ -251,6 +251,14 @@ export const getHistory = async () => {
     return res.json();
 };
 
+export const getHistoryDetail = async (id: number) => {
+    const token = sessionStorage.getItem("token");
+    const res = await apiRequest(`${API_URL}/history/${id}`, {
+        headers: { Authorization: `Bearer ${token}` },
+    });
+    return res.json();
+};
+
 export const renameInterview = async (id: number, title: string) => {
     const token = sessionStorage.getItem("token");
     const res = await fetch(`${API_URL}/history/${id}`, {

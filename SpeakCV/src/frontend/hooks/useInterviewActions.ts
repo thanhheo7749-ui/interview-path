@@ -13,6 +13,7 @@ import {
   getMyProfile,
   getAdminDashboard,
   getHistory,
+  getHistoryDetail,
   updateInterviewConfig,
 } from "@/services/api";
 
@@ -284,30 +285,51 @@ export function useInterviewActions(params: UseInterviewActionsParams) {
     }
   };
 
-  const handleLoadOldInterview = (h: any) => {
-    if (!h.details || h.details.length === 0) return;
+  const normalizeHistoryReport = (h: any) => {
+    const rawDetails = h.details ?? h.report?.details ?? [];
+    const detailsContainer =
+      rawDetails && typeof rawDetails === "object" && !Array.isArray(rawDetails)
+        ? rawDetails
+        : null;
+
+    return {
+      score: h.score ?? h.report?.score,
+      overall_feedback: h.overall_feedback ?? h.report?.overall_feedback,
+      details: rawDetails,
+      inferred_position: h.position || h.title || h.report?.inferred_position || "Free",
+      final_scores:
+        h.final_scores || h.report?.final_scores || detailsContainer?.final_scores,
+      top_skills_to_improve:
+        h.top_skills_to_improve ||
+        h.report?.top_skills_to_improve ||
+        detailsContainer?.top_skills_to_improve,
+      strong_topics:
+        h.strong_topics || h.report?.strong_topics || detailsContainer?.strong_topics,
+      weak_topics:
+        h.weak_topics || h.report?.weak_topics || detailsContainer?.weak_topics,
+      dimension_scores:
+        h.dimension_scores ||
+        h.report?.dimension_scores ||
+        detailsContainer?.dimension_scores,
+      learning_plan:
+        h.learning_plan || h.report?.learning_plan || detailsContainer?.learning_plan,
+    };
+  };
+
+  const handleLoadOldInterview = async (h: any) => {
     setCurrentHistoryId(h.id);
-    setSavedReport({
-      score: h.score,
-      overall_feedback: h.overall_feedback,
-      details: h.details || [],
-      inferred_position: h.position || h.title || "Free",
-      final_scores: h.final_scores,
-      top_skills_to_improve: h.top_skills_to_improve,
-      strong_topics: h.strong_topics,
-      weak_topics: h.weak_topics,
-    });
-    setReportData({
-      score: h.score,
-      overall_feedback: h.overall_feedback,
-      details: h.details || [],
-      inferred_position: h.position || h.title || "Free",
-      final_scores: h.final_scores,
-      top_skills_to_improve: h.top_skills_to_improve,
-      strong_topics: h.strong_topics,
-      weak_topics: h.weak_topics,
-    });
-    toggleModal("report", true);
+    try {
+      const detail = await getHistoryDetail(h.id);
+      const normalizedReport = normalizeHistoryReport(detail);
+      setSavedReport(normalizedReport);
+      setReportData(normalizedReport);
+      toggleModal("report", true);
+    } catch {
+      const normalizedReport = normalizeHistoryReport(h);
+      setSavedReport(normalizedReport);
+      setReportData(normalizedReport);
+      toggleModal("report", true);
+    }
   };
 
   const handleConfirmResume = async (resumeSettings: any) => {
@@ -343,16 +365,7 @@ export function useInterviewActions(params: UseInterviewActionsParams) {
     setHasStarted(true);
     setCurrentHistoryId(h.id);
 
-    setSavedReport({
-      score: h.score,
-      overall_feedback: h.overall_feedback,
-      details: h.details || [],
-      inferred_position: h.position || "Free",
-      final_scores: h.final_scores,
-      top_skills_to_improve: h.top_skills_to_improve,
-      strong_topics: h.strong_topics,
-      weak_topics: h.weak_topics,
-    });
+    setSavedReport(normalizeHistoryReport(h));
 
     if (resumeSettings.interviewType === "timed") {
       resetTimer();

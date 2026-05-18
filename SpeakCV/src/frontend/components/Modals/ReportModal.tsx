@@ -200,12 +200,18 @@ export default function ReportModal({
         };
 
   // Handle both old format (details as array) and new format (details as object with questions/dimension_scores)
+  const nestedReport =
+    report.details && typeof report.details === "object" && !Array.isArray(report.details)
+      ? report.details
+      : null;
   const questionDetails = Array.isArray(report.details)
     ? report.details
-    : report.details?.questions || [];
-  const dimensionScores = report.dimension_scores || report.details?.dimension_scores || [];
-  const learningPlan = report.learning_plan || report.details?.learning_plan || {};
-  const finalScores = report.final_scores || {
+    : report.details?.questions || nestedReport?.details || [];
+  const dimensionScores =
+    report.dimension_scores || report.details?.dimension_scores || nestedReport?.dimension_scores || [];
+  const learningPlan =
+    report.learning_plan || report.details?.learning_plan || nestedReport?.learning_plan || {};
+  const finalScores = report.final_scores || nestedReport?.final_scores || {
     correctness: null,
     depth: null,
     communication: null,
