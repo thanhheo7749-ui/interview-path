@@ -92,7 +92,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(lifespan=lifespan)
 
-origins = [
+default_origins = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
     "http://localhost:3001",
@@ -102,6 +102,13 @@ origins = [
     "http://localhost:8001",
     "http://127.0.0.1:8001",
 ]
+
+configured_origins = [
+    origin.strip()
+    for origin in os.getenv("CORS_ORIGINS", "").split(",")
+    if origin.strip()
+]
+origins = list(dict.fromkeys(default_origins + configured_origins))
 
 app.add_middleware(
     CORSMiddleware,

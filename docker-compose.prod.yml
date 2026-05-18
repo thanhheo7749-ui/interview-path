@@ -1,0 +1,93 @@
+name: interviewpath-prod
+
+services:
+  caddy:
+    image: caddy:2-alpine
+    container_name: interviewpath_caddy
+    profiles:
+      - proxy
+    restart: unless-stopped
+    depends_on:
+      - interviewpath-demo
+      - speakcv-frontend
+      - speakcv-backend
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      PRIMARY_DOMAIN: ${PRIMARY_DOMAIN}
+      SPEAKCV_DOMAIN: ${SPEAKCV_DOMAIN}
+      API_DOMAIN: ${API_DOMAIN}
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+  interviewpath-demo:
+    build:
+      context: ./interviewpath/interviewpath-demo
+      dockerfile: Dockerfile.prod
+      args:
+        VITE_SPEAKCV_URL: ${VITE_SPEAKCV_URL}
+    container_name: interviewpath_demo
+    restart: unless-stopped
+    ports:
+      - "${INTERVIEWPATH_PORT:-5173}:80"
+    expose:
+      - "80"
+
+  speakcv-frontend:
+    build:
+      context: ./SpeakCV/src/frontend
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+        NEXT_PUBLIC_GOOGLE_CLIENT_ID: ${NEXT_PUBLIC_GOOGLE_CLIENT_ID:-}
+    container_name: speakcv_frontend
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+      NEXT_PUBLIC_GOOGLE_CLIENT_ID: ${NEXT_PUBLIC_GOOGLE_CLIENT_ID:-}
+    ports:
+      - "${SPEAKCV_FRONTEND_PORT:-3000}:3000"
+    expose:
+      - "3000"
+    depends_on:
+      - speakcv-backend
+
+  speakcv-backend:
+    build:
+      context: ./SpeakCV/src/backend
+    container_name: speakcv_backend
+    restart: unless-stopped
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    env_file:
+      - ./.env
+    ports:
+      - "${SPEAKCV_BACKEND_PORT:-8000}:8000"
+    expose:
+      - "8000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  db:
+    image: mysql:8.0
+    container_name: speakcv_db
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+    volumes:
+      - speakcv_db_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -p\"$${MYSQL_ROOT_PASSWORD}\""]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+volumes:
+  caddy_data:
+  caddy_config:
+  speakcv_db_data:

@@ -27,3 +27,5 @@ speakcv_db_data/
 
 # Backups (contains sensitive data)
 SpeakCV/backups/
+
+.omx/
