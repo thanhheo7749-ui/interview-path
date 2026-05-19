@@ -52,11 +52,13 @@ function N8nNode({ data, selected }) {
   return (
     <div
       className={[
-        'w-[230px] rounded-2xl border bg-white p-3 shadow-card transition',
+        'relative w-[230px] overflow-hidden rounded-2xl border bg-white p-3 shadow-card transition',
         selected ? 'border-blue-400 ring-4 ring-blue-100' : 'border-slate-200',
-        data.status === 'Running' ? 'scale-[1.02]' : '',
+        data.status === 'Running' ? 'workflow-node-running scale-[1.03]' : '',
+        data.status === 'Success' ? 'workflow-node-success' : '',
       ].join(' ')}
     >
+      {data.status === 'Running' && <span className="workflow-node-scanline" />}
       <Handle type="target" position={Position.Left} className="!h-3 !w-3 !border-2 !border-white !bg-slate-400" />
       <div className="flex items-start gap-3">
         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-950 text-white">

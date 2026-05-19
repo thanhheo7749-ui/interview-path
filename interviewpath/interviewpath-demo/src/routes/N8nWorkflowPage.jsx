@@ -3,19 +3,43 @@ import ReactFlow, {
   Background,
   Controls,
   MarkerType,
-  MiniMap,
   ReactFlowProvider,
   useEdgesState,
   useNodesState,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
-import { ArrowRight, Play, RefreshCcw } from 'lucide-react';
+import {
+  ArrowRight,
+  Bot,
+  CalendarCheck,
+  Database,
+  FileText,
+  Gauge,
+  IdCard,
+  LayoutDashboard,
+  Play,
+  RefreshCcw,
+  ScanText,
+  Send,
+  Target,
+} from 'lucide-react';
 import ExecutionLog from '../components/n8n/ExecutionLog.jsx';
 import N8nNode from '../components/n8n/N8nNode.jsx';
-import NodeDetailPanel from '../components/n8n/NodeDetailPanel.jsx';
+import WorkflowStepShowcase from '../components/n8n/WorkflowStepShowcase.jsx';
 import { mockWorkflowEdges, mockWorkflowNodes, workflowLogs, workflowStatuses } from '../data/mockN8nWorkflow.js';
 
 const edgeIds = mockWorkflowEdges.map((edge) => edge.id);
+const visualIconMap = {
+  'cv-intake': FileText,
+  'extract-data': ScanText,
+  'match-score': Target,
+  'passport-build': IdCard,
+  'practice-link': Send,
+  'interview-feedback': Bot,
+  'schedule-slot': CalendarCheck,
+  'hr-dashboard': LayoutDashboard,
+  'memory-save': Database,
+};
 
 function toReactFlowNodes() {
   return mockWorkflowNodes.map((node) => ({
@@ -33,13 +57,17 @@ function toReactFlowEdges(completedEdges = [], activeEdgeId = null) {
   return mockWorkflowEdges.map((edge) => {
     const completed = completedEdges.includes(edge.id);
     const active = activeEdgeId === edge.id;
+    const strokeColor = completed ? '#16a34a' : active ? '#6d28d9' : '#94a3b8';
+
     return {
       ...edge,
       type: 'smoothstep',
       animated: active,
-      markerEnd: { type: MarkerType.ArrowClosed, color: completed || active ? '#2563eb' : '#94a3b8' },
+      className: active ? 'workflow-edge-active' : '',
+      markerEnd: { type: MarkerType.ArrowClosed, color: strokeColor },
       style: {
-        stroke: completed ? '#16a34a' : active ? '#2563eb' : '#94a3b8',
+        stroke: strokeColor,
+        strokeDasharray: active ? '8 8' : undefined,
         strokeWidth: completed || active ? 3 : 2,
       },
     };
@@ -53,6 +81,89 @@ function formatLogTime(offsetSeconds) {
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function WorkflowStepRail({ currentStepIndex }) {
+  return (
+    <div className="mt-4 flex flex-wrap items-center gap-2">
+      {mockWorkflowNodes.map((node, index) => {
+        const isComplete = currentStepIndex > index || currentStepIndex >= mockWorkflowNodes.length;
+        const isActive = currentStepIndex === index;
+        return (
+          <span
+            key={node.id}
+            className={[
+              'workflow-step-dot',
+              isComplete ? 'is-complete' : '',
+              isActive ? 'is-active' : '',
+            ].join(' ')}
+            title={node.label}
+          >
+            {index + 1}
+          </span>
+        );
+      })}
+    </div>
+  );
+}
+
+function WorkflowStepBrief({ node, stepLabel, currentStepIndex }) {
+  if (!node) {
+    return (
+      <section className="mb-4 rounded-3xl border border-blue-100 bg-white px-5 py-4 shadow-card">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="text-sm font-extrabold text-blue-950">
+              n8n controls the workflow. AI creates the memory. InterviewPath turns every application into a reusable Candidate
+              Passport.
+            </p>
+            <p className="mt-1 text-sm font-semibold leading-6 text-slate-600">
+              Run Workflow auto-plays the full automation. Next Step lets you present each node manually.
+            </p>
+            <WorkflowStepRail currentStepIndex={currentStepIndex} />
+          </div>
+          <span className="shrink-0 rounded-full bg-blue-50 px-3 py-1.5 text-xs font-extrabold text-blue-700">{stepLabel}</span>
+        </div>
+      </section>
+    );
+  }
+
+  const data = node.data;
+  const story = data.story || {};
+  const Icon = visualIconMap[story.visual] || Gauge;
+
+  return (
+    <section className="workflow-step-brief mb-4 rounded-3xl border border-blue-100 bg-white px-5 py-4 shadow-card">
+      <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-5">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="text-[11px] font-extrabold uppercase tracking-[0.2em] text-violet-600">Presenter Step</p>
+            <span className="rounded-full bg-blue-50 px-3 py-1.5 text-xs font-extrabold text-blue-700">{stepLabel}</span>
+            <span className="rounded-full bg-emerald-50 px-3 py-1.5 text-xs font-extrabold text-emerald-700">
+              {story.result || data.status}
+            </span>
+          </div>
+          <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-2">
+            <h2 className="text-2xl font-extrabold leading-8 text-slate-950">{data.label}</h2>
+            <div className="flex flex-wrap gap-2">
+              {(story.chips || []).slice(0, 4).map((chip) => (
+                <span key={chip} className="rounded-full bg-slate-950 px-3 py-1.5 text-[11px] font-extrabold text-white">
+                  {chip}
+                </span>
+              ))}
+            </div>
+          </div>
+          <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
+            {story.headline || data.pitchExplanation || data.description}
+          </p>
+          <WorkflowStepRail currentStepIndex={currentStepIndex} />
+        </div>
+        <div className="flex h-12 w-12 shrink-0 items-center justify-center self-start rounded-2xl bg-slate-950 text-white shadow-card">
+          <Icon size={22} />
+        </div>
+      </div>
+    </section>
+  );
 }
 
 const getInitialState = () => {
@@ -287,23 +398,14 @@ function N8nWorkflowPage() {
         </div>
       </header>
 
-      <section className="mb-4 rounded-3xl border border-blue-100 bg-white px-5 py-4 shadow-card">
-        <div className="flex items-center justify-between gap-4">
-          <div>
-            <p className="text-sm font-extrabold text-blue-950">
-              n8n controls the workflow. AI creates the memory. InterviewPath turns every application into a reusable Candidate
-              Passport.
-            </p>
-            <p className="mt-1 text-sm font-semibold leading-6 text-slate-600">
-              {activeStepNode?.data?.pitchExplanation ||
-                'Run Workflow auto-plays the full automation. Next Step lets you present each node manually.'}
-            </p>
-          </div>
-          <span className="shrink-0 rounded-full bg-blue-50 px-3 py-1.5 text-xs font-extrabold text-blue-700">{stepLabel}</span>
-        </div>
-      </section>
+      <WorkflowStepBrief
+        key={activeStepNode?.id || currentStepIndex}
+        node={activeStepNode}
+        stepLabel={stepLabel}
+        currentStepIndex={currentStepIndex}
+      />
 
-      <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_330px] gap-4">
+      <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_360px] gap-4">
         <div className="flex min-h-0 flex-col">
           <main className="min-h-0 flex-1 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-card">
             <ReactFlowProvider>
@@ -321,7 +423,6 @@ function N8nWorkflowPage() {
                 className="bg-slate-50"
               >
                 <Background color="#cbd5e1" gap={22} size={1} />
-                <MiniMap pannable zoomable nodeStrokeWidth={3} className="!rounded-2xl !border !border-slate-200 !bg-white" />
                 <Controls className="!rounded-2xl !border !border-slate-200 !bg-white !shadow-card" />
               </ReactFlow>
             </ReactFlowProvider>
@@ -330,7 +431,7 @@ function N8nWorkflowPage() {
             <ExecutionLog logs={logs} />
           </div>
         </div>
-        <NodeDetailPanel node={selectedNode} />
+        <WorkflowStepShowcase node={activeStepNode} stepLabel={stepLabel} />
       </div>
     </div>
   );

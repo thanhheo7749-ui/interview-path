@@ -8,6 +8,20 @@ export const stages = [
   'Hired / Talent Pool',
 ];
 
+export const stageStatusByStage = {
+  Shortlisted: 'Needs practice',
+  'Practice Sent': 'Practice sent',
+  'AI Practice': 'AI practice',
+  Scheduled: 'Scheduled',
+  'Technical Round': 'Technical round',
+  'Culture Round': 'Culture round',
+  'Hired / Talent Pool': 'Talent pool',
+};
+
+export function getStageStatus(stage) {
+  return stageStatusByStage[stage] || stage;
+}
+
 export const initialCandidates = [
   {
     id: 'nguyen-van-a',
