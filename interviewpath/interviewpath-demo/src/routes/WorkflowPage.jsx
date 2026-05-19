@@ -5,7 +5,7 @@ import CandidateCard from '../components/CandidateCard.jsx';
 import CandidateDetailPanel from '../components/CandidateDetailPanel.jsx';
 import MetricCard from '../components/MetricCard.jsx';
 import Toast from '../components/Toast.jsx';
-import { initialCandidates, stages } from '../data/mockCandidates.js';
+import { getStageStatus, initialCandidates, stages } from '../data/mockCandidates.js';
 
 function WorkflowPage() {
   const [candidates, setCandidates] = useState(initialCandidates);
@@ -23,8 +23,19 @@ function WorkflowPage() {
   function handleDragEnd(event) {
     const { active, over } = event;
     if (!over) return;
-    setCandidates((current) =>
-      current.map((candidate) => (candidate.id === active.id ? { ...candidate, stage: over.id } : candidate)),
+    const nextStage = over.id;
+    const nextStatus = getStageStatus(nextStage);
+    setCandidates((current) => {
+      return current.map((candidate) =>
+        candidate.id === active.id && candidate.stage !== nextStage
+          ? { ...candidate, stage: nextStage, status: nextStatus }
+          : candidate,
+      );
+    });
+    setSelectedCandidate((current) =>
+      current?.id === active.id && current.stage !== nextStage
+        ? { ...current, stage: nextStage, status: nextStatus }
+        : current,
     );
   }
 
