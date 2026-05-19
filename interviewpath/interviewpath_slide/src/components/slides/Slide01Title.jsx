@@ -18,6 +18,19 @@ function Slide01Title() {
           <br />
           from CV Screening to Employee Onboarding.
         </motion.p>
+        <motion.div className="title-team" variants={fadeUp}>
+          <p className="title-team-label">TEAM MEMBERS</p>
+          <div className="title-team-grid">
+            <div>
+              <p>Lưu Gia Bảo</p>
+              <p>Tạ Hoàng Thành</p>
+            </div>
+            <div>
+              <p>Nguyễn Phương Quang</p>
+              <p>Tạ Vĩnh Quang</p>
+            </div>
+          </div>
+        </motion.div>
       </motion.div>
     </SlideFrame>
   );
