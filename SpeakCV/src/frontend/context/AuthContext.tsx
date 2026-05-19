@@ -56,11 +56,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setRole(newRole);
     // Dispatch custom event for SubscriptionContext (StorageEvent only fires in other tabs)
     window.dispatchEvent(new Event("auth-changed"));
-    if (newRole === "admin") {
-      router.push("/admin");
-    } else {
-      router.push("/interview");
-    }
+    router.push("/interview");
   };
 
   const logout = () => {

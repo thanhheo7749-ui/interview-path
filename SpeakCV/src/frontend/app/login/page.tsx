@@ -6,6 +6,7 @@
 
 "use client";
 import { useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { LogIn, Loader2, ArrowLeft } from "lucide-react";
 import { loginUser, loginGoogle } from "@/services/api";
 import { useGoogleLogin } from "@react-oauth/google";
@@ -13,8 +14,9 @@ import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
 
 export default function LoginPage() {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const searchParams = useSearchParams();
+  const [email, setEmail] = useState(searchParams.get("email") ?? "");
+  const [password, setPassword] = useState(searchParams.get("password") ?? "");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
