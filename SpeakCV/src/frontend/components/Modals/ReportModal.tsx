@@ -262,8 +262,8 @@ export default function ReportModal({
                 Overall Score
               </p>
               <div className="text-7xl font-black my-2 tracking-tighter">
-                {report.score}
-                <span className="text-3xl text-current/50">/10</span>
+                {Math.round(report.score * 10)}
+                <span className="text-3xl text-current/50">%</span>
               </div>
               <p className="text-sm font-medium mt-2 opacity-80 text-center">
                 {report.score >= 8
