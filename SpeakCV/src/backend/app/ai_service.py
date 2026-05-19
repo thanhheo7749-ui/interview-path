@@ -19,8 +19,20 @@ if _root_candidate.exists():
     load_dotenv(_root_candidate)
 load_dotenv(override=True)  # local src/backend/.env overrides
 
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+def _valid_api_key(value: str | None) -> str | None:
+    if not value:
+        return None
+    cleaned = value.strip()
+    if not cleaned:
+        return None
+    lowered = cleaned.lower()
+    if lowered.startswith("your-") or lowered in {"changeme", "none", "null"}:
+        return None
+    return cleaned
+
+
+GEMINI_API_KEY = _valid_api_key(os.getenv("GEMINI_API_KEY"))
+OPENAI_API_KEY = _valid_api_key(os.getenv("OPENAI_API_KEY"))
 
 OPENAI_BASE_URL = os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1")
 OPENAI_MODEL_GPT4O_MINI = os.getenv("OPENAI_MODEL_GPT4O_MINI", "gpt-4.1-mini")
@@ -124,7 +136,10 @@ def _call_openai(messages, model, temperature, max_tokens, response_format=None,
     res = requests.post(f"{OPENAI_BASE_URL.rstrip('/')}/chat/completions", headers=headers, json=data, timeout=timeout)
 
     if res.status_code == 200:
-        return res.json()["choices"][0]["message"]["content"]
+        body = res.json()
+        msg = (((body.get("choices") or [{}])[0]).get("message") or {})
+        content = (msg.get("content") or "").strip()
+        return content
     else:
         raise Exception(f"OpenAI API error (status {res.status_code}): {res.text[:200]}")
 

@@ -4,9 +4,7 @@ __pycache__/
 *.pyc
 
 # Environment files
-.env
-.env.local
-.env.*.local
+
 
 # Build outputs
 .next/
@@ -27,5 +25,10 @@ speakcv_db_data/
 # Logs
 *.log
 
+# Claude local state
+.omc/
+
 # Backups (contains sensitive data)
 SpeakCV/backups/
+
+.omx/

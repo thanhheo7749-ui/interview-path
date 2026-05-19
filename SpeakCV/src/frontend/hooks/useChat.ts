@@ -4,7 +4,7 @@
  * See the LICENSE file in the project root for more information.
  */
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { chatWithAI } from "@/services/api";
 import toast from "react-hot-toast";
 
@@ -98,6 +98,8 @@ const maybeStoreInterviewContext = (analysis: InterviewAnalysis | null) => {
   }
 };
 
+const INTERVIEW_SESSION_KEY = "interview_session_state";
+
 export const useChat = () => {
   const [status, setStatus] = useState("Ready");
   const [aiText, setAiText] = useState("Hello, I'm your AI Interviewer. Are you ready?");
@@ -107,6 +109,40 @@ export const useChat = () => {
   const [usage, setUsage] = useState<InterviewUsage | null>(null);
   const [traceId, setTraceId] = useState("");
   const abortCtrl = useRef<AbortController | null>(null);
+
+  useEffect(() => {
+    const raw = sessionStorage.getItem(INTERVIEW_SESSION_KEY);
+    if (!raw) return;
+    try {
+      const saved = JSON.parse(raw) as {
+        history?: string;
+        chatHistory?: any[];
+        aiText?: string;
+      };
+      if (saved.history) setHistory(saved.history);
+      if (Array.isArray(saved.chatHistory)) setChatHistory(saved.chatHistory);
+      if (saved.aiText) setAiText(saved.aiText);
+    } catch {
+      sessionStorage.removeItem(INTERVIEW_SESSION_KEY);
+    }
+  }, []);
+
+  useEffect(() => {
+    sessionStorage.setItem(
+      INTERVIEW_SESSION_KEY,
+      JSON.stringify({ history, chatHistory, aiText }),
+    );
+  }, [history, chatHistory, aiText]);
+
+  useEffect(() => {
+    if (!history.trim() && chatHistory.length === 0) {
+      sessionStorage.removeItem(INTERVIEW_SESSION_KEY);
+    }
+  }, [history, chatHistory]);
+
+  const appendHistory = (line: string) => {
+    setHistory((prev) => (prev ? `${prev}\n${line}` : line));
+  };
 
   const sendMessage = async (
     userText: string, 
@@ -118,8 +154,8 @@ export const useChat = () => {
     if (!userText.trim()) return;
 
     setStatus("Processing");
-    setHistory(prev => prev + `\nCandidate: ${userText}`);
-    
+    appendHistory(`Candidate: ${userText}`);
+
     const currentChatHistory = [...chatHistory];
     setChatHistory(prev => [...prev, { role: "user", content: userText }]);
 
@@ -166,7 +202,7 @@ export const useChat = () => {
 
       if (parsed.responseText) {
         setAiText(parsed.responseText);
-        setHistory(prev => prev + `\nAI: ${parsed.responseText}`);
+        appendHistory(`AI: ${parsed.responseText}`);
         setChatHistory(prev => [...prev, { role: "assistant", content: parsed.responseText }]);
       }
 

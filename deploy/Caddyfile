@@ -1,0 +1,14 @@
+{$PRIMARY_DOMAIN} {
+	encode zstd gzip
+	reverse_proxy interviewpath-demo:80
+}
+
+{$SPEAKCV_DOMAIN} {
+	encode zstd gzip
+	reverse_proxy speakcv-frontend:3000
+}
+
+{$API_DOMAIN} {
+	encode zstd gzip
+	reverse_proxy speakcv-backend:8000
+}

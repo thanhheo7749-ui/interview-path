@@ -114,6 +114,12 @@ export default function LoginPage() {
             )}
             {loading ? "Đang xử lý..." : "Đăng Nhập"}
           </button>
+
+          <div className="rounded-xl border border-amber-300/40 bg-amber-100/10 p-3 text-sm text-theme-text-secondary">
+            <p className="font-semibold text-theme-text">Tài khoản</p>
+            <p>Email: admin@gmail.com</p>
+            <p>Mật khẩu: admin123</p>
+          </div>
         </form>
 
         <div className="mt-6 flex items-center justify-between">
