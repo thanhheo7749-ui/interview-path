@@ -1,4 +1,4 @@
-.PHONY: docker-build docker-up docker-down docker-logs docker-ps
+.PHONY: docker-build docker-up docker-down docker-logs docker-ps docker-build-speakcv docker-up-speakcv docker-restart
 
 COMPOSE = docker compose --env-file SpeakCV/.env
 
@@ -10,6 +10,9 @@ docker-up:
 
 docker-down:
 	$(COMPOSE) down
+
+docker-restart:
+	$(COMPOSE) down && $(COMPOSE) up --build -d
 
 docker-logs:
 	$(COMPOSE) logs -f
