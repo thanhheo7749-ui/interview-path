@@ -1,5 +1,5 @@
 import { DndContext, useDroppable } from '@dnd-kit/core';
-import { CalendarDays, DatabaseZap, RefreshCcw, Star, Users } from 'lucide-react';
+import { CalendarDays, DatabaseZap, Star, Users } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import CandidateCard from '../components/CandidateCard.jsx';
 import CandidateDetailPanel from '../components/CandidateDetailPanel.jsx';
@@ -115,12 +115,6 @@ function WorkflowPage() {
     updateCandidate(candidate.id, actions[action].update, actions[action].message);
   }
 
-  function resetDemo() {
-    setCandidates(initialCandidates);
-    setSelectedCandidate(null);
-    showToast('Demo state reset to the original hiring journey.');
-  }
-
   return (
     <div className="min-h-[100dvh] p-6">
       <Toast message={toast} />
@@ -132,16 +126,6 @@ function WorkflowPage() {
             InterviewPath does not stop at interview practice. It creates an AI Candidate Passport that stores candidate readiness,
             feedback, and hiring history across the full recruitment journey.
           </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={resetDemo}
-            className="flex items-center gap-2 rounded-xl bg-slate-950 px-4 py-3 text-sm font-extrabold text-white shadow-card transition hover:bg-slate-800"
-          >
-            <RefreshCcw size={17} />
-            Reset Demo
-          </button>
         </div>
       </header>
 
