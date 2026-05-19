@@ -5,7 +5,7 @@
  */
 
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { LogIn, Loader2, ArrowLeft } from "lucide-react";
 import { loginUser, loginGoogle } from "@/services/api";
 import { useGoogleLogin } from "@react-oauth/google";
@@ -19,6 +19,18 @@ export default function LoginPage() {
   const [error, setError] = useState("");
 
   const { login } = useAuth();
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const presetEmail = params.get("email");
+    const presetPassword = params.get("password");
+    const redirect = params.get("redirect");
+    if (presetEmail) setEmail(presetEmail);
+    if (presetPassword) setPassword(presetPassword);
+    if (redirect === "interview") {
+      sessionStorage.setItem("postLoginRedirect", "/interview");
+    }
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

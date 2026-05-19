@@ -67,7 +67,11 @@ function Sidebar() {
         <button
           type="button"
           onClick={() =>
-            window.open(`${speakCvUrl}/login`, "_blank", "noopener,noreferrer")
+            window.open(
+              `${speakCvUrl}/login?email=${encodeURIComponent("admin@gmail.com")}&password=${encodeURIComponent("admin123")}&redirect=interview`,
+              "_blank",
+              "noopener,noreferrer"
+            )
           }
           className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-3 py-3 text-sm font-bold text-white shadow-card transition hover:bg-blue-700"
         >

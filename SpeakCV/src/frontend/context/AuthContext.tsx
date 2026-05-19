@@ -56,6 +56,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setRole(newRole);
     // Dispatch custom event for SubscriptionContext (StorageEvent only fires in other tabs)
     window.dispatchEvent(new Event("auth-changed"));
+
+    const forcedRedirect = sessionStorage.getItem("postLoginRedirect");
+    if (forcedRedirect) {
+      sessionStorage.removeItem("postLoginRedirect");
+      router.push(forcedRedirect);
+      return;
+    }
+
     if (newRole === "admin") {
       router.push("/admin");
     } else {
