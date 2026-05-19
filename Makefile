@@ -1,4 +1,4 @@
-.PHONY: build up down logs ps docker-build docker-up docker-down docker-logs docker-ps docker-build-speakcv docker-up-speakcv prod-deploy prod-ps prod-logs prod-down
+.PHONY: docker-build docker-up docker-down docker-logs docker-ps docker-build-speakcv docker-up-speakcv docker-restart
 
 COMPOSE = docker compose --env-file .env
 PROD_ENV ?= .omx/generated/vps.env
@@ -29,6 +29,9 @@ docker-up-speakcv:
 
 docker-down:
 	$(COMPOSE) down
+
+docker-restart:
+	$(COMPOSE) down && $(COMPOSE) up --build -d
 
 docker-logs:
 	$(COMPOSE) logs -f

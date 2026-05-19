@@ -359,7 +359,16 @@ export default function InterviewRoom() {
         show={modals.report}
         onClose={() => toggleModal("report", false)}
         result={reportData}
-        hasHistory={history.trim().length > 0}
+        hasHistory={
+          history.trim().length > 0 ||
+          (Array.isArray(reportData?.details) && reportData.details.length > 0) ||
+          (reportData?.details &&
+            typeof reportData.details === "object" &&
+            !Array.isArray(reportData.details) &&
+            ((Array.isArray(reportData.details.questions) &&
+              reportData.details.questions.length > 0) ||
+              Object.keys(reportData.details).length > 0))
+        }
         onRetry={actions.handleRetry}
       />
       <GenCVModal

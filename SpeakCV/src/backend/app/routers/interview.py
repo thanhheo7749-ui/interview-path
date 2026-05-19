@@ -644,10 +644,11 @@ async def end_interview(request: models.ReportRequest, current_user: sql_models.
             turn_records = [
                 {
                     "topic": item.get("question", "General Technical Fit"),
-                    "correctness": 0.5,
-                    "depth": 0.5,
-                    "communication": 0.5,
-                    "topic_relevance": 0.5,
+                    "evaluation": item.get("evaluation", ""),
+                    "correctness": None,
+                    "depth": None,
+                    "communication": None,
+                    "topic_relevance": None,
                     "candidate_answer": item.get("candidate_answer", ""),
                 }
                 for item in details
@@ -673,7 +674,7 @@ async def end_interview(request: models.ReportRequest, current_user: sql_models.
                 if existing:
                     existing.score = score
                     existing.overall_feedback = overall_feedback
-                    existing.details = details
+                    existing.details = report_data
 
                     if not existing.position or existing.position.strip().lower() in ["", "chung", "tự do"]:
                         existing.position = final_position
@@ -690,7 +691,7 @@ async def end_interview(request: models.ReportRequest, current_user: sql_models.
                     title=title,
                     score=score,
                     overall_feedback=overall_feedback,
-                    details=details,
+                    details=report_data,
                     interview_type=request.interview_type,
                     question_limit=request.question_limit,
                     time_limit=request.time_limit
@@ -717,6 +718,20 @@ async def end_interview(request: models.ReportRequest, current_user: sql_models.
 async def get_interview_history(current_user: sql_models.User = Depends(get_current_user), db: Session = Depends(get_db)):
     histories = db.query(sql_models.InterviewHistory).filter(sql_models.InterviewHistory.user_id == current_user.id).order_by(sql_models.InterviewHistory.created_at.desc()).all()
     return {"histories": histories}
+
+@router.get("/api/history/{history_id}")
+async def get_interview_history_detail(
+    history_id: int,
+    current_user: sql_models.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    history = db.query(sql_models.InterviewHistory).filter(
+        sql_models.InterviewHistory.id == history_id,
+        sql_models.InterviewHistory.user_id == current_user.id,
+    ).first()
+    if not history:
+        raise HTTPException(status_code=404, detail="Interview history not found.")
+    return history
 
 @router.put("/api/history/{history_id}")
 async def update_interview_history(

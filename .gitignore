@@ -25,6 +25,9 @@ speakcv_db_data/
 # Logs
 *.log
 
+# Claude local state
+.omc/
+
 # Backups (contains sensitive data)
 SpeakCV/backups/
 
