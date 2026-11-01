@@ -256,6 +256,13 @@ def test_a_chunk_whose_row_names_another_company_is_not_returned(db, world):
     assert "MISFILED-CHUNK-TEXT" not in joined(retriever.search(db, world.hr_audience, "misfiled"))
 
 
+def test_a_chunk_of_another_companys_document_is_not_returned(db, world):
+    row = world.b.chunk(db.get(KbDocument, world.other_chunk.document_id), "misfiled FOREIGN-DOCUMENT-TEXT")
+    row.company_id = world.company_id
+    db.commit()
+    assert "FOREIGN-DOCUMENT-TEXT" not in joined(retriever.search(db, world.hr_audience, "misfiled"))
+
+
 # The cache
 
 
@@ -488,7 +495,34 @@ def test_expansion_does_not_reach_draft_rejected_or_foreign_nodes(db, world):
     assert f"n{world.other_node.id}" not in refs
 
 
+def test_expansion_keeps_to_the_allowed_set_it_is_given(db, world):
+    # A node hidden after the allowed rows were read must not arrive through a later edge query.
+    assert retriever._expand(db, world.hr_audience, {world.role_id: 1.0}, {world.role_id}) == {}
+
+
 # Vectors and models
+
+
+def test_a_cached_vector_is_not_compared_once_its_row_has_changed_model(db, world):
+    candidate = aud.candidate(world.company_id)
+    assert retriever.search(db, candidate, "backend developer role", top_k=1).items[0].ref == f"n{world.role_id}"
+    db.query(KbNode).filter(KbNode.id == world.role_id).update({KbNode.embedding_model: "old-model"})
+    db.commit()
+    assert retriever.search(db, candidate, "backend developer role", top_k=1).items[0].ref != f"n{world.role_id}"
+
+
+def test_a_row_re_embedded_during_a_search_is_not_compared(db, world, monkeypatch):
+    # The row list says the current model, but the row has moved on by the time its vector is read.
+    model = get_config().slot("embedding").model
+    db.query(KbNode).update({KbNode.embedding_model: "old-model"})
+    db.query(KbChunk).update({KbChunk.embedding_model: "old-model"})
+    db.commit()
+    real = retriever._allowed_nodes
+    monkeypatch.setattr(retriever, "_allowed_nodes", lambda session, audience: [
+        SimpleNamespace(**{**row._asdict(), "embedding_model": model}) for row in real(session, audience)
+    ])
+    with pytest.raises(retriever.NoEmbeddingsError, match="make reembed"):
+        retriever.search(db, world.hr_audience, "anything")
 
 
 def test_vectors_from_another_model_are_refused_with_a_clear_error(db, world):
