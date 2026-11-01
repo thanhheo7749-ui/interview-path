@@ -415,7 +415,8 @@ async def update_user_admin(
         user.plan = request.plan
     if request.password is not None and request.password != "":
         user.hashed_password = security.get_password_hash(request.password)
-        
+        security.mark_password_changed(user)
+
     db.commit()
     
     return {"message": "User updated successfully!"}

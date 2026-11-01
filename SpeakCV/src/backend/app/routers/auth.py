@@ -66,8 +66,11 @@ def change_password(
         raise HTTPException(status_code=422, detail="The new password must differ from the current one")
     user.hashed_password = security.get_password_hash(body.new_password)
     user.must_change_password = False
+    security.mark_password_changed(user)
     db.commit()
-    return {"message": "Password changed"}
+    # This change ends the caller's old session too, so hand back one that is issued after it.
+    access_token = security.create_access_token(data={"sub": user.email})
+    return {"message": "Password changed", "access_token": access_token, "token_type": "bearer"}
 
 @router.post("/api/auth/google", response_model=models.Token)
 @limiter.limit(LOGIN_LIMIT)

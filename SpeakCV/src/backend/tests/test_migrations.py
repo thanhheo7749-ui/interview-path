@@ -36,6 +36,7 @@ def test_existing_database_is_stamped_and_keeps_its_data(tmp_path):
     with engine.begin() as connection:
         # A database from before this column was added, as on a live server.
         connection.execute(text("ALTER TABLE users DROP COLUMN must_change_password"))
+        connection.execute(text("ALTER TABLE users DROP COLUMN password_changed_at"))
         connection.execute(text("INSERT INTO users (email, full_name, hashed_password) VALUES ('keep@example.test', 'K', 'h')"))
 
     with engine.begin() as connection:
@@ -49,6 +50,7 @@ def test_existing_database_is_stamped_and_keeps_its_data(tmp_path):
     assert kept == [("keep@example.test",)]
     with engine.connect() as connection:
         assert connection.execute(text("SELECT must_change_password FROM users")).scalar() in (0, False)
+        assert connection.execute(text("SELECT password_changed_at FROM users")).scalar() is None
 
 
 def test_running_twice_is_safe(tmp_path):

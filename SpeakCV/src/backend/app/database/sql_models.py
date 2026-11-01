@@ -19,6 +19,7 @@ class User(Base):
     plan = Column(String(20), default="free")
     last_token_reset_date = Column(Date, default=func.current_date())
     must_change_password = Column(Boolean, default=False, server_default=false(), nullable=False)
+    password_changed_at = Column(DateTime(timezone=True), nullable=True)
 
 # 2. UserProfile table (detailed user info)
 class UserProfile(Base):

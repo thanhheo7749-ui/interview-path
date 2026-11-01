@@ -8,9 +8,18 @@ from app.database.sql_models import CompanyMember, User
 MEMBER_ROLES = ("hr", "manager", "employee")
 
 
-def get_authenticated_user(token: str = Depends(security.oauth2_scheme), db: Session = Depends(get_db)) -> User:
-    email = security.verify_token(token)
+def user_from_token(db: Session, token: str) -> User | None:
+    """The one way from a token to a user. None for a bad token, an unknown user, or a session ended by a password change."""
+    payload = security.decode_access_token(token)
+    email = payload.get("sub") if payload else None
     user = db.query(User).filter(User.email == email).first() if email else None
+    if user is None or security.token_predates_password_change(payload, user.password_changed_at):
+        return None
+    return user
+
+
+def get_authenticated_user(token: str = Depends(security.oauth2_scheme), db: Session = Depends(get_db)) -> User:
+    user = user_from_token(db, token)
     if user is None:
         raise HTTPException(status_code=401, detail="Invalid token")
     return user

@@ -54,9 +54,12 @@ test('first sign-in with a temporary password forces a change before anything el
   await expect(page.getByRole('heading', { name: 'Set a new password' })).toBeVisible();
 
   await page.getByLabel('Current password').fill(temporaryPassword());
+  const changed = page.waitForResponse('**/api/me/password');
   await page.getByRole('button', { name: 'Change password' }).click();
+  const { access_token: freshToken } = await (await changed).json();
   await expect(page.getByRole('heading', { name: 'Company settings' })).toBeVisible();
   await expect(page.getByText('Sample data')).toBeVisible();
+  expect(await page.evaluate(() => sessionStorage.getItem('portal_token'))).toBe(freshToken);
 
   await page.reload();
   await expect(page.getByRole('heading', { name: 'Company settings' })).toBeVisible();
