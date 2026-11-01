@@ -14,6 +14,11 @@ export ADMIN_EMAIL= ADMIN_PASSWORD=
 for slot in REASONING BULK EMBEDDING STT TTS; do export "AI_${slot}_PROVIDER=fake"; done
 PY=.venv/bin/python
 $PY -m app.cli migrate
+if [ "${E2E_SEED_SAMPLES:-}" = "1" ]; then
+  # Sample users get this known test password, so specs can sign in without the forced password change.
+  export SAMPLE_USER_PASSWORD=e2e-sample-password-123
+  $PY -m app.cli seed-samples --auto-approve
+fi
 HR_PASSWORD=$($PY -m app.cli create-company --slug e2e --name "E2E Company" --hr-email hr@e2e.test --hr-name "E2E HR" --sample | awk '/Temporary password/ {print $NF}')
 printf '%s' "$HR_PASSWORD" > "$E2E_TMP/portal_e2e_password"
 exec $PY -m uvicorn app.main:app --port ${E2E_API_PORT:-8099}

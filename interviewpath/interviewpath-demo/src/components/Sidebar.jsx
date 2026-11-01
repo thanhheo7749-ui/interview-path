@@ -1,4 +1,4 @@
-import { BrainCircuit, KeyRound, LogOut, Settings } from "lucide-react";
+import { BrainCircuit, KeyRound, LogOut, MessageSquare, Network, Settings } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { NavLink } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext.jsx";
@@ -7,6 +7,8 @@ import LanguageSwitch from "./LanguageSwitch.jsx";
 
 const navItems = [
   { labelKey: "nav.settings", to: "/settings", icon: Settings },
+  { labelKey: "nav.graph", to: "/graph", icon: Network, hrOnly: true },
+  { labelKey: "nav.copilot", to: "/copilot", icon: MessageSquare },
   { labelKey: "nav.password", to: "/account/password", icon: KeyRound },
 ];
 
@@ -32,7 +34,7 @@ function Sidebar() {
       </div>
 
       <nav className="mt-8 space-y-2">
-        {navItems.map((item) => {
+        {navItems.filter((item) => !item.hrOnly || membership?.role === "hr").map((item) => {
           const Icon = item.icon;
           return (
             <NavLink

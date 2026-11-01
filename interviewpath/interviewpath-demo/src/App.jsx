@@ -5,6 +5,8 @@ import SampleBanner from './components/SampleBanner.jsx';
 import Sidebar from './components/Sidebar.jsx';
 import ChangePasswordPage from './routes/ChangePasswordPage.jsx';
 import CompanySettingsPage from './routes/CompanySettingsPage.jsx';
+import CopilotPage from './routes/CopilotPage.jsx';
+import GraphPage from './routes/GraphPage.jsx';
 import LoginPage from './routes/LoginPage.jsx';
 
 function PortalLayout() {
@@ -33,7 +35,9 @@ function App() {
         }
       >
         <Route path="/settings" element={<CompanySettingsPage />} />
-        <Route path="/account/password" element={<ChangePasswordPage />} />
+        <Route path="/graph" element={<GraphPage />} />
+        <Route path="/copilot" element={<CopilotPage />} />
+        <Route path="/account/password"element={<ChangePasswordPage />} />
         <Route path="*" element={<Navigate to="/settings" replace />} />
       </Route>
     </Routes>

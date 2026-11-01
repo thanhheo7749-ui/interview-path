@@ -10,8 +10,6 @@ export default [
       'test-results',
       // Kept on disk until Blocks 2 and 3 connect them; not in any route.
       'src/routes/WorkflowPage.jsx',
-      'src/routes/KnowledgeGraphPage.jsx',
-      'src/components/KnowledgeGraph.jsx',
       'src/components/CandidateCard.jsx',
       'src/components/CandidateDetailPanel.jsx',
       'src/components/MetricCard.jsx',

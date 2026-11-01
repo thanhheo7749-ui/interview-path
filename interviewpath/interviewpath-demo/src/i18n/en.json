@@ -22,7 +22,9 @@
     "settings": "Company settings",
     "password": "Change password",
     "company": "Company",
-    "signOut": "Sign out"
+    "signOut": "Sign out",
+    "graph": "Knowledge graph",
+    "copilot": "Copilot"
   },
   "auth": {
     "loadFailed": "We could not load your account. Check your connection and try again.",
@@ -82,6 +84,83 @@
       "hr": "HR",
       "manager": "Manager",
       "employee": "Employee"
+    }
+  },
+  "demoAi": {
+    "notice": "Demo AI: this content comes from a built-in demo provider, not a real AI model. Do not rely on it."
+  },
+  "graph": {
+    "title": "Knowledge graph",
+    "subtitle": "What the company knowledge looks like for each audience.",
+    "viewAs": "View as",
+    "audiences": {
+      "hr": "HR (all)",
+      "manager": "Manager",
+      "employee": "Employee",
+      "candidate": "Candidate"
+    },
+    "department": "Manager department",
+    "anyDepartment": "No department",
+    "simulateNote": "This switch only simulates what each audience can read. It is read-only and changes no one's access.",
+    "nodeCount": "Nodes",
+    "linkCount": "Links",
+    "legend": "Layers",
+    "layers": {
+      "public": "Public",
+      "internal": "Internal",
+      "confidential": "Confidential"
+    },
+    "types": {
+      "company": "Company",
+      "department": "Department",
+      "role": "Role",
+      "requirement": "Requirement",
+      "skill": "Skill",
+      "value": "Value",
+      "behavior": "Behavior",
+      "policy": "Policy",
+      "process": "Process",
+      "fact": "Fact",
+      "private_note": "Private note"
+    },
+    "nodeList": "Nodes",
+    "empty": "No nodes are visible to this audience.",
+    "loadFailed": "We could not load the graph. Try again.",
+    "detail": "Selected node",
+    "noSelection": "Select a node in the graph or the list to see its details.",
+    "type": "Type",
+    "layer": "Layer",
+    "connections": "Connections",
+    "noConnections": "No connections.",
+    "bodyUnavailable": "The graph view does not include the full text of a node. Open the review pages to read it.",
+    "canvasLabel": "Interactive knowledge graph",
+    "hint": "Drag nodes to rebalance them. Click a node to inspect it."
+  },
+  "copilot": {
+    "title": "Copilot",
+    "subtitle": "Ask about company policies and documents. Answers come only from documents you are allowed to read.",
+    "placeholder": "Ask a question",
+    "inputLabel": "Your question",
+    "send": "Ask",
+    "asking": "Searching the documents...",
+    "empty": "No questions yet.",
+    "counter": "{{count}} / {{max}}",
+    "you": "You",
+    "states": {
+      "answered": "Answered",
+      "conflict": "Sources disagree",
+      "not_found": "Not found"
+    },
+    "sources": "Sources",
+    "page": "page {{page}}",
+    "effective": "effective {{date}}",
+    "notShared": "Company document (not shared)",
+    "conflictNotice": "Two company sources differ on this. Nothing is asserted until HR confirms which applies.",
+    "notFoundNotice": "This was not found in the documents you can read. The question was recorded for HR.",
+    "errors": {
+      "unavailable": "Company knowledge is not searchable yet. The operator needs to rebuild the search index.",
+      "provider": "The AI service did not respond. Please try again later.",
+      "generic": "Copilot could not answer this question. Please try again."
     }
   }
 }
