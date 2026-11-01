@@ -32,6 +32,8 @@ def build_parser() -> argparse.ArgumentParser:
     )
     seed_parser.add_argument("--auto-approve", action="store_true", help="Publish everything. Sample companies only.")
     seed_parser.add_argument("--only", help="Seed one sample company by slug.")
+
+    commands.add_parser("retention", help="Anonymize every application past its retention date")
     return parser
 
 
@@ -130,6 +132,17 @@ def seed_samples(args) -> int:
     return 0
 
 
+def retention_command(_args) -> int:
+    from app.hiring import retention
+
+    db = SessionLocal()
+    try:
+        print(f"Anonymized {retention.run(db)} applications.")
+        return 0
+    finally:
+        db.close()
+
+
 def main(argv=None) -> int:
     args = build_parser().parse_args(argv)
     if args.command == "migrate":
@@ -140,6 +153,8 @@ def main(argv=None) -> int:
         return reembed(args)
     elif args.command == "seed-samples":
         return seed_samples(args)
+    elif args.command == "retention":
+        return retention_command(args)
     return 0
 
 
