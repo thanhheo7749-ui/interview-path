@@ -87,16 +87,16 @@ def test_estimate_counts_only_statements_that_reach_the_classifier(tmp_path):
 def test_precision_and_recall_on_a_tiny_injected_list(tmp_path):
     fake.reset()
     # Rules catch "Must be male" (true positive) and "Preferably under 30" (true positive) and, wrongly,
-    # "Built software for Catholic schools" (false positive). They miss "Young dynamic team member" (false negative).
+    # "Build the Gender: dropdown for the signup form" (false positive: the label is a form field). They miss "Someone with their whole career still ahead of them" (false negative).
     # "Knows Kubernetes" is a true negative. The Vietnamese pair is one true positive and one false negative.
     statements = [
         {"text": "Must be male", "language": "en", "label": True, "category": "gender"},
         {"text": "Preferably under 30", "language": "en", "label": True, "category": "age"},
-        {"text": "Built software for Catholic schools", "language": "en", "label": False, "category": "none"},
-        {"text": "Young dynamic team member", "language": "en", "label": True, "category": "age"},
+        {"text": "Build the Gender: dropdown for the signup form", "language": "en", "label": False, "category": "none"},
+        {"text": "Someone with their whole career still ahead of them", "language": "en", "label": True, "category": "age"},
         {"text": "Knows Kubernetes", "language": "en", "label": False, "category": "none"},
         {"text": "Dưới 30 tuổi", "language": "vi", "label": True, "category": "age"},
-        {"text": "Cần một bạn trẻ năng động", "language": "vi", "label": True, "category": "age"},
+        {"text": "Cần bạn có sức bật của tuổi đôi mươi", "language": "vi", "label": True, "category": "age"},
     ]
 
     report = _evaluate(tmp_path, statements=statements)
@@ -113,7 +113,7 @@ def test_precision_and_recall_on_a_tiny_injected_list(tmp_path):
 def test_classifier_hits_lift_combined_recall_but_not_rules_recall(tmp_path):
     fake.reset()
     fake.enqueue("discrimination_check", json.dumps({"flagged": True, "category": "age", "reason": "Implies youth."}))
-    statements = [{"text": "Young dynamic team member", "language": "en", "label": True, "category": "age"}]
+    statements = [{"text": "Someone with their whole career still ahead of them", "language": "en", "label": True, "category": "age"}]
 
     report = _evaluate(tmp_path, statements=statements)
 
@@ -128,7 +128,7 @@ def test_unchecked_results_are_counted_apart_and_not_as_positives(tmp_path, monk
         raise AIProviderError("down")
 
     monkeypatch.setattr(discrimination.gateway, "generate_structured", down)
-    statements = [{"text": "Young dynamic team member", "language": "en", "label": True, "category": "age"}]
+    statements = [{"text": "Someone with their whole career still ahead of them", "language": "en", "label": True, "category": "age"}]
 
     report = _evaluate(tmp_path, statements=statements)
 
