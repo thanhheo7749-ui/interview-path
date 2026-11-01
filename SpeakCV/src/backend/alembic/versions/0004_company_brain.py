@@ -29,6 +29,7 @@ def upgrade() -> None:
     sa.Column('question', sa.Text(), nullable=False),
     sa.Column('language', sa.String(length=10), nullable=False),
     sa.Column('answered', sa.Boolean(), nullable=False),
+    sa.Column('state', sa.String(length=20), nullable=True),
     sa.Column('top_score', sa.String(length=32), nullable=True),
     sa.Column('embedding', sa.LargeBinary(), nullable=True),
     sa.Column('embedding_model', sa.String(length=100), nullable=True),
