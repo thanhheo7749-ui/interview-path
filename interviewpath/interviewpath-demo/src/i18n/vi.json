@@ -22,7 +22,9 @@
     "settings": "Cài đặt công ty",
     "password": "Đổi mật khẩu",
     "company": "Công ty",
-    "signOut": "Đăng xuất"
+    "signOut": "Đăng xuất",
+    "graph": "Đồ thị tri thức",
+    "copilot": "Copilot"
   },
   "auth": {
     "loadFailed": "Không thể tải tài khoản của bạn. Hãy kiểm tra kết nối rồi thử lại.",
@@ -99,7 +101,7 @@
     "warningsTitle": "Hoàn tất kèm cảnh báo"
   },
   "demoAi": {
-    "notice": "Demo AI: câu trả lời là mô phỏng"
+    "notice": "AI demo: nội dung này đến từ nhà cung cấp demo tích hợp sẵn, không phải mô hình AI thật. Đừng dựa vào nó."
   },
   "documents": {
     "title": "Tài liệu",
@@ -180,5 +182,79 @@
     "empty": "Không có câu hỏi nào chưa được trả lời. Khi ai đó hỏi điều kiến thức chưa có, câu hỏi sẽ được liệt kê ở đây để bạn viết tài liệu còn thiếu.",
     "count_other": "Đã hỏi {{count}} lần",
     "resolve": "Đánh dấu đã xử lý"
+  },
+  "graph": {
+    "title": "Đồ thị tri thức",
+    "subtitle": "Tri thức của công ty trông như thế nào với từng nhóm người xem.",
+    "viewAs": "Xem với tư cách",
+    "audiences": {
+      "hr": "HR (tất cả)",
+      "manager": "Quản lý",
+      "employee": "Nhân viên",
+      "candidate": "Ứng viên"
+    },
+    "department": "Phòng ban của quản lý",
+    "anyDepartment": "Không có phòng ban",
+    "simulateNote": "Công tắc này chỉ mô phỏng nội dung mỗi nhóm được phép đọc. Đây là chế độ chỉ đọc và không thay đổi quyền truy cập của ai.",
+    "nodeCount": "Nút",
+    "linkCount": "Liên kết",
+    "legend": "Tầng",
+    "layers": {
+      "public": "Công khai",
+      "internal": "Nội bộ",
+      "confidential": "Bảo mật"
+    },
+    "types": {
+      "company": "Công ty",
+      "department": "Phòng ban",
+      "role": "Vị trí",
+      "requirement": "Yêu cầu",
+      "skill": "Kỹ năng",
+      "value": "Giá trị",
+      "behavior": "Hành vi",
+      "policy": "Chính sách",
+      "process": "Quy trình",
+      "fact": "Dữ kiện",
+      "private_note": "Ghi chú riêng"
+    },
+    "nodeList": "Danh sách nút",
+    "empty": "Nhóm người xem này không thấy nút nào.",
+    "loadFailed": "Không thể tải đồ thị. Hãy thử lại.",
+    "detail": "Nút đang chọn",
+    "noSelection": "Chọn một nút trong đồ thị hoặc danh sách để xem chi tiết.",
+    "type": "Loại",
+    "layer": "Tầng",
+    "connections": "Kết nối",
+    "noConnections": "Không có kết nối.",
+    "bodyUnavailable": "Chế độ đồ thị không kèm toàn văn của nút. Hãy mở các trang duyệt để đọc.",
+    "canvasLabel": "Đồ thị tri thức tương tác",
+    "hint": "Kéo nút để cân bằng lại. Nhấp vào nút để xem chi tiết."
+  },
+  "copilot": {
+    "title": "Copilot",
+    "subtitle": "Hỏi về chính sách và tài liệu của công ty. Câu trả lời chỉ lấy từ tài liệu bạn được phép đọc.",
+    "placeholder": "Đặt câu hỏi",
+    "inputLabel": "Câu hỏi của bạn",
+    "send": "Hỏi",
+    "asking": "Đang tìm trong tài liệu...",
+    "empty": "Chưa có câu hỏi nào.",
+    "counter": "{{count}} / {{max}}",
+    "you": "Bạn",
+    "states": {
+      "answered": "Đã trả lời",
+      "conflict": "Các nguồn mâu thuẫn",
+      "not_found": "Không tìm thấy"
+    },
+    "sources": "Nguồn",
+    "page": "trang {{page}}",
+    "effective": "có hiệu lực {{date}}",
+    "notShared": "Tài liệu của công ty (không chia sẻ)",
+    "conflictNotice": "Hai nguồn của công ty đang khác nhau về nội dung này. Chưa khẳng định gì cho đến khi HR xác nhận nguồn nào áp dụng.",
+    "notFoundNotice": "Không tìm thấy trong các tài liệu bạn được đọc. Câu hỏi đã được ghi lại cho HR.",
+    "errors": {
+      "unavailable": "Tri thức công ty chưa thể tìm kiếm. Người vận hành cần xây dựng lại chỉ mục tìm kiếm.",
+      "provider": "Dịch vụ AI không phản hồi. Vui lòng thử lại sau.",
+      "generic": "Copilot không thể trả lời câu hỏi này. Vui lòng thử lại."
+    }
   }
 }

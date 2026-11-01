@@ -1,7 +1,10 @@
+import { LAYER_COLORS } from './src/lib/layers.js';
+
 export default {
   content: ['./index.html', './src/**/*.{js,jsx}'],
   theme: {
     extend: {
+      colors: { layer: LAYER_COLORS },
       fontFamily: {
         sans: ['Plus Jakarta Sans', 'ui-sans-serif', 'system-ui', 'sans-serif'],
       },

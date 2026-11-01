@@ -19,7 +19,7 @@ test('HR uploads, reviews, resolves a conflict and sees an empty gap list', asyn
   await signIn(page, BRAIN_USER);
 
   // Fake AI slots show the Demo AI notice.
-  await expect(page.getByText('Demo AI: answers are simulated')).toBeVisible();
+  await expect(page.getByTestId('demo-ai-notice')).toContainText('Demo AI');
 
   await upload(page, 'leave.md', 'Leave policy');
 

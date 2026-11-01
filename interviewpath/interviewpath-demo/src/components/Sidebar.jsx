@@ -1,4 +1,4 @@
-import { AlertTriangle, BrainCircuit, ClipboardCheck, FileText, HelpCircle, KeyRound, LogOut, Settings } from "lucide-react";
+import { AlertTriangle, BrainCircuit, ClipboardCheck, FileText, HelpCircle, KeyRound, LogOut, MessageSquare, Network, Settings } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { NavLink } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext.jsx";
@@ -16,6 +16,8 @@ const kbNavItems = [
 
 const navItems = [
   { labelKey: "nav.settings", to: "/settings", icon: Settings },
+  { labelKey: "nav.graph", to: "/graph", icon: Network, hrOnly: true },
+  { labelKey: "nav.copilot", to: "/copilot", icon: MessageSquare },
   { labelKey: "nav.password", to: "/account/password", icon: KeyRound },
 ];
 
@@ -25,7 +27,7 @@ function Sidebar() {
   const { memberships, membership, selectCompany } = useCompany();
   const isHr = membership?.role === "hr";
   const kbCounts = useKbCounts(membership?.company_id ?? null, isHr);
-  const items = isHr ? [...navItems, ...kbNavItems] : navItems;
+  const items = [...navItems.filter((item) => !item.hrOnly || isHr), ...(isHr ? kbNavItems : [])];
 
   return (
     <aside className="fixed inset-y-0 left-0 z-30 flex w-64 flex-col border-r border-slate-200 bg-white px-4 py-5 shadow-panel">

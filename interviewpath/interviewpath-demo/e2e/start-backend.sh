@@ -15,13 +15,14 @@ export ADMIN_EMAIL= ADMIN_PASSWORD=
 for slot in REASONING BULK EMBEDDING STT TTS; do export "AI_${slot}_PROVIDER=fake"; done
 PY=.venv/bin/python
 $PY -m app.cli migrate
+if [ "${E2E_SEED_SAMPLES:-}" = "1" ]; then
+  # Sample users get this known test password, so specs can sign in without the forced password change.
+  export SAMPLE_USER_PASSWORD=e2e-sample-password-123
+  $PY -m app.cli seed-samples --auto-approve
+fi
 HR_PASSWORD=$($PY -m app.cli create-company --slug e2e --name "E2E Company" --hr-email hr@e2e.test --hr-name "E2E HR" --sample | awk '/Temporary password/ {print $NF}')
 printf '%s' "$HR_PASSWORD" > "$E2E_TMP/portal_e2e_password"
 # A second company for the knowledge specs, so they do not disturb the password flow tested in login.spec.js.
 BRAIN_PASSWORD=$($PY -m app.cli create-company --slug brain --name "Brain Company" --hr-email brain-hr@e2e.test --hr-name "Brain HR" | awk '/Temporary password/ {print $NF}')
 printf '%s' "$BRAIN_PASSWORD" > "$E2E_TMP/portal_e2e_brain_password"
-# Optional extra sample companies; the other specs run without them.
-if [ -n "${E2E_SEED_SAMPLES:-}" ]; then
-  $PY -m app.cli seed-samples --auto-approve
-fi
 exec env PYTHONPATH=. $PY "$E2E_DIR/serve-backend.py" "${E2E_API_PORT:-8099}"

@@ -1,16 +1,52 @@
 {
   "nodes": [
     {
-      "ref": "Annual leave days", "type": "policy", "title": "Annual leave days",
+      "ref": "Annual leave days",
+      "type": "policy",
+      "title": "Annual leave days",
       "body": "Full-time employees receive paid annual leave per calendar year. Annual leave days.",
       "quote": "Full-time employees receive 12 days of paid annual leave per calendar year.",
-      "fact_kind": "number", "fact_value": "12", "fact_unit": "days", "scope_text": "Full-time employees", "effective_date": ""
+      "fact_kind": "number",
+      "fact_value": "12",
+      "fact_unit": "days",
+      "scope_text": "Full-time employees",
+      "effective_date": ""
     },
     {
-      "ref": "Annual leave days policy", "type": "policy", "title": "Annual leave days policy",
+      "ref": "Annual leave days policy",
+      "type": "policy",
+      "title": "Annual leave days policy",
       "body": "Full-time employees receive paid annual leave per calendar year. Annual leave days.",
       "quote": "Full-time employees receive 15 days of paid annual leave per calendar year.",
-      "fact_kind": "number", "fact_value": "15", "fact_unit": "days", "scope_text": "Full-time employees", "effective_date": ""
+      "fact_kind": "number",
+      "fact_value": "15",
+      "fact_unit": "days",
+      "scope_text": "Full-time employees",
+      "effective_date": ""
+    },
+    {
+      "ref": "Zephyrk7 welcome note greets visitors at the harbour gate",
+      "type": "policy",
+      "title": "Zephyrk7 welcome note greets visitors at the harbour gate",
+      "body": "Zephyrk7 welcome note greets visitors at the harbour gate\n\nThis note was written for the end-to-end test.",
+      "quote": "Zephyrk7 welcome note greets visitors at the harbour gate",
+      "fact_kind": "none",
+      "fact_value": "",
+      "fact_unit": "",
+      "scope_text": "",
+      "effective_date": ""
+    },
+    {
+      "ref": "Zephyrk7 quokka lantern onboarding grants amber badges",
+      "type": "policy",
+      "title": "Zephyrk7 quokka lantern onboarding grants amber badges",
+      "body": "Zephyrk7 quokka lantern onboarding grants amber badges\n\nThis note was written for the end-to-end test.",
+      "quote": "Zephyrk7 quokka lantern onboarding grants amber badges",
+      "fact_kind": "none",
+      "fact_value": "",
+      "fact_unit": "",
+      "scope_text": "",
+      "effective_date": ""
     }
   ],
   "edges": []

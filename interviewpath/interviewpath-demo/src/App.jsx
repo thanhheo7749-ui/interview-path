@@ -5,6 +5,8 @@ import SampleBanner from './components/SampleBanner.jsx';
 import Sidebar from './components/Sidebar.jsx';
 import ChangePasswordPage from './routes/ChangePasswordPage.jsx';
 import CompanySettingsPage from './routes/CompanySettingsPage.jsx';
+import CopilotPage from './routes/CopilotPage.jsx';
+import GraphPage from './routes/GraphPage.jsx';
 import LoginPage from './routes/LoginPage.jsx';
 import ConflictsPage from './routes/ConflictsPage.jsx';
 import DocumentsPage from './routes/DocumentsPage.jsx';
@@ -52,7 +54,9 @@ function App() {
           <Route path="/review" element={<ReviewPage />} />
           <Route path="/conflicts" element={<ConflictsPage />} />
           <Route path="/gaps" element={<GapsPage />} />
+          <Route path="/graph" element={<GraphPage />} />
         </Route>
+        <Route path="/copilot" element={<CopilotPage />} />
         <Route path="*" element={<Navigate to="/settings" replace />} />
       </Route>
     </Routes>
