@@ -1,0 +1,122 @@
+"""Job posting logic: versioned requirements, publishing and tracked channel links."""
+import re
+import secrets
+from datetime import datetime, timezone
+
+from sqlalchemy.orm import Session
+
+from app.brain import audience as aud
+from app.brain import retriever
+from app.database.sql_models import Company, Job, JobChannelLink, JobRequirement
+
+
+class JobError(ValueError):
+    """Carries an HTTP-friendly status so routers can translate it."""
+
+    def __init__(self, status_code: int, detail: str):
+        super().__init__(detail)
+        self.status_code = status_code
+        self.detail = detail
+
+
+def active_requirements(db: Session, job_id: int) -> list[JobRequirement]:
+    return (
+        db.query(JobRequirement)
+        .filter(JobRequirement.job_id == job_id, JobRequirement.active.is_(True))
+        .order_by(JobRequirement.position, JobRequirement.id)
+        .all()
+    )
+
+
+def _key(text, must_have, visibility, node_id) -> tuple:
+    return (text, bool(must_have), visibility, node_id)
+
+
+def _field(item, name, default=None):
+    return item.get(name, default) if isinstance(item, dict) else getattr(item, name, default)
+
+
+def update_requirements(db: Session, job: Job, items) -> None:
+    """Unchanged rows stay, removed or changed rows go inactive, new rows are added. Any difference bumps version once.
+
+    Old rows are kept (inactive) so results that point at them stay valid.
+    """
+    existing_any = db.query(JobRequirement.id).filter(JobRequirement.job_id == job.id).first() is not None
+    unmatched: dict[tuple, list[JobRequirement]] = {}
+    for row in active_requirements(db, job.id):
+        unmatched.setdefault(_key(row.text, row.must_have, row.visibility, row.node_id), []).append(row)
+
+    changed = False
+    for position, item in enumerate(items):
+        key = _key(_field(item, "text"), _field(item, "must_have", False), _field(item, "visibility", "public"),
+                   _field(item, "node_id"))
+        matches = unmatched.get(key)
+        if matches:
+            matches.pop(0).position = position
+        else:
+            changed = True
+            db.add(JobRequirement(
+                company_id=job.company_id, job_id=job.id, node_id=key[3], text=key[0], must_have=key[1],
+                visibility=key[2], position=position, active=True,
+            ))
+    for rows in unmatched.values():
+        for row in rows:
+            row.active = False
+            changed = True
+    # The first requirements a job ever gets are its initial state, not an edit.
+    if changed and existing_any:
+        job.version += 1
+    db.flush()
+
+
+def prefill(db: Session, company_id: int, role_node_id: int) -> dict | None:
+    """HR sees every layer, so confidential requirements are returned with their visibility for HR to review."""
+    audience = aud.simulated(db, company_id, "hr", None)
+    profile = retriever.role_profile(db, audience, role_node_id)
+    if profile is None:
+        return None
+    return {
+        "role_node_id": profile.role_node_id,
+        "title": profile.title,
+        "description": profile.body,
+        "department_id": profile.department_id,
+        "requirements": [
+            {"text": item.body.strip() or item.title, "must_have": item.must_have,
+             "visibility": item.visibility, "node_id": item.node_id}
+            for item in profile.requirements
+        ],
+    }
+
+
+def _slugify(text: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-")
+
+
+def publish(db: Session, job: Job, company: Company) -> None:
+    if job.status != "draft":
+        raise JobError(409, "Only a draft job can be published")
+    if not (job.description or "").strip():
+        raise JobError(422, "A job needs a description before it is published")
+    if not active_requirements(db, job.id):
+        raise JobError(422, "A job needs at least one requirement before it is published")
+    base = _slugify(f"{company.slug} {job.title}")[:130].strip("-") or "job"
+    slug = f"{base}-{secrets.token_hex(3)}"
+    while db.query(Job.id).filter(Job.slug == slug).first() is not None:
+        slug = f"{base}-{secrets.token_hex(4)}"
+    job.slug = slug
+    job.status = "published"
+    job.published_at = datetime.now(timezone.utc)
+    db.flush()
+
+
+def ensure_channels(db: Session, job: Job, channels: list[str]) -> list[JobChannelLink]:
+    result = []
+    for channel in dict.fromkeys(channels):
+        link = db.query(JobChannelLink).filter_by(job_id=job.id, company_id=job.company_id, channel=channel).first()
+        if link is None:
+            link = JobChannelLink(company_id=job.company_id, job_id=job.id, channel=channel,
+                                  token=secrets.token_urlsafe(16))
+            db.add(link)
+        result.append(link)
+    db.flush()
+    return result

@@ -15,7 +15,7 @@ from app.ai.config import get_config
 from app.brain import fake_demo, ingestion, org_sync
 from app.database.database import SessionLocal
 from app.database.sql_models import (
-    Company, CompanyMember, Department, KbConflict, KbDocument, KbEdge, KbIngestionJob, KbNode, User,
+    Company, CompanyMember, Department, Job, KbConflict, KbDocument, KbEdge, KbIngestionJob, KbNode, User,
 )
 
 SAMPLES_DIR = Path(__file__).resolve().parents[2] / "seed" / "sample_companies"
@@ -150,7 +150,42 @@ def _seed_company(db, folder: Path, passwords: _Passwords, auto_approve: bool, u
             auto_approve_document(db, document.id, hr.id if hr else None)
 
     db.expire_all()
+    _seed_job(db, company)
     return _summary(db, company, created, skipped)
+
+
+def _seed_job(db, company: Company) -> None:
+    """One published Backend Developer job per sample company. Skipped when the company already has a job."""
+    from app.brain import audience as aud
+    from app.brain import retriever
+    from app.hiring import jobs
+
+    # The pipeline wrote in another session. End this transaction so the reads below see it.
+    db.commit()
+    if db.query(Job.id).filter_by(company_id=company.id).first() is not None:
+        return
+    role = db.query(KbNode).filter_by(
+        company_id=company.id, type="role", title="Backend Developer", status="published"
+    ).order_by(KbNode.id).first()
+    if role is None:
+        return
+    profile = retriever.role_profile(db, aud.simulated(db, company.id, "hr", None), role.id)
+    if profile is None or not profile.requirements:
+        return
+    job = Job(
+        company_id=company.id, department_id=role.department_id, role_node_id=role.id, title=role.title,
+        description=role.body, status="draft", version=1, interview_languages=["vi", "en", "ko"],
+    )
+    db.add(job)
+    db.flush()
+    jobs.update_requirements(db, job, [
+        {"text": item.body.strip() or item.title, "must_have": item.must_have, "visibility": item.visibility,
+         "node_id": item.node_id}
+        for item in profile.requirements
+    ])
+    jobs.publish(db, job, company)
+    jobs.ensure_channels(db, job, ["company_site", "linkedin", "referral"])
+    db.commit()
 
 
 def _summary(db, company: Company, created: int, skipped: int) -> dict:
