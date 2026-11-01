@@ -6,6 +6,7 @@ from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.ai.config import SLOTS, get_config
 from app.auth import security
 from app.auth.dependencies import get_authenticated_user, require_member
 from app.database.database import get_db
@@ -108,6 +109,12 @@ def _member_out(member: CompanyMember, user: User) -> dict:
         "department_id": member.department_id,
         "role": member.role,
     }
+
+
+@router.get("/api/ai-status")
+def ai_status(user: User = Depends(get_authenticated_user)) -> dict:
+    config = get_config()
+    return {"fake_slots": [slot for slot in SLOTS if config.slot(slot).provider == "fake"]}
 
 
 @router.get("/api/me", response_model=MeOut)

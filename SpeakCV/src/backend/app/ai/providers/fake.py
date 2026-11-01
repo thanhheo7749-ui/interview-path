@@ -9,6 +9,8 @@ from app.ai.schema import to_strict_schema
 from app.ai.types import ProviderAudio, ProviderEmbedding, ProviderText, ProviderTranscript, Usage
 
 _queues = defaultdict(deque)
+_responders = {}
+_last_system = {"value": ""}
 _current_feature = {"value": None}
 _last_messages = {"value": []}
 _TOKEN = re.compile(r"\w+", re.UNICODE)
@@ -19,8 +21,19 @@ def enqueue(feature: str, text: str) -> None:
     _queues[feature].append(text)
 
 
+def register(feature: str, fn) -> None:
+    """Answer calls for this feature with fn(system, messages, schema) -> text once the queue is empty."""
+    _responders[feature] = fn
+
+
+def last_system() -> str:
+    return _last_system["value"]
+
+
 def reset() -> None:
     _queues.clear()
+    _responders.clear()
+    _last_system["value"] = ""
     _last_messages["value"] = []
 
 
@@ -53,20 +66,24 @@ def _default_value(schema: dict):
 
 
 class FakeProvider:
-    def _next(self) -> str | None:
+    def _next(self, system: str, messages: list[dict], schema: dict | None) -> str | None:
+        _last_system["value"] = system or ""
         queue = _queues.get(_current_feature["value"])
-        return queue.popleft() if queue else None
+        if queue:
+            return queue.popleft()
+        responder = _responders.get(_current_feature["value"])
+        return responder(system, messages, schema) if responder else None
 
     def generate_text(self, *, model, system, messages, max_output_tokens) -> ProviderText:
         _last_messages["value"] = list(messages)
-        text = self._next()
+        text = self._next(system, messages, None)
         if text is None:
             text = f"[fake:{model}] {messages[-1]['content'][:80]}"
         return ProviderText(text=text, usage=_usage(system, messages, text))
 
     def generate_structured(self, *, model, system, messages, schema, max_output_tokens) -> ProviderText:
         _last_messages["value"] = list(messages)
-        text = self._next()
+        text = self._next(system, messages, schema)
         if text is None:
             text = json.dumps(_default_value(to_strict_schema(schema)), ensure_ascii=False)
         return ProviderText(text=text, usage=_usage(system, messages, text))

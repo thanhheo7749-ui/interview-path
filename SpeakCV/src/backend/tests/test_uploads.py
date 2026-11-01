@@ -56,3 +56,8 @@ def test_transcribe_never_writes_a_file_named_by_the_client(tmp_path, monkeypatc
     assert response.status_code == 200
     assert not (tmp_path.parent.parent / "evil_upload.webm").exists()
     assert os.listdir(tmp_path) == []
+
+
+def test_missing_type_is_guessed_from_the_extension(upload_client):
+    response = upload_client.post("/upload", files={"file": ("a.webm", b"abc", "application/octet-stream")})
+    assert response.status_code == 200
