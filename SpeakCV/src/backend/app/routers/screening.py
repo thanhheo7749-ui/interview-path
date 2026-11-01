@@ -41,7 +41,7 @@ class StateOut(BaseModel):
     notice: str | None
 
 
-def _out(session_id: int, state: voice.SessionState) -> StateOut:
+def state_out(session_id: int, state: voice.SessionState) -> StateOut:
     return StateOut(session_id=session_id, **asdict(state))
 
 
@@ -59,10 +59,12 @@ def _owned_application(db: Session, user_id: int, application_id: int, lock: boo
     return application
 
 
-def _owned_session(db: Session, user_id: int, session_id: int) -> VoiceSession:
-    session = db.query(VoiceSession).filter(
-        VoiceSession.id == session_id, VoiceSession.owner_user_id == user_id, VoiceSession.purpose == PURPOSE,
-    ).first()
+def _owned_session(db: Session, user_id: int, session_id: int, purpose: str | None = None) -> VoiceSession:
+    """A session belongs to its owner, whatever its purpose. The /api/screening aliases pass the purpose they serve."""
+    query = db.query(VoiceSession).filter(VoiceSession.id == session_id, VoiceSession.owner_user_id == user_id)
+    if purpose is not None:
+        query = query.filter(VoiceSession.purpose == purpose)
+    session = query.first()
     if session is None:
         raise _not_found()
     return session
@@ -88,7 +90,7 @@ def _resume(db: Session, session: VoiceSession) -> StateOut | None:
     """The state of a session still running, or None if the clock has just finished it."""
     session_id = session.id
     state = _current_state(db, session)
-    return None if state.status in voice.TERMINAL_STATUSES else _out(session_id, state)
+    return None if state.status in voice.TERMINAL_STATUSES else state_out(session_id, state)
 
 
 def _check_can_start(application: Application) -> None:
@@ -138,12 +140,21 @@ def start(application_id: int, body: StartIn, user: User = Depends(get_authentic
                  payload={"language": body.language, "questions": len(plan)})
     db.commit()
     session_id = session.id
-    return _out(session_id, _current_state(db, session))
+    return state_out(session_id, _current_state(db, session))
+
+
+def _get_state(db: Session, user_id: int, session_id: int, purpose: str | None) -> StateOut:
+    return state_out(session_id, _current_state(db, _owned_session(db, user_id, session_id, purpose)))
+
+
+@router.get("/api/voice/{session_id}/state", response_model=StateOut)
+def get_voice_state(session_id: int, user: User = Depends(get_authenticated_user), db: Session = Depends(get_db)):
+    return _get_state(db, user.id, session_id, None)
 
 
 @router.get("/api/screening/{session_id}/state", response_model=StateOut)
 def get_state(session_id: int, user: User = Depends(get_authenticated_user), db: Session = Depends(get_db)):
-    return _out(session_id, _current_state(db, _owned_session(db, user.id, session_id)))
+    return _get_state(db, user.id, session_id, PURPOSE)
 
 
 async def _read_audio(file: UploadFile) -> tuple[bytes, str]:
@@ -162,19 +173,40 @@ async def _read_audio(file: UploadFile) -> tuple[bytes, str]:
     return b"".join(chunks), mime_type
 
 
-def _submit(db: Session, user_id: int, session_id: int, position: int, audio: bytes, mime_type: str) -> StateOut:
-    session = _owned_session(db, user_id, session_id)
-    if not consents.has_active(db, user_id, CONSENT_PURPOSE, application_id=session.application_id):
+def _submit(db: Session, user_id: int, session_id: int, position: int, audio: bytes, mime_type: str,
+            purpose: str | None) -> StateOut:
+    session = _owned_session(db, user_id, session_id, purpose)
+    # Only a candidate's recording rests on the consent they gave; a manager is a member of the company.
+    if session.purpose == PURPOSE and not consents.has_active(
+        db, user_id, CONSENT_PURPOSE, application_id=session.application_id
+    ):
         raise HTTPException(status_code=409, detail="Your recording consent has been withdrawn")
     try:
-        return _out(session_id, voice.submit_answer(db, session, position, audio, mime_type))
+        return state_out(session_id, voice.submit_answer(db, session, position, audio, mime_type))
     except voice.PositionNotCurrent as exc:
         raise HTTPException(status_code=409, detail="This is not the current question") from exc
     except voice.SessionGone as exc:
         raise _not_found() from exc
 
 
+async def _answer(db: Session, user_id: int, session_id: int, position: int, file: UploadFile, purpose: str | None):
+    await run_in_threadpool(_owned_session, db, user_id, session_id, purpose)
+    audio, mime_type = await _read_audio(file)
+    return await run_in_threadpool(_submit, db, user_id, session_id, position, audio, mime_type, purpose)
+
+
 # Declares only the file: a transcript or history sent by the client has nowhere to go.
+@router.post("/api/voice/{session_id}/turns/{position}/answer", response_model=StateOut)
+async def submit_voice_answer(
+    session_id: int,
+    position: int,
+    file: UploadFile = File(...),
+    user: User = Depends(get_authenticated_user),
+    db: Session = Depends(get_db),
+):
+    return await _answer(db, user.id, session_id, position, file, None)
+
+
 @router.post("/api/screening/{session_id}/turns/{position}/answer", response_model=StateOut)
 async def submit_answer(
     session_id: int,
@@ -183,15 +215,11 @@ async def submit_answer(
     user: User = Depends(get_authenticated_user),
     db: Session = Depends(get_db),
 ):
-    user_id = user.id
-    await run_in_threadpool(_owned_session, db, user_id, session_id)
-    audio, mime_type = await _read_audio(file)
-    return await run_in_threadpool(_submit, db, user_id, session_id, position, audio, mime_type)
+    return await _answer(db, user.id, session_id, position, file, PURPOSE)
 
 
-@router.get("/api/screening/{session_id}/turns/{position}/question-audio")
-def question_audio(session_id: int, position: int, user: User = Depends(get_authenticated_user), db: Session = Depends(get_db)):
-    session = _owned_session(db, user.id, session_id)
+def _question_audio(db: Session, user_id: int, session_id: int, position: int, purpose: str | None):
+    session = _owned_session(db, user_id, session_id, purpose)
     turn = db.query(VoiceTurn).filter_by(session_id=session.id, position=position).first()
     if turn is None or not turn.question_text:
         raise _not_found()
@@ -202,3 +230,14 @@ def question_audio(session_id: int, position: int, user: User = Depends(get_auth
     except AIError:
         return Response(status_code=204)
     return Response(content=result.audio, media_type=result.mime_type, headers={"Cache-Control": "no-store"})
+
+
+@router.get("/api/voice/{session_id}/turns/{position}/question-audio")
+def voice_question_audio(session_id: int, position: int, user: User = Depends(get_authenticated_user),
+                         db: Session = Depends(get_db)):
+    return _question_audio(db, user.id, session_id, position, None)
+
+
+@router.get("/api/screening/{session_id}/turns/{position}/question-audio")
+def question_audio(session_id: int, position: int, user: User = Depends(get_authenticated_user), db: Session = Depends(get_db)):
+    return _question_audio(db, user.id, session_id, position, PURPOSE)

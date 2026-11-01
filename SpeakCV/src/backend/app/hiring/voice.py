@@ -39,6 +39,11 @@ ALLOWED_AUDIO = {
 }
 CLOSING_AFTER_SECONDS = 13 * 60
 HARD_LIMIT_SECONDS = 15 * 60
+# The one place limits per purpose live: (closing after, hard limit), in active seconds.
+PURPOSE_LIMITS = {
+    "screening": (CLOSING_AFTER_SECONDS, HARD_LIMIT_SECONDS),
+    "intake": (6 * 60, 7 * 60 + 30),
+}
 RESUME_HOURS = 24
 MAX_COUNTED_GAP_SECONDS = 210  # the 3 minutes an answer may take, and time to upload it
 MAX_FOLLOWUPS_PER_QUESTION = 1
@@ -163,13 +168,7 @@ class PurposeRules:
     max_followups_per_question: int
     max_counted_gap_seconds: int
     decide_followup: FOLLOWUP_HOOK
-
-
-# Add a purpose here, with its own limits and hook. A session of a purpose not listed cannot be created.
-PURPOSES = {
-    "screening": PurposeRules(CLOSING_AFTER_SECONDS, HARD_LIMIT_SECONDS, RESUME_HOURS, MAX_FOLLOWUPS_PER_QUESTION,
-                              MAX_COUNTED_GAP_SECONDS, screening_followup),
-}
+    on_complete: Callable[["SessionInfo"], None]  # runs after the completing request has committed; must not raise
 
 
 def schedule_analysis(application_id: int) -> None:
@@ -193,6 +192,49 @@ def _schedule(application_id: int | None) -> None:
         schedule_analysis(application_id)
     except Exception as exc:
         logger.error("Could not schedule analysis for application %s: %s", application_id, type(exc).__name__)
+
+
+def _on_screening_complete(info: SessionInfo) -> None:
+    _schedule(info.application_id)
+
+
+def schedule_intake(session_id: int) -> None:
+    """Turning the transcript into a document is slow (masking, then the pipeline), so it runs on its own thread."""
+    run = importlib.import_module("app.bridges.intake").run_completion  # imported here: intake depends on this engine
+
+    def work():
+        try:
+            run(session_id)
+        except Exception as exc:
+            logger.error("Intake completion failed for session %s: %s", session_id, type(exc).__name__)
+
+    threading.Thread(target=work, name=f"intake-{session_id}", daemon=True).start()
+
+
+def _on_intake_complete(info: SessionInfo) -> None:
+    schedule_intake(info.id)
+
+
+# Add a purpose here, with its own limits and hooks. A session of a purpose not listed cannot be created.
+PURPOSES = {
+    "screening": PurposeRules(*PURPOSE_LIMITS["screening"], RESUME_HOURS, MAX_FOLLOWUPS_PER_QUESTION,
+                              MAX_COUNTED_GAP_SECONDS, screening_followup, _on_screening_complete),
+    "intake": PurposeRules(*PURPOSE_LIMITS["intake"], RESUME_HOURS, MAX_FOLLOWUPS_PER_QUESTION,
+                           MAX_COUNTED_GAP_SECONDS, screening_followup, _on_intake_complete),
+}
+
+
+def _after_complete(info: SessionInfo) -> None:
+    """The session is already committed: a failure here must not fail the request that finished it."""
+    try:
+        PURPOSES[info.purpose].on_complete(info)
+    except Exception as exc:
+        logger.error("Completion hook failed for session %s: %s", info.id, type(exc).__name__)
+
+
+def _info(session: VoiceSession) -> SessionInfo:
+    return SessionInfo(session.id, session.company_id, session.purpose, session.application_id,
+                       session.owner_user_id, session.language, session.plan)
 
 
 def _now() -> datetime:
@@ -331,11 +373,11 @@ def _apply_clock(db, session: VoiceSession, now: datetime | None = None) -> bool
     action = _clock_action(db, session, now or _now())
     if action is None:
         return False
-    application_id = session.application_id
+    info = _info(session)
     action(db, session)
     db.commit()
     if action is _complete:
-        _schedule(application_id)
+        _after_complete(info)
     return True
 
 
@@ -494,8 +536,7 @@ def submit_answer(db, session: VoiceSession, position: int, audio: bytes, mime_t
     root = current.parent_position or current.position
     followups_asked = sum(1 for turn in turns if turn.parent_position == root)
     may_follow_up = not closing and followups_asked < rules.max_followups_per_question
-    info = SessionInfo(session.id, session.company_id, session.purpose, session.application_id,
-                       session.owner_user_id, session.language, session.plan)
+    info = _info(session)
     question = AnsweredTurn(current.position, current.question_text, current.question_source, current.source_ref,
                             bool(current.is_followup), current.parent_position, "")
     db.rollback()
@@ -515,7 +556,6 @@ def submit_answer(db, session: VoiceSession, position: int, audio: bytes, mime_t
     old_path = turn.audio_path
     path = recordings.save_turn_audio(session.company_id, _owner_key(session), position, audio, suffix)
     turn.audio_path = path
-    application_id = session.application_id
     notice = None
     completed = False
     if result is None:
@@ -539,5 +579,5 @@ def submit_answer(db, session: VoiceSession, position: int, audio: bytes, mime_t
     if old_path and old_path != path:
         recordings.delete(old_path)
     if completed:
-        _schedule(application_id)
+        _after_complete(info)
     return _state(db, session, notice)
