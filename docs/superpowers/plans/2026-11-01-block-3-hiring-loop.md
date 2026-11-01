@@ -16,6 +16,7 @@
 
 - Git commit messages: a single line, no body, never a `Co-Authored-By` trailer. Commit only the files your task touches.
 - Never print, log or commit values from `.env` files. Do not push. Do not touch Docker containers you did not start.
+- Routes that call the AI gateway must not block the event loop: use plain `def`, or wrap the call in `run_in_threadpool` when the route must stay `async` because of `read_upload`.
 - Business code imports only `app.ai.gateway`. Names no AI vendor.
 - **AI never rejects anyone.** Only an HR action sets a rejection. `hr_decision` is written only in `app/hiring/decisions.py`.
 - A weak CV still gets the interview. The CV label never changes automatically, only through an HR correction with a logged reason.

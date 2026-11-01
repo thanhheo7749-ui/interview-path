@@ -16,6 +16,7 @@
 
 - Git commit messages: a single line, no body, never a `Co-Authored-By` trailer. Commit only the files your task touches.
 - Never print, log or commit values from `.env` files. Do not push. Do not touch Docker containers you did not start.
+- Routes that call the AI gateway must not block the event loop: use plain `def`, or wrap the call in `run_in_threadpool` when the route must stay `async` because of `read_upload`.
 - Business code imports only `app.ai.gateway`.
 - JD generation uses `retriever.search` and `role_profile` with the candidate audience.
 - AI cannot add salary, benefits or requirements absent from the graph. A line with no valid source is rejected by code unless HR confirms it, which records `hr_confirmed` with user and time and labels the line "Confirmed by HR".

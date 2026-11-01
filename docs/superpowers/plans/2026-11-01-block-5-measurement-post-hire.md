@@ -16,6 +16,7 @@
 
 - Git commit messages: a single line, no body, never a `Co-Authored-By` trailer. Commit only the files your task touches.
 - Never print, log or commit values from `.env` files. Do not push. Do not touch Docker containers you did not start.
+- Routes that call the AI gateway must not block the event loop: use plain `def`, or wrap the call in `run_in_threadpool` when the route must stay `async` because of `read_upload`.
 - Business code imports only `app.ai.gateway`.
 - **Numbers are computed by code.** AI may explain a computed table, but may not produce figures. Every number in commentary must exist in the table.
 - Requirements never change automatically. Reality Check only suggests, by a fixed rule with no AI.
