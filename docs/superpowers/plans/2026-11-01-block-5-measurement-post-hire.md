@@ -42,7 +42,7 @@
 ### Task 1: Data model and simulator
 
 **Files:**
-- Create: `SpeakCV/src/backend/app/database/models_insights.py`, `app/insights/__init__.py`, `app/insights/simulator.py`, `alembic/versions/0007_measurement.py`, `tests/test_insights_simulator.py`
+- Create: `SpeakCV/src/backend/app/database/models_insights.py`, `app/insights/__init__.py`, `app/insights/simulator.py`, `alembic/versions/0008_measurement.py`, `tests/test_insights_simulator.py`
 - Modify: `app/database/sql_models.py`, `app/cli.py`, root `Makefile`
 
 **Interfaces:**
@@ -191,7 +191,7 @@ def suggestion_for(hired_total, hired_with_requirement, low_pct=30, high_pct=70,
     return "keep"
 ```
 
-Per-company thresholds: add `reality_low_pct=30`, `reality_high_pct=70`, `reality_min_hired=10` to `companies` through a new migration `0008_reality_thresholds`, chained after the current head. If Task 1's `0007` is the head, use it as `down_revision`.
+Per-company thresholds: add `reality_low_pct=30`, `reality_high_pct=70`, `reality_min_hired=10` to `companies` through a new migration `0009_reality_thresholds`, chained after the current head. If Task 1's `0008` is the head, use it as `down_revision`.
 
 - [ ] **Step 4: Run the tests**
 

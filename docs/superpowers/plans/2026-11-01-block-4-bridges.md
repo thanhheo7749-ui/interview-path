@@ -42,7 +42,7 @@
 ### Task 1: Data model and discrimination guard
 
 **Files:**
-- Create: `SpeakCV/src/backend/app/database/models_bridges.py`, `app/bridges/__init__.py`, `app/bridges/discrimination.py`, `alembic/versions/0006_bridges.py`, `tests/test_bridges_discrimination.py`
+- Create: `SpeakCV/src/backend/app/database/models_bridges.py`, `app/bridges/__init__.py`, `app/bridges/discrimination.py`, `alembic/versions/0007_bridges.py`, `tests/test_bridges_discrimination.py`
 - Modify: `app/database/sql_models.py`, `app/database/models_brain.py`, `app/brain/ingestion.py`, `app/brain/review.py`, `app/hiring/jobs.py`, `app/brain/fake_demo.py`
 
 **Interfaces:**

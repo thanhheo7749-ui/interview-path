@@ -45,7 +45,7 @@
 ### Task 1: Hiring data model and shared services
 
 **Files:**
-- Create: `SpeakCV/src/backend/app/database/models_hiring.py`, `app/hiring/__init__.py`, `app/hiring/state.py`, `app/hiring/audit.py`, `app/hiring/consents.py`, `app/hiring/notify.py`, `alembic/versions/0005_hiring.py`, `tests/test_hiring_state.py`, `tests/test_hiring_consents.py`, `tests/test_hiring_notify.py`
+- Create: `SpeakCV/src/backend/app/database/models_hiring.py`, `app/hiring/__init__.py`, `app/hiring/state.py`, `app/hiring/audit.py`, `app/hiring/consents.py`, `app/hiring/notify.py`, `alembic/versions/0006_hiring.py`, `tests/test_hiring_state.py`, `tests/test_hiring_consents.py`, `tests/test_hiring_notify.py`
 - Modify: `app/database/sql_models.py`, `app/database/models_brain.py` only if an import is needed, `.env.example`, `docker-compose.yml`, `docker-compose.prod.yml`
 
 **Interfaces:**
@@ -124,7 +124,7 @@ Column types: IDs are `Integer` with `ForeignKey`; text bodies are `Text` (`LONG
 
 `hr_decision` is `String(20)`, default `"pending"`, not nullable. `purpose` on `voice_sessions` is `screening` or `intake`.
 
-Generate `alembic/versions/0005_hiring.py` against the current head.
+Generate `alembic/versions/0006_hiring.py` against the current head.
 
 Add `RECORDINGS_DIR=./recordings` and optional `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM` to `.env.example`. Add `recordings/` to `.gitignore`. Add a named volume `speakcv_recordings:/data/recordings` and `RECORDINGS_DIR: /data/recordings` to `speakcv-backend` in both compose files.
 
