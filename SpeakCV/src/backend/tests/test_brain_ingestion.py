@@ -775,3 +775,13 @@ def test_seed_fixture_edges_all_pass_the_relation_table(db, tmp_path, monkeypatc
     results = seed.seed_samples(auto_approve=True)
     assert all(result["dropped_items"] == 0 for result in results)
     assert all(result["open_conflicts"] == 4 for result in results)
+
+
+def test_demo_extraction_with_a_short_heading_still_passes_the_quote_gate(db, company):
+    from app.brain import fake_demo
+
+    fake_demo.load_extraction_fixture([])
+    fake_demo.install()
+    job = run(db, make_doc(db, company))
+    assert job.dropped_items == 0
+    assert db.query(KbNode).filter_by(title="Leave", type="policy").count() == 1
