@@ -1,5 +1,6 @@
 import json
 import types
+from datetime import datetime, timedelta, timezone
 
 import pytest
 from fastapi.testclient import TestClient
@@ -195,6 +196,47 @@ def test_audio_plays_audits_and_hides_other_companies(db, world, api, monkeypatc
     assert api.get(path, headers=hr(world)).status_code == 404
     assert api.get(path, headers=world["people"]["emp"]["headers"]).status_code == 403
     assert db.query(AuditLog).filter_by(action="audio_played").count() == 2
+
+
+def test_real_audio_is_served_then_gone_after_retention(db, world, api, tmp_path, monkeypatch):
+    """No stand-in: the real route and the real recordings.read, on a real file, before and after retention."""
+    from app.hiring import recordings, retention
+
+    monkeypatch.setenv("RECORDINGS_DIR", str(tmp_path))
+    reads = []
+    real_read = recordings.read
+    monkeypatch.setattr(recordings, "read", lambda path: reads.append(path) or real_read(path))
+    application = make_application(db, world["job"], alias="#A7")
+    stored = recordings.save_turn_audio(world["company"].id, f"{application.id}/restart-1", 1, b"REAL-AUDIO", ".webm")
+    make_session(db, application, [(1, "Question", "Answer", stored)], restart_count=1)
+    application.hr_decided_at = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=world["company"].retention_days + 1)
+    db.commit()
+    application_id = application.id
+    path = url(world, f"/applications/{application_id}/turns/1/audio")
+
+    served = api.get(path, headers=hr(world))
+    assert served.status_code == 200 and served.content == b"REAL-AUDIO"
+    assert reads == [stored]
+
+    db.rollback()
+    assert retention.run(db) == 1
+    assert not (tmp_path / stored).exists()
+    db.rollback()
+    gone = api.get(path, headers=hr(world))
+    assert gone.status_code == 404 and gone.json() == {"detail": "Recording not found"}
+    assert reads == [stored]  # the path was cleared, so nothing tried to read a file that is gone
+
+
+def test_a_file_lost_from_disk_gets_404_from_the_real_read(db, world, api, tmp_path, monkeypatch):
+    from app.hiring import recordings
+
+    monkeypatch.setenv("RECORDINGS_DIR", str(tmp_path))
+    application = make_application(db, world["job"], alias="#A8")
+    stored = recordings.save_turn_audio(world["company"].id, application.id, 1, b"REAL-AUDIO", ".webm")
+    make_session(db, application, [(1, "Question", "Answer", stored)])
+    recordings.delete(stored)
+    response = api.get(url(world, f"/applications/{application.id}/turns/1/audio"), headers=hr(world))
+    assert response.status_code == 404 and response.json() == {"detail": "Recording not found"}
 
 
 def test_board_module_does_not_reference_raw_cv_text():

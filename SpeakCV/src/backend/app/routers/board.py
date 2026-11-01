@@ -139,7 +139,7 @@ def post_fast_track(company_id: int, app_id: int, member: CompanyMember = Depend
 def post_retry_analysis(company_id: int, app_id: int, background: BackgroundTasks,
                         member: CompanyMember = Depends(require_member("hr")), db: Session = Depends(get_db)):
     application = _application(db, company_id, app_id)
-    if application.stage != "ready_for_hr" or application.analysis_status != "failed":
+    if application.anonymized_at is not None or application.stage != "ready_for_hr" or application.analysis_status != "failed":
         raise HTTPException(status_code=409, detail="Only a failed analysis can be retried")
     audit.record(db, company_id, member.user_id, "analysis_retried", "application", application.id)
     db.commit()

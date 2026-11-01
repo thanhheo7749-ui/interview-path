@@ -3,6 +3,7 @@ from app.database.sql_models import (
     Application, CultureNote, CvClaim, Job, KbNode, RequirementResult, VoiceSession, VoiceTurn,
 )
 from app.hiring import jobs
+from app.hiring.state import NOT_TAKEN
 
 CELLS = {
     ("meets", "many"): "priority",
@@ -11,6 +12,8 @@ CELLS = {
     ("not_met", "few"): "not_enough_evidence",
 }
 LANES = ("not_interviewed", "refused_recording", "withdrawn", "analysis_failed", "analyzing")
+NOT_ENOUGH_EVIDENCE = "not_enough_evidence"
+NOT_TAKEN_NOTE = "did not take the interview"
 NOT_INTERVIEWED = ("invited", "session_in_progress")
 ANALYZING = ("session_completed", "analyzing")
 
@@ -18,7 +21,13 @@ ANALYZING = ("session_completed", "analyzing")
 def cell_for(application) -> str | None:
     if application.stage != "ready_for_hr":
         return None
+    if application.analysis_status == NOT_TAKEN:  # whatever the CV label says: the interview gave no evidence
+        return NOT_ENOUGH_EVIDENCE
     return CELLS.get((application.cv_status, application.interview_band))
+
+
+def interview_note(application) -> str | None:
+    return NOT_TAKEN_NOTE if application.analysis_status == NOT_TAKEN else None
 
 
 def _lane_for(application) -> str | None:
@@ -49,13 +58,15 @@ def card(application) -> dict:
         "hr_decision": application.hr_decision,
         "fast_tracked": bool(application.fast_tracked),
         "analysis_status": application.analysis_status,
+        "interview_note": interview_note(application),
         "hidden_text_detected": bool(application.hidden_text_detected),
         "created_at": application.created_at.isoformat() if application.created_at else None,
     }
 
 
 def job_board(db, company_id: int, job_id: int) -> dict:
-    query = db.query(Application).filter(Application.company_id == company_id, Application.job_id == job_id)
+    query = db.query(Application).filter(Application.company_id == company_id, Application.job_id == job_id,
+                                         Application.anonymized_at.is_(None))  # nothing is left to review or decide
     if hasattr(Application, "is_simulated"):
         query = query.filter(Application.is_simulated.is_(False))
     cells = {name: [] for name in CELLS.values()}
@@ -122,6 +133,7 @@ def detail(db, application) -> dict:
     return {
         "id": application.id,
         "alias": application.alias,
+        "anonymized": application.anonymized_at is not None,
         "job": {"id": job.id, "title": job.title},
         "stage": application.stage,
         "cell": cell_for(application),
@@ -131,6 +143,7 @@ def detail(db, application) -> dict:
         "cv_status_correction_reason": application.cv_status_correction_reason,
         "interview_band": application.interview_band,
         "analysis_status": application.analysis_status,
+        "interview_note": interview_note(application),
         "hr_decision": application.hr_decision,
         "hr_decided_at": application.hr_decided_at.isoformat() if application.hr_decided_at else None,
         "fast_tracked": bool(application.fast_tracked),

@@ -416,12 +416,12 @@ def test_different_blind_texts_compare_their_cached_results(db, world, same_payl
     assert result.identical_result is same_payload
 
 
-def test_an_anonymized_application_gets_409_and_no_ai_call(client, db, world, spy):
+def test_an_anonymized_application_gets_404_and_no_ai_call(client, db, world, spy):
     application = screened(db, world)
     retention.anonymize_application(db, application)
     spy.clear()
     response = client.post(url(world, "fairness-check"), json={"application_id": application.id}, headers=hr())
-    assert response.status_code == 409
+    assert response.status_code == 404
     assert spy == []
 
 

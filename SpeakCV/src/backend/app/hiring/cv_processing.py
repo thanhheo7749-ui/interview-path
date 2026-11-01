@@ -34,7 +34,7 @@ def _locked(db, application_id: int) -> Application | None:
 
 def _locked_processing(db, application_id: int) -> Application:
     application = _locked(db, application_id)
-    if application is None or application.stage != "cv_processing":
+    if application is None or application.stage != "cv_processing" or application.anonymized_at is not None:
         raise _NoLongerProcessing
     return application
 
@@ -42,7 +42,7 @@ def _locked_processing(db, application_id: int) -> Application:
 def _claim(db, application_id: int) -> bool:
     """Only one job may process an application. A second task for it finds the stage moved on, and stops."""
     application = _locked(db, application_id)
-    if application is None:
+    if application is None or application.anonymized_at is not None:
         db.rollback()
         return False
     try:
@@ -91,7 +91,7 @@ def _process(db, application_id: int) -> None:
         language = company.default_locale if company.default_locale in INVITATION else "en"
         subject, body = INVITATION[language]
         notify.enqueue(db, application.company_id, application.candidate_user_id, "invited", language,
-                       subject.format(title=job.title), body.format(title=job.title))
+                       subject.format(title=job.title), body.format(title=job.title), application_id=application_id)
     db.commit()
 
 
@@ -113,7 +113,7 @@ def run(application_id: int) -> None:
             return
         try:
             _process(db, application_id)
-        except _NoLongerProcessing:
+        except (_NoLongerProcessing, screening.ApplicationDeleted):
             db.rollback()
         except (NoExtractableText, CvTooLarge) as exc:
             db.rollback()

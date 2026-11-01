@@ -1,5 +1,6 @@
 """HR job management under a company. Every lookup by ID also filters on company_id."""
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.auth.dependencies import require_member
@@ -172,7 +173,11 @@ def close_job(company_id: int, job_id: int, member: CompanyMember = Depends(requ
 @router.post(JOBS + "/{job_id}/channels", response_model=list[ChannelOut])
 def add_channels(company_id: int, job_id: int, body: ChannelsIn,
                  member: CompanyMember = Depends(require_member("hr")), db: Session = Depends(get_db)):
-    job = _get_job(db, company_id, job_id)
-    links = jobs.ensure_channels(db, job, body.channels)
-    db.commit()
-    return links
+    for _ in range(len(body.channels) + 1):
+        try:
+            links = jobs.ensure_channels(db, _get_job(db, company_id, job_id), body.channels)
+            db.commit()
+            return links
+        except IntegrityError:
+            db.rollback()  # another request added one first; the next read comes after this and sees its link
+    raise HTTPException(status_code=503, detail="Please try again.")

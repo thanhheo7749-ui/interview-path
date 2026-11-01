@@ -12,7 +12,7 @@ from app.database.sql_models import (
     Application, AuditLog, Company, CompanyMember, Consent, CultureNote, CvClaim, Job, Notification, RequirementResult,
     ScreeningCache, VoiceSession, VoiceTurn,
 )
-from app.hiring import audit, notify
+from app.hiring import audit, notify, voice
 from app.hiring.state import advance
 
 logger = logging.getLogger(__name__)
@@ -60,7 +60,7 @@ KEPT = {
     "cv_claims": ("status",),
     "voice_sessions": ("purpose", "language", "status"),
     "voice_turns": ("question_source", "transcript_status"),
-    "consents": ("purpose", "text_version"),
+    "consents": ("purpose", "text_version", "language"),
     "audit_log": (
         "action", "target_type", "ai_provider", "ai_model", "prompt_version",
         "payload",  # by rule audit payloads hold no personal content
@@ -119,10 +119,16 @@ def _erase(row) -> None:
         setattr(row, name, None if row.__table__.c[name].nullable else "")
 
 
-def _delete_notifications(db, application, user_id: int) -> None:
-    """A notification has no link to its application. While the user has another live application at this
-    company, only the ones naming this job go; the rest go with the last application."""
-    rows = db.query(Notification).filter(Notification.company_id == application.company_id, Notification.user_id == user_id)
+def _delete_notifications(db, application, user_id: int | None) -> None:
+    """Notifications pointing at this application go. An old row with no link goes by the former rule: while the user
+    has another live application at this company, only one naming this job goes; the rest go with the last one."""
+    db.query(Notification).filter(Notification.application_id == application.id).delete(synchronize_session=False)
+    if user_id is None:
+        return
+    rows = db.query(Notification).filter(
+        Notification.company_id == application.company_id, Notification.user_id == user_id,
+        Notification.application_id.is_(None),
+    )
     another_live = (
         db.query(Application.id)
         .filter(
@@ -195,10 +201,13 @@ def anonymize_application(db, application, *, trigger: str = TRIGGER_RETENTION) 
     for model in (RequirementResult, CvClaim, CultureNote, Consent):
         for row in db.query(model).filter_by(application_id=application_id):
             _erase(row)
+    for session in sessions:
+        if session.status in voice.ACTIVE_STATUSES:
+            session.status = voice.ABANDONED  # nothing resumes it, and no sweep or poll counts it again
     for row in (*sessions, *turns):
         _erase(row)
+    _delete_notifications(db, application, user_id)
     if user_id is not None:
-        _delete_notifications(db, application, user_id)
         _unlink_audit(db, application, user_id)
     _stop_cv_job(application)
     _erase(application)
@@ -307,7 +316,7 @@ def _queue_reminder(db, application_id: int, cutoff: datetime) -> bool:
     language = company.default_locale if company.default_locale in REMINDER else "en"
     subject, body = REMINDER[language]
     notify.enqueue(db, application.company_id, application.candidate_user_id, "reminder", language,
-                   subject.format(title=title), body.format(title=title))
+                   subject.format(title=title), body.format(title=title), application_id=application_id)
     audit.record(db, application.company_id, None, REMINDER_QUEUED, "application", application_id)
     db.commit()
     return True
@@ -337,7 +346,7 @@ def send_reminders(db, now=None) -> int:
 def _daily_pass() -> None:
     db = SessionLocal()
     try:
-        for step in (run, send_reminders, notify.send_pending):
+        for step in (voice.sweep_abandoned, run, send_reminders, notify.send_pending):
             try:
                 step(db)
             except Exception as exc:

@@ -77,10 +77,17 @@ def _active_session(db: Session, application_id: int) -> VoiceSession | None:
     )
 
 
+def _current_state(db: Session, session: VoiceSession) -> voice.SessionState:
+    try:
+        return voice.current_state(db, session)
+    except voice.SessionGone as exc:
+        raise _not_found() from exc
+
+
 def _resume(db: Session, session: VoiceSession) -> StateOut | None:
     """The state of a session still running, or None if the clock has just finished it."""
     session_id = session.id
-    state = voice.current_state(db, session)
+    state = _current_state(db, session)
     return None if state.status in voice.TERMINAL_STATUSES else _out(session_id, state)
 
 
@@ -116,7 +123,8 @@ def start(application_id: int, body: StartIn, user: User = Depends(get_authentic
     if active is not None and (resumed := _resume(db, active)) is not None:
         return resumed
     _check_can_start(application)
-    consents.record(db, user_id, application.company_id, application_id, CONSENT_PURPOSE, body.consent_version)
+    consents.record(db, user_id, application.company_id, application_id, CONSENT_PURPOSE, body.consent_version,
+                    language=body.language)
     session = voice.create_session(
         db, company_id=application.company_id, purpose=PURPOSE, owner_user_id=user_id, language=body.language,
         plan=plan, application_id=application_id,
@@ -130,12 +138,12 @@ def start(application_id: int, body: StartIn, user: User = Depends(get_authentic
                  payload={"language": body.language, "questions": len(plan)})
     db.commit()
     session_id = session.id
-    return _out(session_id, voice.current_state(db, session))
+    return _out(session_id, _current_state(db, session))
 
 
 @router.get("/api/screening/{session_id}/state", response_model=StateOut)
 def get_state(session_id: int, user: User = Depends(get_authenticated_user), db: Session = Depends(get_db)):
-    return _out(session_id, voice.current_state(db, _owned_session(db, user.id, session_id)))
+    return _out(session_id, _current_state(db, _owned_session(db, user.id, session_id)))
 
 
 async def _read_audio(file: UploadFile) -> tuple[bytes, str]:
@@ -162,6 +170,8 @@ def _submit(db: Session, user_id: int, session_id: int, position: int, audio: by
         return _out(session_id, voice.submit_answer(db, session, position, audio, mime_type))
     except voice.PositionNotCurrent as exc:
         raise HTTPException(status_code=409, detail="This is not the current question") from exc
+    except voice.SessionGone as exc:
+        raise _not_found() from exc
 
 
 # Declares only the file: a transcript or history sent by the client has nowhere to go.
@@ -183,7 +193,7 @@ async def submit_answer(
 def question_audio(session_id: int, position: int, user: User = Depends(get_authenticated_user), db: Session = Depends(get_db)):
     session = _owned_session(db, user.id, session_id)
     turn = db.query(VoiceTurn).filter_by(session_id=session.id, position=position).first()
-    if turn is None:
+    if turn is None or not turn.question_text:
         raise _not_found()
     text, language, company_id = turn.question_text, session.language, session.company_id
     db.rollback()  # hold no snapshot during a slow call

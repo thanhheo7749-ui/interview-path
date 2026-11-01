@@ -336,6 +336,15 @@ async def delete_user(
             status_code=409,
             detail="Cannot delete: this user is the only HR member of " + ", ".join(sole_hr_companies),
         )
+    live_application = db.query(sql_models.Application.id).filter(
+        sql_models.Application.candidate_user_id == user_id, sql_models.Application.anonymized_at.is_(None),
+    ).first()
+    if live_application is not None:
+        raise HTTPException(
+            status_code=409,
+            detail="Cannot delete: this user still has personal data in job applications. Anonymize them first.",
+        )
+    db.query(sql_models.Notification).filter(sql_models.Notification.user_id == user_id).delete()
     db.query(sql_models.CompanyMember).filter(sql_models.CompanyMember.user_id == user_id).delete()
 
     # Cascade delete all related records before deleting the user

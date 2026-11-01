@@ -4,6 +4,7 @@ The AI only proposes. Code verifies every quote against the cited turn's transcr
 verify, and computes the band. This module never writes `cv_status` or `hr_decision`.
 """
 import logging
+import os
 import re
 from typing import Literal
 
@@ -17,9 +18,9 @@ from app.database.database import SessionLocal
 from app.database.sql_models import (
     Application, Company, CultureNote, CvClaim, Job, KbNode, RequirementResult, VoiceSession, VoiceTurn,
 )
-from app.hiring import audit, jobs
+from app.hiring import audit, jobs, voice
 from app.hiring.screening import _DIRECTIVE
-from app.hiring.state import InvalidTransition, advance
+from app.hiring.state import NOT_TAKEN, InvalidTransition, advance
 
 logger = logging.getLogger(__name__)
 
@@ -135,7 +136,7 @@ def _mark_failed(application_id: int) -> None:
     db = SessionLocal()
     try:
         application = _locked(db, application_id)
-        if application is None:
+        if application is None or application.anonymized_at is not None:
             return
         if application.stage == "analyzing":
             advance(application, "ready_for_hr")
@@ -153,7 +154,7 @@ def _mark_failed(application_id: int) -> None:
 def _claim(db, application_id: int) -> bool:
     """Only an application waiting for analysis, or one whose analysis failed, is analysed."""
     application = _locked(db, application_id)
-    if application is None:
+    if application is None or application.anonymized_at is not None:
         db.rollback()
         return False
     if application.stage == "session_completed":
@@ -164,6 +165,21 @@ def _claim(db, application_id: int) -> bool:
     application.analysis_status = "running"
     db.commit()
     return True
+
+
+def _record_not_taken(db, application_id: int) -> None:
+    """With no answers there is nothing to send to the paid model, and nothing it could say."""
+    application = _locked(db, application_id)
+    if application is None or application.anonymized_at is not None:
+        db.rollback()
+        return
+    application.analysis_status = NOT_TAKEN
+    application.interview_band = None
+    application.ai_suggestion = None
+    if application.stage == "analyzing":
+        advance(application, "ready_for_hr")
+    audit.record(db, application.company_id, None, "interview_not_taken", "application", application_id)
+    db.commit()
 
 
 def _analyse(db, application_id: int) -> None:
@@ -181,6 +197,9 @@ def _analyse(db, application_id: int) -> None:
         .order_by(KbNode.id).all()
     )
     turns = [t for t in _latest_turns(db, application) if (t.transcript or "").strip()]
+    if not turns:
+        _record_not_taken(db, application_id)
+        return
     turn_ids = {t.position: t.id for t in turns}
     transcripts = {t.position: t.transcript for t in turns}
     prompt = _prompt(requirements, claims, values, turns)
@@ -236,8 +255,8 @@ def _analyse(db, application_id: int) -> None:
     suggestion = output.suggestion.strip()[:MAX_SUGGESTION_CHARS] or None
 
     application = _locked(db, application_id)
-    if application is None or application.stage not in ("analyzing", "ready_for_hr"):
-        db.rollback()
+    if application is None or application.anonymized_at is not None or application.stage not in ("analyzing", "ready_for_hr"):
+        db.rollback()  # deleted during the call: nothing of this result is written
         return
     db.query(RequirementResult).filter_by(application_id=application_id, source="interview").delete(
         synchronize_session=False)
@@ -282,3 +301,36 @@ def run(application_id: int) -> None:
         logger.warning("Analysis could not finish for application %s: %s", application_id, type(exc).__name__)
     finally:
         db.close()
+
+
+def requeue_interrupted() -> list[int]:
+    """At startup nothing can still be running. Whatever a crash left waiting or half analysed waits to be analysed."""
+    db = SessionLocal()
+    try:
+        rows = (
+            db.query(Application)
+            .filter(Application.stage.in_(("session_completed", "analyzing")), Application.anonymized_at.is_(None))
+            .populate_existing().with_for_update().all()
+        )
+        for application in rows:
+            if application.stage == "analyzing":
+                advance(application, "session_completed")
+            application.analysis_status = None
+        application_ids = [application.id for application in rows]
+        db.commit()
+        return application_ids
+    finally:
+        db.close()
+
+
+def recover_interrupted() -> list[int]:
+    """Called from lifespan, so it assumes one worker process, as cv_processing.fail_interrupted does. Off under test."""
+    if os.environ.get("APP_ENV") == "test":
+        return []
+    application_ids = requeue_interrupted()
+    for application_id in application_ids:
+        try:
+            voice.schedule_analysis(application_id)
+        except Exception as exc:
+            logger.error("Could not schedule analysis for application %s: %s", application_id, type(exc).__name__)
+    return application_ids

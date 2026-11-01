@@ -6,6 +6,12 @@ Transactions: every function that writes begins with `_lock`, which ends the ses
 REPEATABLE READ a transaction reads from the snapshot of its first plain read, so a request that has read anything (the
 login check does) would not see rows another request has committed. A locking read takes no snapshot, so the first
 plain read after `_lock` happens after the lock and sees the winner's rows. No lock or snapshot is held during AI calls.
+
+Lock order: the application, then its session, as deleting an application does. `_lock` also refuses a session whose
+application was deleted, and it runs again after every AI call, so nothing is written after a deletion.
+
+The clock: `active_seconds` is the time a candidate has been at it, and it is what the limits measure. A gap between two
+requests counts up to `max_counted_gap_seconds`, so a dropped connection costs little and the session can resume.
 """
 import importlib
 import logging
@@ -22,7 +28,7 @@ from app.ai import gateway
 from app.ai.types import AIError
 from app.database.sql_models import Application, VoiceSession, VoiceTurn
 from app.hiring import audit, recordings
-from app.hiring.state import advance
+from app.hiring.state import NOT_TAKEN, advance
 
 logger = logging.getLogger(__name__)
 
@@ -34,6 +40,7 @@ ALLOWED_AUDIO = {
 CLOSING_AFTER_SECONDS = 13 * 60
 HARD_LIMIT_SECONDS = 15 * 60
 RESUME_HOURS = 24
+MAX_COUNTED_GAP_SECONDS = 210  # the 3 minutes an answer may take, and time to upload it
 MAX_FOLLOWUPS_PER_QUESTION = 1
 
 STT_ATTEMPTS = 2
@@ -47,9 +54,9 @@ IN_PROGRESS = "in_progress"
 CLOSING = "closing"
 PAUSED = "paused"
 COMPLETED = "completed"
-EXPIRED = "expired"
+ABANDONED = "abandoned"
 ACTIVE_STATUSES = (IN_PROGRESS, PAUSED)
-TERMINAL_STATUSES = (COMPLETED, EXPIRED)
+TERMINAL_STATUSES = (COMPLETED, ABANDONED)
 NOTICE_RETRY = "retry"
 NOTICE_REPEAT = "repeat"
 
@@ -81,6 +88,10 @@ class AudioTooLarge(ValueError):
 
 class PositionNotCurrent(Exception):
     pass
+
+
+class SessionGone(Exception):
+    """The session's application was deleted. Whatever was being done for it is discarded."""
 
 
 @dataclass(frozen=True)
@@ -150,12 +161,14 @@ class PurposeRules:
     hard_limit_seconds: int
     resume_hours: int
     max_followups_per_question: int
+    max_counted_gap_seconds: int
     decide_followup: FOLLOWUP_HOOK
 
 
 # Add a purpose here, with its own limits and hook. A session of a purpose not listed cannot be created.
 PURPOSES = {
-    "screening": PurposeRules(CLOSING_AFTER_SECONDS, HARD_LIMIT_SECONDS, RESUME_HOURS, MAX_FOLLOWUPS_PER_QUESTION, screening_followup),
+    "screening": PurposeRules(CLOSING_AFTER_SECONDS, HARD_LIMIT_SECONDS, RESUME_HOURS, MAX_FOLLOWUPS_PER_QUESTION,
+                              MAX_COUNTED_GAP_SECONDS, screening_followup),
 }
 
 
@@ -190,10 +203,6 @@ def _naive_utc(value: datetime) -> datetime:
     return value.astimezone(timezone.utc).replace(tzinfo=None) if value.tzinfo else value
 
 
-def _elapsed(session: VoiceSession, now: datetime) -> float:
-    return (now - _naive_utc(session.started_at)).total_seconds()
-
-
 def _rules(session: VoiceSession) -> PurposeRules:
     return PURPOSES[session.purpose]
 
@@ -217,8 +226,8 @@ def create_session(db, *, company_id, purpose, owner_user_id, language, plan, ap
     now = _now()
     session = VoiceSession(
         company_id=company_id, purpose=purpose, application_id=application_id, owner_user_id=owner_user_id,
-        language=language, status=IN_PROGRESS, plan=items, started_at=now,
-        expires_at=now + timedelta(hours=PURPOSES[purpose].resume_hours),
+        language=language, status=IN_PROGRESS, plan=items, started_at=now, active_seconds=0,
+        last_activity_at=now.replace(microsecond=0), expires_at=now + timedelta(hours=PURPOSES[purpose].resume_hours),
     )
     db.add(session)
     db.flush()
@@ -228,7 +237,18 @@ def create_session(db, *, company_id, purpose, owner_user_id, language, plan, ap
 
 
 def _lock(db, session_id: int) -> VoiceSession:
+    """Lock the application and then the session, and see their latest rows. Raises SessionGone after a deletion."""
     db.rollback()
+    application_id = db.query(VoiceSession.application_id).filter(VoiceSession.id == session_id).scalar()  # never changes
+    db.rollback()
+    if application_id is not None:
+        application = (
+            db.query(Application).filter(Application.id == application_id)
+            .populate_existing().with_for_update().first()
+        )
+        if application is None or application.anonymized_at is not None:
+            db.rollback()
+            raise SessionGone
     return db.query(VoiceSession).filter(VoiceSession.id == session_id).populate_existing().with_for_update().one()
 
 
@@ -258,27 +278,57 @@ def _complete(db, session: VoiceSession) -> None:
     audit.record(db, session.company_id, None, "voice_session_completed", "voice_session", session.id)
 
 
-def _expire(db, session: VoiceSession) -> None:
-    session.status = EXPIRED
+def _abandon(db, session: VoiceSession) -> None:
+    """Nothing was said, so there is nothing to analyse. HR sees this, and can grant a restart."""
+    session.status = ABANDONED
+    session.finished_at = _now()
     _move_stage(db, session, "ready_for_hr")
-    audit.record(db, session.company_id, None, "voice_session_expired", "voice_session", session.id)
+    if session.application_id is not None:
+        db.get(Application, session.application_id).analysis_status = NOT_TAKEN
+    audit.record(db, session.company_id, None, "voice_session_abandoned", "voice_session", session.id)
 
 
-def _clock_action(session: VoiceSession, now: datetime):
-    if session.status not in ACTIVE_STATUSES:
-        return None
+def _has_an_answer(db, session: VoiceSession) -> bool:
+    return any(turn.transcript_status == ANSWERED and (turn.transcript or "").strip() for turn in _turns(db, session.id))
+
+
+def _last_activity(session: VoiceSession, now: datetime) -> datetime:
+    return _naive_utc(session.last_activity_at or session.started_at or now)
+
+
+def _count_activity(session: VoiceSession, now: datetime) -> None:
+    """Add the time since the last request. Both columns change together on a locked row, so no second counts twice.
+
+    MySQL stores whole seconds, so this counts whole seconds. A gap under one second stays on the clock for the next
+    request, which is why many quick polls still add up.
+    """
+    now = now.replace(microsecond=0)
+    gap = int((now - _last_activity(session, now)).total_seconds())
+    if gap <= 0:
+        return
     rules = _rules(session)
-    elapsed = _elapsed(session, now)
-    if elapsed > rules.resume_hours * 3600:
-        return _expire
-    if elapsed > rules.hard_limit_seconds:
-        return _complete
-    return None
+    session.active_seconds = (session.active_seconds or 0) + min(gap, rules.max_counted_gap_seconds)
+    session.last_activity_at = now
+    session.expires_at = now + timedelta(hours=rules.resume_hours)
 
 
-def _apply_clock(db, session: VoiceSession) -> bool:
-    """On a locked session, finish it if its time is up, and commit. Returns whether it was finished now."""
-    action = _clock_action(session, _now())
+def _clock_action(db, session: VoiceSession, now: datetime):
+    """On a locked running session, count the time and say how it ends now, if it does."""
+    rules = _rules(session)
+    if (now - _last_activity(session, now)).total_seconds() > rules.resume_hours * 3600:
+        return _complete if _has_an_answer(db, session) else _abandon
+    _count_activity(session, now)
+    return _complete if session.active_seconds > rules.hard_limit_seconds else None
+
+
+def _apply_clock(db, session: VoiceSession, now: datetime | None = None) -> bool:
+    """On a locked session, count the time, and finish it and commit if its time is up. Returns whether it finished.
+
+    If not, the count is pending in this transaction. A rollback loses none of it: the next request counts the same gap.
+    """
+    if session.status not in ACTIVE_STATUSES:
+        return False
+    action = _clock_action(db, session, now or _now())
     if action is None:
         return False
     application_id = session.application_id
@@ -297,15 +347,15 @@ def _state(db, session: VoiceSession, notice: str | None = None) -> SessionState
     if session.status in TERMINAL_STATUSES or current is None:
         return SessionState(session.status, None, None, None, None, total, 0, False, notice)
     rules = _rules(session)
-    elapsed = _elapsed(session, _now())
-    status = CLOSING if session.status == IN_PROGRESS and elapsed > rules.closing_after_seconds else session.status
+    active = session.active_seconds or 0
+    status = CLOSING if session.status == IN_PROGRESS and active > rules.closing_after_seconds else session.status
     if current.is_followup:
         why = WHY_FOLLOWUP.get(session.language, WHY_FOLLOWUP["en"])
     else:
         index = sum(1 for turn in turns if not turn.is_followup and turn.position < current.position)
         why = plan[index].get("why") if index < len(plan) else None
     return SessionState(status, current.position, current.question_text, current.question_source, why, total,
-                        max(0, int(rules.hard_limit_seconds - elapsed)), bool(current.is_followup), notice)
+                        max(0, rules.hard_limit_seconds - active), bool(current.is_followup), notice)
 
 
 def _released_state(db, session: VoiceSession) -> SessionState:
@@ -315,11 +365,36 @@ def _released_state(db, session: VoiceSession) -> SessionState:
 
 
 def current_state(db, session: VoiceSession) -> SessionState:
-    """The state to resume from. Reading it finishes a session whose time is up, which commits; otherwise it only reads."""
-    if _clock_action(session, _now()) is not None:
-        session = _lock(db, session.id)
-        _apply_clock(db, session)
+    """The state to resume from. Reading it counts the time, and finishes a session whose time is up. Commits."""
+    session = _lock(db, session.id)
+    if session.status not in ACTIVE_STATUSES:
+        return _released_state(db, session)
+    if not _apply_clock(db, session):
+        db.commit()
     return _state(db, session)
+
+
+def sweep_abandoned(db, now: datetime | None = None) -> int:
+    """Finish every session idle past its resume window, for the daily task. Commits, one session at a time."""
+    now = _naive_utc(now) if now else _now()
+    db.commit()  # end any transaction, so the list below sees what other sessions committed
+    session_ids = []
+    for purpose, rules in PURPOSES.items():
+        session_ids += [row[0] for row in (
+            db.query(VoiceSession.id)
+            .filter(VoiceSession.purpose == purpose, VoiceSession.status.in_(ACTIVE_STATUSES),
+                    VoiceSession.last_activity_at < now - timedelta(hours=rules.resume_hours))
+            .order_by(VoiceSession.id).all()
+        )]
+    count = 0
+    for session_id in session_ids:
+        try:
+            count += _apply_clock(db, _lock(db, session_id), now)
+            db.rollback()  # a candidate came back in time: their next request counts this gap
+        except Exception as exc:
+            db.rollback()
+            logger.warning("Could not finish session %s: %s", session_id, type(exc).__name__)
+    return count
 
 
 def _transcribe(audio: bytes, mime_type: str, language: str, company_id: int):
@@ -390,6 +465,7 @@ def submit_answer(db, session: VoiceSession, position: int, audio: bytes, mime_t
     Discards anything pending in `db` and commits. The row lock is held only to check and to store, never during AI
     calls, so an upload that overlaps this one waits briefly at most. Each re-checks under the lock before storing, so
     the first to finish wins; files are written only then, so the stored audio always matches the stored transcript.
+    Raises SessionGone if the application was deleted, including during the AI calls: no file has been written by then.
     """
     suffix = ALLOWED_AUDIO.get(mime_type)
     if suffix is None:
@@ -399,10 +475,10 @@ def submit_answer(db, session: VoiceSession, position: int, audio: bytes, mime_t
 
     session_id = session.id
     session = _lock(db, session_id)
-    if _apply_clock(db, session):
-        return _state(db, session)
     if session.status in TERMINAL_STATUSES:
         return _released_state(db, session)
+    if _apply_clock(db, session):
+        return _state(db, session)
     turns = _turns(db, session_id)
     wanted = next((turn for turn in turns if turn.position == position), None)
     if wanted is not None and wanted.transcript_status in ANSWERED_STATUSES:
@@ -414,7 +490,7 @@ def submit_answer(db, session: VoiceSession, position: int, audio: bytes, mime_t
 
     rules = _rules(session)
     hook = decide_followup or rules.decide_followup
-    closing = _elapsed(session, _now()) > rules.closing_after_seconds
+    closing = session.active_seconds > rules.closing_after_seconds
     root = current.parent_position or current.position
     followups_asked = sum(1 for turn in turns if turn.parent_position == root)
     may_follow_up = not closing and followups_asked < rules.max_followups_per_question
@@ -435,6 +511,7 @@ def submit_answer(db, session: VoiceSession, position: int, audio: bytes, mime_t
     if session.status in TERMINAL_STATUSES or turn is None or turn.position != position:
         return _released_state(db, session)  # another upload of this position finished first
 
+    _count_activity(session, _now())
     old_path = turn.audio_path
     path = recordings.save_turn_audio(session.company_id, _owner_key(session), position, audio, suffix)
     turn.audio_path = path

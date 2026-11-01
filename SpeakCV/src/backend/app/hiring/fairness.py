@@ -8,6 +8,7 @@ import unicodedata
 from dataclasses import dataclass
 
 from app.ai.config import get_config
+from app.database.sql_models import Application
 from app.hiring import audit, identity, screening
 
 _FOUND_BY_AI = re.compile(r"\[(NAME|GENDER|AGE|ADDRESS)\]")
@@ -27,6 +28,10 @@ _WOMEN_TO_MEN = {
 
 class FairnessUnavailable(Exception):
     """This application cannot be checked. The message is fixed text, safe to show."""
+
+
+class ApplicationDeleted(FairnessUnavailable):
+    """This application's personal data has been deleted, so to HR there is nothing here to check."""
 
 
 @dataclass(frozen=True)
@@ -116,22 +121,25 @@ def _same_result(db, application, original_hash: str, swapped_hash: str) -> bool
 def check(db, application, *, actor_user_id=None) -> FairnessResult:
     """Commits. It holds no transaction during the masking call, and rereads the application after it."""
     if application.anonymized_at is not None:
-        raise FairnessUnavailable("This application's personal data has been deleted")
+        raise ApplicationDeleted("This application's personal data has been deleted")
     raw_text, original_blind, original_hash = application.cv_text_raw, application.cv_text_blind, application.cv_blind_hash
     if not raw_text or not original_blind:
         raise FairnessUnavailable("This application's CV has not been read")
     swapped_text = swap_identity(raw_text, found_terms(raw_text, original_blind))
     if swapped_text == identity.regex_mask(raw_text):
         raise FairnessUnavailable("No name or gender term was found in this CV, so there is nothing to swap")
-    company_id = application.company_id
+    application_id, company_id = application.id, application.company_id
     db.commit()
 
     masked = identity.mask(swapped_text, company_id=company_id)
 
-    db.refresh(application)
-    if application.anonymized_at is not None:
+    application = (
+        db.query(Application).filter(Application.id == application_id)
+        .populate_existing().with_for_update().first()
+    )
+    if application is None or application.anonymized_at is not None:
         db.rollback()
-        raise FairnessUnavailable("This application's personal data has been deleted")
+        raise ApplicationDeleted("This application's personal data has been deleted")
     identical_text = masked.blind_text == original_blind
     identical_result = _same_result(db, application, original_hash, masked.blind_hash)
     slot = get_config().slot("bulk")

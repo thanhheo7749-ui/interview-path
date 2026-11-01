@@ -73,7 +73,7 @@ def _check_reapply(db, user_id: int, job_id: int) -> None:
         raise AlreadyApplied(recent[0] + timedelta(days=REAPPLY_DAYS))
 
 
-def create_application(db, user, job, file_bytes, suffix, src_token, consent_version) -> Application:
+def create_application(db, user, job, file_bytes, suffix, src_token, consent_version, consent_language=None) -> Application:
     """Commits. Discards anything the session has pending, because each attempt needs a new transaction."""
     user_id, job_id = user.id, job.id
     path = None
@@ -98,7 +98,8 @@ def create_application(db, user, job, file_bytes, suffix, src_token, consent_ver
             db.add(application)
             try:
                 db.flush()
-                consents.record(db, user_id, job.company_id, application.id, "cv_processing", consent_version)
+                consents.record(db, user_id, job.company_id, application.id, "cv_processing", consent_version,
+                                language=consent_language)
                 db.commit()
                 return application
             except IntegrityError as exc:  # two applications took the same alias; the rollback above allows a new read

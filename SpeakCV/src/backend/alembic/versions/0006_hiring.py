@@ -33,7 +33,7 @@ def upgrade() -> None:
     sa.Column('prompt_version', sa.String(length=50), nullable=True),
     sa.Column('payload', sa.JSON(), nullable=False),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('(CURRENT_TIMESTAMP)'), nullable=False),
-    sa.ForeignKeyConstraint(['actor_user_id'], ['users.id'], ),
+    sa.ForeignKeyConstraint(['actor_user_id'], ['users.id'], ondelete='SET NULL'),
     sa.ForeignKeyConstraint(['company_id'], ['companies.id'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id')
     )
@@ -41,26 +41,6 @@ def upgrade() -> None:
         batch_op.create_index(batch_op.f('ix_audit_log_action'), ['action'], unique=False)
         batch_op.create_index(batch_op.f('ix_audit_log_company_id'), ['company_id'], unique=False)
         batch_op.create_index(batch_op.f('ix_audit_log_id'), ['id'], unique=False)
-
-    op.create_table('notifications',
-    sa.Column('id', sa.Integer(), nullable=False),
-    sa.Column('company_id', sa.Integer(), nullable=False),
-    sa.Column('user_id', sa.Integer(), nullable=False),
-    sa.Column('kind', sa.String(length=50), nullable=False),
-    sa.Column('language', sa.String(length=10), nullable=False),
-    sa.Column('subject', sa.String(length=255), nullable=False),
-    sa.Column('body', sa.Text(), nullable=False),
-    sa.Column('status', sa.String(length=30), nullable=False),
-    sa.Column('sent_at', sa.DateTime(timezone=True), nullable=True),
-    sa.ForeignKeyConstraint(['company_id'], ['companies.id'], ondelete='CASCADE'),
-    sa.ForeignKeyConstraint(['user_id'], ['users.id'], ),
-    sa.PrimaryKeyConstraint('id')
-    )
-    with op.batch_alter_table('notifications', schema=None) as batch_op:
-        batch_op.create_index(batch_op.f('ix_notifications_company_id'), ['company_id'], unique=False)
-        batch_op.create_index(batch_op.f('ix_notifications_id'), ['id'], unique=False)
-        batch_op.create_index(batch_op.f('ix_notifications_status'), ['status'], unique=False)
-        batch_op.create_index(batch_op.f('ix_notifications_user_id'), ['user_id'], unique=False)
 
     op.create_table('jobs',
     sa.Column('id', sa.Integer(), nullable=False),
@@ -77,7 +57,7 @@ def upgrade() -> None:
     sa.Column('published_at', sa.DateTime(timezone=True), nullable=True),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('(CURRENT_TIMESTAMP)'), nullable=False),
     sa.ForeignKeyConstraint(['company_id'], ['companies.id'], ondelete='CASCADE'),
-    sa.ForeignKeyConstraint(['created_by'], ['users.id'], ),
+    sa.ForeignKeyConstraint(['created_by'], ['users.id'], ondelete='SET NULL'),
     sa.ForeignKeyConstraint(['department_id'], ['departments.id'], ),
     sa.ForeignKeyConstraint(['role_node_id'], ['kb_nodes.id'], ),
     sa.PrimaryKeyConstraint('id')
@@ -120,10 +100,10 @@ def upgrade() -> None:
     sa.Column('is_simulated', sa.Boolean(), nullable=False),
     sa.Column('anonymized_at', sa.DateTime(timezone=True), nullable=True),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('(CURRENT_TIMESTAMP)'), nullable=False),
-    sa.ForeignKeyConstraint(['candidate_user_id'], ['users.id'], ),
+    sa.ForeignKeyConstraint(['candidate_user_id'], ['users.id'], ondelete='SET NULL'),
     sa.ForeignKeyConstraint(['company_id'], ['companies.id'], ondelete='CASCADE'),
-    sa.ForeignKeyConstraint(['cv_status_corrected_by'], ['users.id'], ),
-    sa.ForeignKeyConstraint(['hr_decided_by'], ['users.id'], ),
+    sa.ForeignKeyConstraint(['cv_status_corrected_by'], ['users.id'], ondelete='SET NULL'),
+    sa.ForeignKeyConstraint(['hr_decided_by'], ['users.id'], ondelete='SET NULL'),
     sa.ForeignKeyConstraint(['job_id'], ['jobs.id'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('company_id', 'alias', name='uq_application_alias')
@@ -135,6 +115,29 @@ def upgrade() -> None:
         batch_op.create_index(batch_op.f('ix_applications_id'), ['id'], unique=False)
         batch_op.create_index(batch_op.f('ix_applications_job_id'), ['job_id'], unique=False)
 
+    op.create_table('notifications',
+    sa.Column('id', sa.Integer(), nullable=False),
+    sa.Column('company_id', sa.Integer(), nullable=False),
+    sa.Column('user_id', sa.Integer(), nullable=False),
+    sa.Column('application_id', sa.Integer(), nullable=True),
+    sa.Column('kind', sa.String(length=50), nullable=False),
+    sa.Column('language', sa.String(length=10), nullable=False),
+    sa.Column('subject', sa.String(length=255), nullable=False),
+    sa.Column('body', sa.Text(), nullable=False),
+    sa.Column('status', sa.String(length=30), nullable=False),
+    sa.Column('sent_at', sa.DateTime(timezone=True), nullable=True),
+    sa.ForeignKeyConstraint(['application_id'], ['applications.id'], ondelete='CASCADE'),
+    sa.ForeignKeyConstraint(['company_id'], ['companies.id'], ondelete='CASCADE'),
+    sa.ForeignKeyConstraint(['user_id'], ['users.id'], ),
+    sa.PrimaryKeyConstraint('id')
+    )
+    with op.batch_alter_table('notifications', schema=None) as batch_op:
+        batch_op.create_index(batch_op.f('ix_notifications_application_id'), ['application_id'], unique=False)
+        batch_op.create_index(batch_op.f('ix_notifications_company_id'), ['company_id'], unique=False)
+        batch_op.create_index(batch_op.f('ix_notifications_id'), ['id'], unique=False)
+        batch_op.create_index(batch_op.f('ix_notifications_status'), ['status'], unique=False)
+        batch_op.create_index(batch_op.f('ix_notifications_user_id'), ['user_id'], unique=False)
+
     op.create_table('job_channel_links',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('company_id', sa.Integer(), nullable=False),
@@ -145,7 +148,8 @@ def upgrade() -> None:
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('(CURRENT_TIMESTAMP)'), nullable=False),
     sa.ForeignKeyConstraint(['company_id'], ['companies.id'], ondelete='CASCADE'),
     sa.ForeignKeyConstraint(['job_id'], ['jobs.id'], ondelete='CASCADE'),
-    sa.PrimaryKeyConstraint('id')
+    sa.PrimaryKeyConstraint('id'),
+    sa.UniqueConstraint('job_id', 'channel', name='uq_job_channel')
     )
     with op.batch_alter_table('job_channel_links', schema=None) as batch_op:
         batch_op.create_index(batch_op.f('ix_job_channel_links_company_id'), ['company_id'], unique=False)
@@ -196,11 +200,12 @@ def upgrade() -> None:
     sa.Column('application_id', sa.Integer(), nullable=True),
     sa.Column('purpose', sa.String(length=50), nullable=False),
     sa.Column('text_version', sa.String(length=30), nullable=False),
+    sa.Column('language', sa.String(length=10), nullable=True),
     sa.Column('granted_at', sa.DateTime(timezone=True), server_default=sa.text('(CURRENT_TIMESTAMP)'), nullable=False),
     sa.Column('withdrawn_at', sa.DateTime(timezone=True), nullable=True),
     sa.ForeignKeyConstraint(['application_id'], ['applications.id'], ondelete='CASCADE'),
     sa.ForeignKeyConstraint(['company_id'], ['companies.id'], ondelete='CASCADE'),
-    sa.ForeignKeyConstraint(['user_id'], ['users.id'], ),
+    sa.ForeignKeyConstraint(['user_id'], ['users.id'], ondelete='SET NULL'),
     sa.PrimaryKeyConstraint('id')
     )
     with op.batch_alter_table('consents', schema=None) as batch_op:
@@ -222,9 +227,11 @@ def upgrade() -> None:
     sa.Column('started_at', sa.DateTime(timezone=True), nullable=True),
     sa.Column('finished_at', sa.DateTime(timezone=True), nullable=True),
     sa.Column('expires_at', sa.DateTime(timezone=True), nullable=True),
+    sa.Column('active_seconds', sa.Integer(), server_default='0', nullable=False),
+    sa.Column('last_activity_at', sa.DateTime(timezone=True), nullable=True),
     sa.ForeignKeyConstraint(['application_id'], ['applications.id'], ondelete='CASCADE'),
     sa.ForeignKeyConstraint(['company_id'], ['companies.id'], ondelete='CASCADE'),
-    sa.ForeignKeyConstraint(['owner_user_id'], ['users.id'], ),
+    sa.ForeignKeyConstraint(['owner_user_id'], ['users.id'], ondelete='SET NULL'),
     sa.PrimaryKeyConstraint('id')
     )
     with op.batch_alter_table('voice_sessions', schema=None) as batch_op:
@@ -368,6 +375,14 @@ def downgrade() -> None:
         batch_op.drop_index(batch_op.f('ix_job_requirements_company_id'))
 
     op.drop_table('job_requirements')
+    with op.batch_alter_table('notifications', schema=None) as batch_op:
+        batch_op.drop_index(batch_op.f('ix_notifications_user_id'))
+        batch_op.drop_index(batch_op.f('ix_notifications_status'))
+        batch_op.drop_index(batch_op.f('ix_notifications_id'))
+        batch_op.drop_index(batch_op.f('ix_notifications_company_id'))
+        batch_op.drop_index(batch_op.f('ix_notifications_application_id'))
+
+    op.drop_table('notifications')
     with op.batch_alter_table('job_channel_links', schema=None) as batch_op:
         batch_op.drop_index(batch_op.f('ix_job_channel_links_token'))
         batch_op.drop_index(batch_op.f('ix_job_channel_links_job_id'))
@@ -390,13 +405,6 @@ def downgrade() -> None:
         batch_op.drop_index(batch_op.f('ix_jobs_company_id'))
 
     op.drop_table('jobs')
-    with op.batch_alter_table('notifications', schema=None) as batch_op:
-        batch_op.drop_index(batch_op.f('ix_notifications_user_id'))
-        batch_op.drop_index(batch_op.f('ix_notifications_status'))
-        batch_op.drop_index(batch_op.f('ix_notifications_id'))
-        batch_op.drop_index(batch_op.f('ix_notifications_company_id'))
-
-    op.drop_table('notifications')
     with op.batch_alter_table('audit_log', schema=None) as batch_op:
         batch_op.drop_index(batch_op.f('ix_audit_log_id'))
         batch_op.drop_index(batch_op.f('ix_audit_log_company_id'))

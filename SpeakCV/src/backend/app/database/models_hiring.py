@@ -28,7 +28,7 @@ class Job(Base):
     status = Column(String(30), nullable=False, default="draft")
     version = Column(Integer, nullable=False, default=1)
     interview_languages = Column(JSON, nullable=False, default=list)
-    created_by = Column(Integer, ForeignKey("users.id"), nullable=True)
+    created_by = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     published_at = Column(DateTime(timezone=True), nullable=True)
     created_at = _created_at()
 
@@ -49,6 +49,7 @@ class JobRequirement(Base):
 
 class JobChannelLink(Base):
     __tablename__ = "job_channel_links"
+    __table_args__ = (UniqueConstraint("job_id", "channel", name="uq_job_channel"),)
 
     id = Column(Integer, primary_key=True, index=True)
     company_id = Column(Integer, ForeignKey("companies.id", ondelete="CASCADE"), nullable=False, index=True)
@@ -67,7 +68,7 @@ class Application(Base):
     company_id = Column(Integer, ForeignKey("companies.id", ondelete="CASCADE"), nullable=False, index=True)
     job_id = Column(Integer, ForeignKey("jobs.id", ondelete="CASCADE"), nullable=False, index=True)
     job_version = Column(Integer, nullable=False, default=1)
-    candidate_user_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
+    candidate_user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
     alias = Column(String(20), nullable=False)
     source_channel = Column(String(50), nullable=True)
     cv_file_path = Column(String(500), nullable=True)
@@ -80,14 +81,14 @@ class Application(Base):
     processing_error = Column(Text, nullable=True)
     cv_status = Column(String(20), nullable=True)  # meets | not_met
     cv_status_reason = Column(JSON, nullable=True)
-    cv_status_corrected_by = Column(Integer, ForeignKey("users.id"), nullable=True)
+    cv_status_corrected_by = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     cv_status_correction_reason = Column(Text, nullable=True)
     interview_band = Column(String(20), nullable=True)  # many | few
-    analysis_status = Column(String(20), nullable=True)  # pending | running | done | failed
+    analysis_status = Column(String(20), nullable=True)  # pending | running | done | failed | not_taken
     ai_suggestion = Column(Text, nullable=True)
     # Written only by app/hiring/decisions.py (POST .../decision).
     hr_decision = Column(String(20), nullable=False, default="pending")  # pending | approved | rejected
-    hr_decided_by = Column(Integer, ForeignKey("users.id"), nullable=True)
+    hr_decided_by = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     hr_decided_at = Column(DateTime(timezone=True), nullable=True)
     fast_tracked = Column(Boolean, nullable=False, default=False)
     withdraw_reason = Column(Text, nullable=True)
@@ -143,7 +144,7 @@ class VoiceSession(Base):
     company_id = Column(Integer, ForeignKey("companies.id", ondelete="CASCADE"), nullable=False, index=True)
     purpose = Column(String(20), nullable=False)  # screening | intake
     application_id = Column(Integer, ForeignKey("applications.id", ondelete="CASCADE"), nullable=True, index=True)
-    owner_user_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
+    owner_user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
     language = Column(String(10), nullable=False)
     status = Column(String(30), nullable=False, default="created")
     plan = Column(JSON, nullable=True)
@@ -151,6 +152,8 @@ class VoiceSession(Base):
     started_at = Column(DateTime(timezone=True), nullable=True)
     finished_at = Column(DateTime(timezone=True), nullable=True)
     expires_at = Column(DateTime(timezone=True), nullable=True)
+    active_seconds = Column(Integer, nullable=False, default=0, server_default="0")
+    last_activity_at = Column(DateTime(timezone=True), nullable=True)
 
 
 class VoiceTurn(Base):
@@ -190,11 +193,12 @@ class Consent(Base):
     __tablename__ = "consents"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
     company_id = Column(Integer, ForeignKey("companies.id", ondelete="CASCADE"), nullable=False, index=True)
     application_id = Column(Integer, ForeignKey("applications.id", ondelete="CASCADE"), nullable=True, index=True)
     purpose = Column(String(50), nullable=False)
     text_version = Column(String(30), nullable=False)
+    language = Column(String(10), nullable=True)  # NULL when the client did not say which text it showed
     granted_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     withdrawn_at = Column(DateTime(timezone=True), nullable=True)
 
@@ -204,7 +208,7 @@ class AuditLog(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     company_id = Column(Integer, ForeignKey("companies.id", ondelete="CASCADE"), nullable=False, index=True)
-    actor_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    actor_user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     action = Column(String(80), nullable=False, index=True)
     target_type = Column(String(50), nullable=False)
     target_id = Column(Integer, nullable=True)
@@ -221,6 +225,7 @@ class Notification(Base):
     id = Column(Integer, primary_key=True, index=True)
     company_id = Column(Integer, ForeignKey("companies.id", ondelete="CASCADE"), nullable=False, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    application_id = Column(Integer, ForeignKey("applications.id", ondelete="CASCADE"), nullable=True, index=True)
     kind = Column(String(50), nullable=False)
     language = Column(String(10), nullable=False, default="en")
     subject = Column(String(255), nullable=False)

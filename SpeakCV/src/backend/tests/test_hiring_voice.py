@@ -96,9 +96,17 @@ def turn(db, session_id, position):
     return db.query(VoiceTurn).filter_by(session_id=session_id, position=position).one_or_none()
 
 
-def backdate(db, session_id, **delta):
+def spend_time(db, session_id, **delta):
+    """The candidate has been active this long, and the last request was just now."""
     row = session_row(db, session_id)
-    row.started_at = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(**delta)
+    row.active_seconds = int(timedelta(**delta).total_seconds())
+    row.last_activity_at = datetime.now(timezone.utc).replace(tzinfo=None)
+    db.commit()
+
+
+def go_idle(db, session_id, **delta):
+    row = session_row(db, session_id)
+    row.last_activity_at = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(**delta)
     db.commit()
 
 
@@ -186,7 +194,7 @@ def test_start_again_returns_the_same_session_and_one_consent(client, world, db,
 
 
 def test_start_again_after_the_session_finished_gets_409(client, world, db, started):
-    backdate(db, started["session_id"], minutes=16)
+    spend_time(db, started["session_id"], minutes=16)
     assert start(client, world).status_code == 409
     assert db.query(VoiceSession).count() == 1
 
@@ -217,7 +225,7 @@ def test_a_session_after_an_hr_restart_keeps_the_count_and_the_old_audio(client,
     answer(client, started["session_id"], 1, data=b"old answer")
     old_path = turn(db, started["session_id"], 1).audio_path
     row = session_row(db, started["session_id"])
-    row.status = "expired"
+    row.status = "abandoned"
     row.restart_count = 1
     db.get(Application, world.application_id).stage = "invited"
     db.commit()
@@ -616,6 +624,7 @@ def test_unknown_purpose_and_empty_plan_are_refused(db, world):
 def test_limits_match_the_agreed_values():
     assert voice.MAX_AUDIO_BYTES == 15 * 1024 * 1024
     assert (voice.CLOSING_AFTER_SECONDS, voice.HARD_LIMIT_SECONDS, voice.RESUME_HOURS, voice.MAX_FOLLOWUPS_PER_QUESTION) == (780, 900, 24, 1)
+    assert voice.MAX_COUNTED_GAP_SECONDS == 210
     assert voice.ALLOWED_AUDIO == {
         "audio/webm": ".webm", "audio/mp4": ".mp4", "audio/x-m4a": ".m4a", "audio/m4a": ".m4a",
         "audio/ogg": ".ogg", "audio/wav": ".wav", "audio/x-wav": ".wav",
@@ -627,7 +636,7 @@ def test_limits_match_the_agreed_values():
 
 def test_after_13_minutes_the_state_is_closing_and_the_current_answer_completes(client, world, db, started, scheduled):
     session_id = started["session_id"]
-    backdate(db, session_id, minutes=13, seconds=5)
+    spend_time(db, session_id, minutes=13, seconds=5)
     current = state(client, session_id).json()
     assert current["status"] == "closing" and current["position"] == 1
     assert 0 < current["time_left_seconds"] <= 115
@@ -642,7 +651,7 @@ def test_after_13_minutes_the_state_is_closing_and_the_current_answer_completes(
 
 def test_silence_while_closing_also_completes(client, world, db, started, monkeypatch):
     session_id = started["session_id"]
-    backdate(db, session_id, minutes=14)
+    spend_time(db, session_id, minutes=14)
     stt_returning(monkeypatch, "")
     assert answer(client, session_id, 1).json()["status"] == "completed"
     assert turn(db, session_id, 1).transcript_status == "no_answer"
@@ -654,7 +663,7 @@ def test_time_left_counts_down_from_the_hard_limit(client, world, db, started):
 
 def test_after_15_minutes_no_answer_is_accepted_and_the_session_completes(client, world, db, started, monkeypatch, scheduled):
     session_id = started["session_id"]
-    backdate(db, session_id, minutes=15, seconds=5)
+    spend_time(db, session_id, minutes=15, seconds=5)
     calls = stt_returning(monkeypatch, ANSWER)
     response = answer(client, session_id, 1)
     assert response.status_code == 200
@@ -668,7 +677,7 @@ def test_after_15_minutes_no_answer_is_accepted_and_the_session_completes(client
 
 
 def test_reading_state_after_15_minutes_completes_once(client, world, db, started, scheduled):
-    backdate(db, started["session_id"], minutes=20)
+    spend_time(db, started["session_id"], minutes=20)
     assert state(client, started["session_id"]).json()["status"] == "completed"
     assert state(client, started["session_id"]).json()["status"] == "completed"
     assert scheduled == [world.application_id]
@@ -677,22 +686,22 @@ def test_reading_state_after_15_minutes_completes_once(client, world, db, starte
 # 11. Expiry
 
 
-def test_after_24_hours_the_session_expires_on_access_and_goes_to_hr(client, world, db, started, scheduled):
+def test_after_24_idle_hours_with_no_answer_the_session_is_abandoned_and_goes_to_hr(client, world, db, started, scheduled):
     session_id = started["session_id"]
-    backdate(db, session_id, hours=24, seconds=5)
+    go_idle(db, session_id, hours=24, seconds=5)
     response = state(client, session_id)
     assert response.status_code == 200
-    assert response.json()["status"] == "expired" and response.json()["question_text"] is None
-    assert session_row(db, session_id).status == "expired"
+    assert response.json()["status"] == "abandoned" and response.json()["question_text"] is None
+    assert session_row(db, session_id).status == "abandoned"
     assert stage(db, world) == "ready_for_hr"
     assert scheduled == []
-    assert db.query(AuditLog).filter_by(action="voice_session_expired", target_id=session_id).count() == 1
+    assert db.query(AuditLog).filter_by(action="voice_session_abandoned", target_id=session_id).count() == 1
 
 
-def test_an_upload_after_expiry_stores_nothing(client, world, db, started, monkeypatch):
-    backdate(db, started["session_id"], hours=30)
+def test_an_upload_after_24_idle_hours_stores_nothing(client, world, db, started, monkeypatch):
+    go_idle(db, started["session_id"], hours=30)
     calls = stt_returning(monkeypatch, ANSWER)
-    assert answer(client, started["session_id"], 1).json()["status"] == "expired"
+    assert answer(client, started["session_id"], 1).json()["status"] == "abandoned"
     assert calls == [] and turn(db, started["session_id"], 1).audio_path is None
     assert stage(db, world) == "ready_for_hr"
 
@@ -758,7 +767,7 @@ def test_a_failing_schedule_does_not_lose_the_answer(client, world, db, started,
         raise RuntimeError("no worker")
 
     monkeypatch.setattr(voice, "schedule_analysis", boom)
-    backdate(db, started["session_id"], minutes=14)
+    spend_time(db, started["session_id"], minutes=14)
     assert answer(client, started["session_id"], 1).json()["status"] == "completed"
     assert turn(db, started["session_id"], 1).transcript == ANSWER
 
