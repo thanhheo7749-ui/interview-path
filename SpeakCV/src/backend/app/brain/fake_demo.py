@@ -64,6 +64,25 @@ def _copilot(_system, messages, _schema) -> str:
     )
 
 
+_FACT = re.compile(r'<fact id="([^"]+)" kind="\w+" status="(\w+)">\nlabel: (.*)\nquote: (.*)\n</fact>')
+_LANGUAGE = re.compile(r"<language>(\w+)</language>")
+_CLEAR = ("evidence", "met", "explained")
+
+
+def _candidate_brief(_system, messages, _schema) -> str:
+    """One strength per clear fact, one point to clarify per unclear one, and a question for each of those."""
+    content = messages[-1]["content"]
+    language = (_LANGUAGE.search(content) or [None, "en"])[1]
+    strengths, clarify, questions = [], [], []
+    for ident, status, label, _quote in _FACT.findall(content):
+        if status in _CLEAR:
+            strengths.append({"evidence_id": ident, "summary": f"[Demo AI] ({language}) {label}", "quote": ""})
+        else:
+            clarify.append({"evidence_id": ident, "summary": f"[Demo AI] ({language}) {label}", "quote": ""})
+            questions.append({"evidence_id": ident, "question": f"[Demo AI] ({language}) {label}?"})
+    return json.dumps({"strengths": strengths, "to_clarify": clarify, "questions": questions}, ensure_ascii=False)
+
+
 def install() -> None:
     config = get_config()
     if config.slot("bulk").provider == "fake":
@@ -72,3 +91,4 @@ def install() -> None:
         fake.register("discrimination_check", _not_discriminating)
     if config.slot("reasoning").provider == "fake":
         fake.register("copilot_answer", _copilot)
+        fake.register("candidate_brief", _candidate_brief)
