@@ -193,7 +193,10 @@ def search(db: Session, audience: Audience, query: str, top_k: int = 8, char_bud
     comparable = [(f"n{row_id}", vector) for row_id, vector in node_vectors.items() if vector.size == query_array.size]
     comparable += [(f"c{row_id}", vector) for row_id, vector in chunk_vectors.items() if vector.size == query_array.size]
     if not comparable:
-        raise NoEmbeddingsError(f"No embeddings for model {model}. Run make reembed.")
+        # Rows never embedded, such as company and department nodes, are not candidates and not a mismatch.
+        if any(row.embedding_model is not None for row in [*nodes.values(), *chunks.values()]):
+            raise NoEmbeddingsError(f"No embeddings for model {model}. Run make reembed.")
+        return ContextBundle((), 0.0, frozenset())
 
     texts = {f"n{row.id}": _node_text(row) for row in nodes.values()}
     texts.update({f"c{row.id}": row.text for row in chunks.values()})

@@ -544,13 +544,56 @@ def test_rows_of_another_model_are_not_compared_when_others_match(db, world):
     assert bundle.items[0].ref != f"n{world.role_id}"
 
 
-def test_rows_that_were_never_embedded_ask_the_operator_to_reembed(db):
+@pytest.fixture
+def fresh_company(db):
     company = Company(slug="fresh", name="Fresh")
     db.add(company)
     db.commit()
-    Builder(db, company.id).node("Fresh", type="company", embedded=False)
+    builder = Builder(db, company.id)
+    company_node = builder.node("Fresh", type="company", embedded=False)
+    department_node = builder.node("Engineering", type="department", embedded=False)
+    builder.edge(department_node, company_node, "part_of")
+    return SimpleNamespace(id=company.id, b=builder, company_node=company_node)
+
+
+def test_a_company_with_only_org_nodes_gets_an_empty_bundle(db, fresh_company):
+    bundle = retriever.search(db, aud.Audience(fresh_company.id, "hr"), "anything")
+    assert bundle == retriever.ContextBundle((), 0.0, frozenset())
+
+
+def test_unembedded_rows_beside_current_vectors_are_skipped_as_candidates(db, fresh_company):
+    policy = fresh_company.b.node("Leave policy", "Annual leave rules")
+
+    bundle = retriever.search(db, aud.Audience(fresh_company.id, "hr"), "leave policy")
+
+    assert [item.ref for item in bundle.items] == [f"n{policy.id}"]
+
+
+def test_vectors_only_from_another_model_raise_beside_unembedded_rows(db, fresh_company):
+    policy = fresh_company.b.node("Leave policy", "Annual leave rules")
+    policy.embedding_model = "old-model"
+    db.commit()
     with pytest.raises(retriever.NoEmbeddingsError, match="make reembed"):
-        retriever.search(db, aud.Audience(company.id, "hr"), "anything")
+        retriever.search(db, aud.Audience(fresh_company.id, "hr"), "leave policy")
+
+
+def test_chunk_vectors_only_from_another_model_raise_beside_unembedded_rows(db, fresh_company):
+    document = fresh_company.b.document("Handbook", visibility="public")
+    chunk = fresh_company.b.chunk(document, "Annual leave rules")
+    chunk.embedding_model = "old-model"
+    db.commit()
+    with pytest.raises(retriever.NoEmbeddingsError, match="make reembed"):
+        retriever.search(db, aud.Audience(fresh_company.id, "hr"), "leave policy")
+
+
+def test_only_allowed_rows_count_as_a_model_mismatch(db, fresh_company):
+    secret = fresh_company.b.node("Pay note", "salary band", type="private_note", visibility="confidential")
+    secret.embedding_model = "old-model"
+    db.commit()
+
+    assert retriever.search(db, aud.candidate(fresh_company.id), "salary band").items == ()
+    with pytest.raises(retriever.NoEmbeddingsError, match="make reembed"):
+        retriever.search(db, aud.Audience(fresh_company.id, "hr"), "salary band")
 
 
 def test_an_unembedded_node_is_still_reachable_as_a_neighbour(db, world):
