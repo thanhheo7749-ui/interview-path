@@ -32,4 +32,8 @@ if [ "${E2E_SEED_BOARD:-}" = "1" ]; then
   printf '%s' "$BOARD_PASSWORD" > "$E2E_TMP/portal_e2e_board_password"
   PYTHONPATH=. $PY "$E2E_DIR/seed_board.py" "$E2E_TMP/board_seed.json"
 fi
+# One user in two companies, to test that nothing from the previous company survives a switch.
+SWITCH_PASSWORD=$($PY -m app.cli create-company --slug switch-a --name "Switch Alpha" --hr-email switch-hr@e2e.test --hr-name "Switch HR" | awk '/Temporary password/ {print $NF}')
+printf '%s' "$SWITCH_PASSWORD" > "$E2E_TMP/portal_e2e_switch_password"
+$PY -m app.cli create-company --slug switch-b --name "Switch Beta" --hr-email switch-hr@e2e.test --hr-name "Switch HR" > /dev/null
 exec env PYTHONPATH=. $PY "$E2E_DIR/serve-backend.py" "${E2E_API_PORT:-8099}"

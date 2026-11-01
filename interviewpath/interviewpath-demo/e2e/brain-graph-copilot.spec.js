@@ -114,6 +114,41 @@ test('the graph shows real nodes, and View as narrows and restores them', async 
   await expect(list.getByRole('button', { name: new RegExp(internalNodeTitle) })).toBeVisible();
 });
 
+test('the side panel shows the node body, and HR changes its layer and unpublishes it after a confirmation', async ({ page, request }) => {
+  const title = 'Corridor note g3';
+  const hr = await apiLogin(request, HR);
+  const nodeTitle = await uploadAndAccept(request, hr, {
+    title,
+    visibility: 'internal',
+    line: 'Zephyrg3 archive corridor smells of cedar and lemon',
+  });
+  await signIn(page, HR);
+  await page.getByRole('link', { name: 'Knowledge graph' }).click();
+  const list = page.getByTestId('graph-node-list');
+  await list.getByRole('button', { name: new RegExp(nodeTitle) }).click();
+  const detail = page.getByTestId('graph-detail');
+  await expect(detail.getByTestId('graph-body')).toContainText('The corridor body text shows in the graph panel.');
+  await expect(page.getByText(/does not include the full text/)).toHaveCount(0);
+  await expect(detail).toContainText('Internal');
+
+  await detail.getByLabel('Layer of this node').selectOption('public');
+  await detail.getByRole('button', { name: 'Change layer' }).click();
+  await expect(detail.getByRole('alertdialog')).toContainText('Move this node to the Public layer');
+  // Cancelling changes nothing.
+  await detail.getByRole('button', { name: 'Cancel' }).click();
+  await expect(detail).toContainText('Internal');
+  await detail.getByRole('button', { name: 'Change layer' }).click();
+  await detail.getByRole('alertdialog').getByRole('button', { name: 'Change layer' }).click();
+  await expect(detail.getByTestId('graph-body')).toBeVisible();
+  await expect(list.getByRole('button', { name: new RegExp(nodeTitle) })).toContainText('Public');
+
+  await detail.getByRole('button', { name: 'Unpublish node' }).click();
+  await expect(detail.getByRole('alertdialog')).toContainText('stops being used by the Copilot');
+  await detail.getByRole('alertdialog').getByRole('button', { name: 'Unpublish', exact: true }).click();
+  await expect(list.getByRole('button', { name: new RegExp(nodeTitle) })).toHaveCount(0);
+  await expect(page.getByText('Select a node in the graph or the list')).toBeVisible();
+});
+
 test('the manager view offers a department and asks the server for it', async ({ page }) => {
   await signIn(page, HR);
   await page.goto('/graph');

@@ -128,7 +128,8 @@
       "processing": "Đang xử lý",
       "review": "Sẵn sàng để duyệt",
       "published": "Đã xuất bản",
-      "failed": "Thất bại"
+      "failed": "Thất bại",
+      "withdrawn": "Đã thu hồi"
     },
     "job": {
       "queued": "Đang chờ",
@@ -136,7 +137,20 @@
       "review": "Sẵn sàng để duyệt",
       "failed": "Thất bại",
       "done": "Hoàn tất"
-    }
+    },
+    "language": "Ngôn ngữ",
+    "languages": {
+      "auto": "Tự động",
+      "vi": "Tiếng Việt",
+      "en": "Tiếng Anh",
+      "ko": "Tiếng Hàn"
+    },
+    "retryFailed": "Thử lại các đoạn lỗi",
+    "conflictMessage": "Tài liệu này đã thay đổi kể từ khi tải trang nên thao tác chưa được áp dụng. Danh sách đã được làm mới. ({{detail}})",
+    "withdraw": "Thu hồi",
+    "withdrawConfirm": "Thu hồi \"{{title}}\"? Nội dung sẽ không còn được Copilot và đồ thị sử dụng, và các mục tri thức không có tài liệu nguồn nào khác sẽ bị xóa.",
+    "withdrawYes": "Thu hồi tài liệu",
+    "withdrawn": "Đã thu hồi tài liệu. Đã xóa {{removed}} mục, giữ lại {{kept}} mục vì còn tài liệu khác hỗ trợ."
   },
   "review": {
     "title": "Duyệt",
@@ -161,7 +175,11 @@
       "benefit": "Phúc lợi",
       "tool": "Công cụ",
       "term": "Thuật ngữ"
-    }
+    },
+    "factValue": "Giá trị dữ kiện",
+    "factUnit": "Đơn vị dữ kiện",
+    "factScope": "Áp dụng cho",
+    "effective": "hiệu lực {{date}}"
   },
   "conflicts": {
     "title": "Mâu thuẫn",
@@ -227,9 +245,16 @@
     "layer": "Tầng",
     "connections": "Kết nối",
     "noConnections": "Không có kết nối.",
-    "bodyUnavailable": "Chế độ đồ thị không kèm toàn văn của nút. Hãy mở các trang duyệt để đọc.",
     "canvasLabel": "Đồ thị tri thức tương tác",
-    "hint": "Kéo nút để cân bằng lại. Nhấp vào nút để xem chi tiết."
+    "hint": "Kéo nút để cân bằng lại. Nhấp vào nút để xem chi tiết.",
+    "body": "Nội dung",
+    "changeLayer": "Tầng của nút này",
+    "applyLayer": "Đổi tầng",
+    "layerConfirm": "Chuyển nút này sang tầng {{layer}}? Quyền đọc sẽ thay đổi ngay.",
+    "layerYes": "Đổi tầng",
+    "unpublish": "Hủy xuất bản nút",
+    "unpublishConfirm": "Hủy xuất bản nút này? Copilot sẽ không dùng nó nữa và nó biến mất khỏi đồ thị.",
+    "unpublishYes": "Hủy xuất bản"
   },
   "copilot": {
     "title": "Copilot",

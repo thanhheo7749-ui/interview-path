@@ -128,7 +128,8 @@
       "processing": "Processing",
       "review": "Ready for review",
       "published": "Published",
-      "failed": "Failed"
+      "failed": "Failed",
+      "withdrawn": "Withdrawn"
     },
     "job": {
       "queued": "Queued",
@@ -136,7 +137,20 @@
       "review": "Ready for review",
       "failed": "Failed",
       "done": "Done"
-    }
+    },
+    "language": "Language",
+    "languages": {
+      "auto": "Auto",
+      "vi": "Vietnamese",
+      "en": "English",
+      "ko": "Korean"
+    },
+    "retryFailed": "Retry failed sections",
+    "conflictMessage": "This document has changed since the page loaded, so the action was not applied. The list is refreshed. ({{detail}})",
+    "withdraw": "Withdraw",
+    "withdrawConfirm": "Withdraw \"{{title}}\"? Its content stops being used by the Copilot and the graph, and knowledge items with no other source document are removed.",
+    "withdrawYes": "Withdraw document",
+    "withdrawn": "Document withdrawn. {{removed}} items removed, {{kept}} kept because another document supports them."
   },
   "review": {
     "title": "Review",
@@ -161,7 +175,11 @@
       "benefit": "Benefit",
       "tool": "Tool",
       "term": "Term"
-    }
+    },
+    "factValue": "Fact value",
+    "factUnit": "Fact unit",
+    "factScope": "Applies to",
+    "effective": "effective {{date}}"
   },
   "conflicts": {
     "title": "Conflicts",
@@ -228,9 +246,16 @@
     "layer": "Layer",
     "connections": "Connections",
     "noConnections": "No connections.",
-    "bodyUnavailable": "The graph view does not include the full text of a node. Open the review pages to read it.",
     "canvasLabel": "Interactive knowledge graph",
-    "hint": "Drag nodes to rebalance them. Click a node to inspect it."
+    "hint": "Drag nodes to rebalance them. Click a node to inspect it.",
+    "body": "Content",
+    "changeLayer": "Layer of this node",
+    "applyLayer": "Change layer",
+    "layerConfirm": "Move this node to the {{layer}} layer? Who can read it changes right away.",
+    "layerYes": "Change layer",
+    "unpublish": "Unpublish node",
+    "unpublishConfirm": "Unpublish this node? It stops being used by the Copilot and disappears from the graph.",
+    "unpublishYes": "Unpublish"
   },
   "copilot": {
     "title": "Copilot",

@@ -41,3 +41,21 @@ export function WarningList({ warnings, onDismiss }) {
 export function EmptyState({ children }) {
   return <p className={`${cardClass} text-sm font-semibold text-slate-600`}>{children}</p>;
 }
+
+// An inline confirmation for an action that changes what the company knowledge says.
+export function ConfirmBar({ message, confirmLabel, busy, onConfirm, onCancel }) {
+  const { t } = useTranslation();
+  return (
+    <div role="alertdialog" aria-label={message} className="space-y-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+      <p className="font-semibold">{message}</p>
+      <div className="flex gap-2">
+        <button type="button" disabled={busy} onClick={onConfirm} className={primaryButton}>
+          {confirmLabel}
+        </button>
+        <button type="button" disabled={busy} onClick={onCancel} className={secondaryButton}>
+          {t('common.cancel')}
+        </button>
+      </div>
+    </div>
+  );
+}

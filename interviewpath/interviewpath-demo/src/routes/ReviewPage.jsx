@@ -4,9 +4,11 @@ import { useCompany } from '../company/CompanyContext.jsx';
 import {
   EmptyState, ErrorAlert, WarningList, cardClass, inputClass, primaryButton, secondaryButton,
 } from '../components/KbFeedback.jsx';
-import { decideReview, getReviewQueue, notifyKbChanged } from '../lib/kb.js';
+import { decideReview, getReviewQueue, notifyKbChanged, uniqueSources } from '../lib/kb.js';
 
 const VISIBILITIES = ['public', 'internal', 'confidential'];
+
+const isFact = (node) => Boolean(node.fact_kind) && node.fact_kind !== 'none';
 
 function groupByDocument(nodes) {
   const groups = new Map();
@@ -73,6 +75,9 @@ function ReviewPage() {
     title: valueOf(node, 'title'),
     body: valueOf(node, 'body'),
     visibility: valueOf(node, 'visibility'),
+    ...(isFact(node)
+      ? { fact_value: valueOf(node, 'fact_value'), fact_unit: valueOf(node, 'fact_unit'), scope_text: valueOf(node, 'scope_text') }
+      : {}),
   });
 
   const nodes = queue?.nodes ?? [];
@@ -135,18 +140,44 @@ function ReviewPage() {
                     className={`${inputClass} mt-1 w-full`}
                   />
                 </label>
-                {node.fact_kind && node.fact_value && (
-                  <p className="text-sm text-slate-600">
-                    {t('review.fact')}: <strong>{node.fact_value} {node.fact_unit}</strong>
-                    {node.scope_text ? ` (${node.scope_text})` : ''}
-                  </p>
+                {isFact(node) && (
+                  <div className="grid gap-3 md:grid-cols-3">
+                    <label className="text-sm font-semibold text-slate-700">
+                      <span className="block">{t('review.factValue')}</span>
+                      <input
+                        maxLength={255}
+                        value={valueOf(node, 'fact_value') ?? ''}
+                        onChange={(e) => edit(node, 'fact_value', e.target.value)}
+                        className={`${inputClass} mt-1 w-full`}
+                      />
+                    </label>
+                    <label className="text-sm font-semibold text-slate-700">
+                      <span className="block">{t('review.factUnit')}</span>
+                      <input
+                        maxLength={50}
+                        value={valueOf(node, 'fact_unit') ?? ''}
+                        onChange={(e) => edit(node, 'fact_unit', e.target.value)}
+                        className={`${inputClass} mt-1 w-full`}
+                      />
+                    </label>
+                    <label className="text-sm font-semibold text-slate-700">
+                      <span className="block">{t('review.factScope')}</span>
+                      <input
+                        maxLength={500}
+                        value={valueOf(node, 'scope_text') ?? ''}
+                        onChange={(e) => edit(node, 'scope_text', e.target.value)}
+                        className={`${inputClass} mt-1 w-full`}
+                      />
+                    </label>
+                  </div>
                 )}
-                {node.sources?.map((source) => (
+                {uniqueSources(node.sources).map((source) => (
                   <blockquote key={`${source.document_title}-${source.page}-${source.quote}`} className="border-l-4 border-blue-300 pl-3 text-sm text-slate-700">
                     <p>{source.quote}</p>
                     <footer className="mt-1 text-xs text-slate-500">
                       {source.document_title}
                       {source.page != null ? `, ${t('review.page', { page: source.page })}` : ''}
+                      {source.effective_date ? `, ${t('review.effective', { date: source.effective_date })}` : ''}
                     </footer>
                   </blockquote>
                 ))}

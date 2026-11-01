@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Navigate } from 'react-router-dom';
+import { ConfirmBar, ErrorAlert, primaryButton, secondaryButton } from '../components/KbFeedback.jsx';
 import { useCompany } from '../company/CompanyContext.jsx';
 import KnowledgeGraph from '../components/KnowledgeGraph.jsx';
 import { api } from '../lib/api.js';
-import { getGraph } from '../lib/kb.js';
+import { decideReview, getGraph, notifyKbChanged } from '../lib/kb.js';
 import { LAYERS, LAYER_COLORS } from '../lib/layers.js';
 
 const AUDIENCES = ['hr', 'manager', 'employee', 'candidate'];
@@ -25,6 +26,11 @@ function GraphExplorer({ companyId }) {
   const [departments, setDepartments] = useState([]);
   const [result, setResult] = useState({ key: null, graph: EMPTY_GRAPH, failed: false });
   const [selectedId, setSelectedId] = useState(null);
+  const [reloadKey, setReloadKey] = useState(0);
+  const [pendingLayer, setPendingLayer] = useState('');
+  const [confirming, setConfirming] = useState(null);
+  const [changing, setChanging] = useState(false);
+  const [changeError, setChangeError] = useState('');
 
   useEffect(() => {
     let cancelled = false;
@@ -53,7 +59,7 @@ function GraphExplorer({ companyId }) {
     return () => {
       cancelled = true;
     };
-  }, [companyId, viewAs, departmentId, requestKey]);
+  }, [companyId, viewAs, departmentId, requestKey, reloadKey]);
 
   const loading = result.key !== requestKey;
   const graph = useMemo(() => {
@@ -63,6 +69,31 @@ function GraphExplorer({ companyId }) {
   }, [result.graph]);
   const nodesById = useMemo(() => new Map(graph.nodes.map((node) => [node.id, node])), [graph]);
   const selected = nodesById.get(selectedId) ?? null;
+
+  const select = (id) => {
+    setSelectedId(id);
+    setPendingLayer('');
+    setConfirming(null);
+    setChangeError('');
+  };
+
+  // Changing a layer or unpublishing goes through the same review route as every other knowledge edit.
+  const applyChange = async (item) => {
+    setChanging(true);
+    setChangeError('');
+    try {
+      await decideReview(companyId, [{ node_id: Number(selected.id), ...item }]);
+      setConfirming(null);
+      setPendingLayer('');
+      if (item.action === 'reject') setSelectedId(null);
+      setReloadKey((k) => k + 1);
+      notifyKbChanged();
+    } catch (err) {
+      setChangeError(err.message);
+    } finally {
+      setChanging(false);
+    }
+  };
   const connections = useMemo(
     () =>
       selected
@@ -151,7 +182,7 @@ function GraphExplorer({ companyId }) {
             <KnowledgeGraph
               graph={graph}
               selectedNode={selected}
-              onSelectNode={(node) => setSelectedId(node.id)}
+              onSelectNode={(node) => select(node.id)}
             />
           ) : (
             !loading &&
@@ -173,7 +204,62 @@ function GraphExplorer({ companyId }) {
                 <span aria-hidden="true" className="inline-block h-3 w-3 rounded-full" style={{ backgroundColor: LAYER_COLORS[selected.layer] }} />
                 {t(`graph.layers.${selected.layer}`, { defaultValue: selected.layer })}
               </p>
-              <p className="text-xs text-slate-500">{t('graph.bodyUnavailable')}</p>
+              {selected.body && (
+                <div>
+                  <p className="font-bold text-slate-500">{t('graph.body')}</p>
+                  <p data-testid="graph-body" className="mt-1 whitespace-pre-wrap text-slate-700">{selected.body}</p>
+                </div>
+              )}
+              {selected.type !== 'company' && selected.type !== 'department' && (
+                <div className="space-y-2 border-t border-slate-100 pt-3">
+                  <ErrorAlert message={changeError} />
+                  <label className="block text-sm font-semibold text-slate-700">
+                    <span className="block">{t('graph.changeLayer')}</span>
+                    <select
+                      value={pendingLayer || selected.layer}
+                      onChange={(e) => {
+                        setPendingLayer(e.target.value === selected.layer ? '' : e.target.value);
+                        setConfirming(null);
+                      }}
+                      className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-950"
+                    >
+                      {LAYERS.map((layer) => (
+                        <option key={layer} value={layer}>
+                          {t(`graph.layers.${layer}`)}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  {pendingLayer && confirming !== 'layer' && (
+                    <button type="button" onClick={() => setConfirming('layer')} className={primaryButton}>
+                      {t('graph.applyLayer')}
+                    </button>
+                  )}
+                  {confirming === 'layer' && (
+                    <ConfirmBar
+                      message={t('graph.layerConfirm', { layer: t(`graph.layers.${pendingLayer}`) })}
+                      confirmLabel={t('graph.layerYes')}
+                      busy={changing}
+                      onConfirm={() => applyChange({ action: 'edit', visibility: pendingLayer })}
+                      onCancel={() => setConfirming(null)}
+                    />
+                  )}
+                  {confirming !== 'unpublish' && (
+                    <button type="button" onClick={() => setConfirming('unpublish')} className={secondaryButton}>
+                      {t('graph.unpublish')}
+                    </button>
+                  )}
+                  {confirming === 'unpublish' && (
+                    <ConfirmBar
+                      message={t('graph.unpublishConfirm')}
+                      confirmLabel={t('graph.unpublishYes')}
+                      busy={changing}
+                      onConfirm={() => applyChange({ action: 'reject' })}
+                      onCancel={() => setConfirming(null)}
+                    />
+                  )}
+                </div>
+              )}
               <p className="font-bold text-slate-500">{t('graph.connections')}</p>
               {connections.length === 0 ? (
                 <p className="text-slate-500">{t('graph.noConnections')}</p>
@@ -203,7 +289,7 @@ function GraphExplorer({ companyId }) {
                 <button
                   type="button"
                   aria-pressed={selectedId === node.id}
-                  onClick={() => setSelectedId(node.id)}
+                  onClick={() => select(node.id)}
                   className={[
                     'flex w-full items-center gap-2 rounded-xl border px-3 py-2 text-left text-sm font-semibold transition',
                     selectedId === node.id ? 'border-slate-950 bg-slate-50' : 'border-slate-200 hover:bg-slate-50',

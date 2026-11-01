@@ -11,12 +11,18 @@ export const getAiStatus = () => api('/api/ai-status', { skipAuthRedirect: true 
 
 export const listDocuments = (companyId) => api(`${kb(companyId)}/documents`);
 
-// `form` is a FormData with file, title, visibility and optionally department_id and effective_date.
+// `form` is a FormData with file, title, visibility and optionally department_id, effective_date and language.
 export const uploadDocument = (companyId, form) => api(`${kb(companyId)}/documents`, { method: 'POST', formData: form });
 
 export const getJob = (companyId, jobId) => api(`${kb(companyId)}/jobs/${jobId}`);
 
 export const retryJob = (companyId, jobId) => api(`${kb(companyId)}/jobs/${jobId}/retry`, { method: 'POST' });
+
+export const retryFailedSections = (companyId, jobId) =>
+  api(`${kb(companyId)}/jobs/${jobId}/retry-failed`, { method: 'POST' });
+
+export const unpublishDocument = (companyId, documentId) =>
+  api(`${kb(companyId)}/documents/${documentId}/unpublish`, { method: 'POST' });
 
 export const getReviewQueue = (companyId) => api(`${kb(companyId)}/review`);
 
@@ -42,4 +48,15 @@ export function getGraph(companyId, { viewAs, departmentId } = {}) {
 
 export function askCopilot(companyId, question) {
   return api(`/api/companies/${companyId}/copilot/ask`, { method: 'POST', body: { question } });
+}
+
+// A node shows the same quote twice when two overlapping chunks both contain it.
+export function uniqueSources(sources) {
+  const seen = new Set();
+  return (Array.isArray(sources) ? sources : []).filter((source) => {
+    const key = `${source.document_title}|${source.page}|${source.quote}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }

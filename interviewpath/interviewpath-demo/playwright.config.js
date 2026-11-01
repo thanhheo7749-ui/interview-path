@@ -13,6 +13,8 @@ const webUrl = `http://localhost:${process.env.E2E_WEB_PORT}`;
 
 export default defineConfig({
   testDir: './e2e',
+  // One backend on SQLite: parallel writers cause 'database is locked' flakes.
+  workers: 1,
   use: { baseURL: webUrl },
   webServer: [
     {

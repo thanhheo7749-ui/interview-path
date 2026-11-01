@@ -47,6 +47,42 @@
       "fact_unit": "",
       "scope_text": "",
       "effective_date": ""
+    },
+    {
+      "ref": "Probation period length",
+      "type": "policy",
+      "title": "Probation period length",
+      "body": "New engineers serve a probation period before confirmation.",
+      "quote": "Probation period lasts 60 days for new engineers.",
+      "fact_kind": "number",
+      "fact_value": "60",
+      "fact_unit": "days",
+      "scope_text": "New engineers",
+      "effective_date": ""
+    },
+    {
+      "ref": "Zephyrw9 lanterns glow at dusk in the cafeteria",
+      "type": "policy",
+      "title": "Zephyrw9 lanterns glow at dusk in the cafeteria",
+      "body": "Zephyrw9 lanterns glow at dusk in the cafeteria\n\nThis note was written for the withdraw test.",
+      "quote": "Zephyrw9 lanterns glow at dusk in the cafeteria",
+      "fact_kind": "none",
+      "fact_value": "",
+      "fact_unit": "",
+      "scope_text": "",
+      "effective_date": ""
+    },
+    {
+      "ref": "Zephyrg3 archive corridor smells of cedar and lemon",
+      "type": "policy",
+      "title": "Zephyrg3 archive corridor smells of cedar and lemon",
+      "body": "Zephyrg3 archive corridor smells of cedar and lemon\n\nThe corridor body text shows in the graph panel.",
+      "quote": "Zephyrg3 archive corridor smells of cedar and lemon",
+      "fact_kind": "none",
+      "fact_value": "",
+      "fact_unit": "",
+      "scope_text": "",
+      "effective_date": ""
     }
   ],
   "edges": []

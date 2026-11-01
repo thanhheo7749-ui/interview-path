@@ -2,13 +2,12 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useCompany } from '../company/CompanyContext.jsx';
 import { EmptyState, ErrorAlert, WarningList, cardClass, primaryButton, secondaryButton } from '../components/KbFeedback.jsx';
-import { listConflicts, notifyKbChanged, resolveConflict } from '../lib/kb.js';
+import { listConflicts, notifyKbChanged, resolveConflict, uniqueSources } from '../lib/kb.js';
 
 function Side({ label, node }) {
   const { t } = useTranslation();
   if (!node) return <div className="rounded-xl border border-slate-200 bg-slate-50 p-4" />;
-  // Sources are optional: the conflicts route may not return quotes.
-  const sources = Array.isArray(node.sources) ? node.sources : [];
+  const sources = uniqueSources(node.sources);
   return (
     <div className="space-y-2 rounded-xl border border-slate-200 bg-slate-50 p-4" data-testid={`conflict-${label}`}>
       <p className="text-xs font-bold uppercase tracking-[0.12em] text-slate-400">{t('conflicts.source', { label })}</p>
@@ -24,9 +23,13 @@ function Side({ label, node }) {
         <dd className="text-slate-900">{t(`layers.${node.visibility}`, { defaultValue: node.visibility })}</dd>
       </dl>
       {sources.map((source) => (
-        <blockquote key={`${source.document_title}-${source.quote}`} className="border-l-4 border-blue-300 pl-3 text-sm text-slate-700">
+        <blockquote key={`${source.document_title}-${source.page}-${source.quote}`} className="border-l-4 border-blue-300 pl-3 text-sm text-slate-700">
           <p>{source.quote}</p>
-          <footer className="mt-1 text-xs text-slate-500">{source.document_title}</footer>
+          <footer className="mt-1 text-xs text-slate-500">
+            {source.document_title}
+            {source.page != null ? `, ${t('review.page', { page: source.page })}` : ''}
+            {source.effective_date ? `, ${t('review.effective', { date: source.effective_date })}` : ''}
+          </footer>
         </blockquote>
       ))}
     </div>
