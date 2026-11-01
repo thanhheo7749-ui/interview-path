@@ -20,6 +20,7 @@ from .core import settings
 from .core.rate_limit import limiter
 from .routers import profile, auth, cv, admin, companies, kb_documents, kb_conflicts, kb_review, copilot, jobs_hr, public_jobs
 from .routers import applications as applications_router
+from .routers import board as board_router
 from .brain import fake_demo, ingestion
 from .hiring import cv_processing
 from .hiring import fake_demo as hiring_fake_demo
@@ -120,6 +121,7 @@ def create_app(legacy_b2c: bool | None = None) -> FastAPI:
     app.include_router(jobs_hr.router)
     app.include_router(public_jobs.router)
     app.include_router(applications_router.router)
+    app.include_router(board_router.router)
     enabled = settings.flag("LEGACY_B2C_ENABLED") if legacy_b2c is None else legacy_b2c
     if enabled:
         _include_legacy_routers(app)
