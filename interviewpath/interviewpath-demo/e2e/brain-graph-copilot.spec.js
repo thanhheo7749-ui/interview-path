@@ -204,7 +204,7 @@ test('an employee gets Copilot but no graph', async ({ page }) => {
   await expect(page.getByRole('link', { name: 'Knowledge graph' })).toHaveCount(0);
   await expect(page.getByRole('link', { name: 'Copilot' })).toBeVisible();
   await page.goto('/graph');
-  await expect(page).toHaveURL(/\/settings$/);
+  await expect(page).toHaveURL(/\/copilot$/);
 
   await page.getByRole('link', { name: 'Copilot' }).click();
   await page.getByLabel('Your question').fill(INTERNAL_LINE);
