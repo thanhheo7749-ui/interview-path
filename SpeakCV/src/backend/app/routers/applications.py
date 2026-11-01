@@ -14,6 +14,7 @@ from app.core.uploads import CV_UPLOAD_TYPES, read_upload
 from app.database.database import get_db
 from app.database.sql_models import Application, Company, Job, RequirementResult, User
 from app.hiring import applications, audit, consents, cv_processing, jobs
+from app.hiring import retention
 from app.hiring.state import InvalidTransition, advance
 
 router = APIRouter()
@@ -269,6 +270,13 @@ def decline_recording(application_id: int, user: User = Depends(get_authenticate
     audit.record(db, application.company_id, user.id, "recording_declined", "application", application.id)
     db.commit()
     return _out(db, application)
+
+
+@router.delete("/api/me/applications/{application_id}", status_code=204)
+def delete_my_application(application_id: int, user: User = Depends(get_authenticated_user), db: Session = Depends(get_db)):
+    application = _owned(db, user, application_id, lock=True)
+    if not retention.try_anonymize(db, application, trigger=retention.TRIGGER_CANDIDATE):
+        raise HTTPException(status_code=503, detail="Your data could not be deleted just now. Please try again.")
 
 
 @router.get("/api/consents/{purpose}", response_model=ConsentOut)

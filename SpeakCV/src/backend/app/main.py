@@ -22,8 +22,10 @@ from .routers import profile, auth, cv, admin, companies, kb_documents, kb_confl
 from .routers import applications as applications_router
 from .routers import board as board_router
 from .routers import screening as screening_router
+from .routers import trust
 from .brain import fake_demo, ingestion
 from .hiring import cv_processing
+from .hiring import retention
 from .hiring import fake_demo as hiring_fake_demo
 from .database import sql_models
 from .database.database import SessionLocal
@@ -62,7 +64,10 @@ async def lifespan(app: FastAPI):
     seed_admin()
     ingestion.fail_interrupted_jobs()
     cv_processing.fail_interrupted()
+    retention_task = retention.start_daily_task(app)
     yield
+    if retention_task is not None:
+        retention_task.cancel()
 
 
 def _include_legacy_routers(app: FastAPI) -> None:
@@ -124,6 +129,8 @@ def create_app(legacy_b2c: bool | None = None) -> FastAPI:
     app.include_router(applications_router.router)
     app.include_router(board_router.router)
     app.include_router(screening_router.router)
+    app.include_router(trust.router)
+    app.include_router(trust.me_router)
     enabled = settings.flag("LEGACY_B2C_ENABLED") if legacy_b2c is None else legacy_b2c
     if enabled:
         _include_legacy_routers(app)
