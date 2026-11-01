@@ -61,6 +61,7 @@ class MemberOut(BaseModel):
 
 class MemberCreated(MemberOut):
     temporary_password: Optional[str] = None
+    existing_account: bool = False
 
 
 class MembershipOut(BaseModel):

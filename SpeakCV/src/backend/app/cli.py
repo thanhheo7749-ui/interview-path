@@ -2,6 +2,8 @@ import argparse
 import secrets
 import sys
 
+from sqlalchemy import func
+
 from app.database.database import SessionLocal
 from app.database.migrate import run_migrations
 from app.database.sql_models import Company, CompanyMember, User
@@ -37,7 +39,7 @@ def create_company(args) -> int:
         db.flush()
 
         email = args.hr_email.strip().lower()
-        user = db.query(User).filter(User.email == email).first()
+        user = db.query(User).filter(func.lower(User.email) == email).first()
         temporary_password = None
         if user is None:
             temporary_password = secrets.token_urlsafe(12)

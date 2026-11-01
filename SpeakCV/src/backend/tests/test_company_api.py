@@ -302,3 +302,63 @@ def test_temporary_password_logs_in(api, company, people):
 def test_an_invalid_token_gets_401(api, company):
     response = api.get(f"/api/companies/{company}", headers={"Authorization": "Bearer not-a-token"})
     assert response.status_code == 401
+
+
+def test_add_member_reports_whether_the_account_already_existed(api, db, company, people):
+    url = f"/api/companies/{company}/members"
+    fresh = api.post(url, headers=people["hr"], json={"email": "fresh@example.test", "role": "employee"}).json()
+    assert fresh["existing_account"] is False
+    make_user(db, "old@example.test")
+    old = api.post(url, headers=people["hr"], json={"email": "old@example.test", "role": "employee"}).json()
+    assert old["existing_account"] is True
+    assert old["temporary_password"] is None
+
+
+def _admin(db):
+    make_user(db, "root@example.test", role="admin")
+    return auth_header("root@example.test")
+
+
+def test_admin_cannot_delete_the_only_hr_of_a_company(api, db, company, people):
+    hr_user = db.query(User).filter_by(email="hr@example.test").one()
+    response = api.delete(f"/api/admin/users/{hr_user.id}", headers=_admin(db))
+    assert response.status_code == 409
+    assert "Acme" in response.json()["detail"]
+    assert db.query(User).filter_by(id=hr_user.id).count() == 1
+    assert db.query(CompanyMember).filter_by(user_id=hr_user.id).count() == 1
+
+
+def test_admin_deleting_a_user_removes_their_memberships(api, db, company, people):
+    employee = db.query(User).filter_by(email="employee@example.test").one()
+    uid = employee.id
+    assert api.delete(f"/api/admin/users/{uid}", headers=_admin(db)).status_code == 200
+    db.expire_all()
+    assert db.query(User).filter_by(id=uid).count() == 0
+    assert db.query(CompanyMember).filter_by(user_id=uid).count() == 0
+
+
+def test_admin_can_delete_one_of_several_hr_members(api, db, company, people):
+    other = make_user(db, "hr2@example.test")
+    db.add(CompanyMember(company_id=company, user_id=other.id, role="hr"))
+    db.commit()
+    assert api.delete(f"/api/admin/users/{other.id}", headers=_admin(db)).status_code == 200
+
+
+def test_emails_are_case_insensitive_across_register_login_and_members(api, db, company, people):
+    assert api.post("/api/register", json={"email": "Foo@X.test", "password": "pw-123456", "full_name": "Foo"}).status_code == 200
+    assert api.post("/api/login", json={"email": "foo@x.test", "password": "pw-123456"}).status_code == 200
+    assert api.post("/api/login", json={"email": "FOO@x.test", "password": "pw-123456"}).status_code == 200
+    assert api.post("/api/register", json={"email": "foo@x.test", "password": "pw-123456", "full_name": "Foo"}).status_code == 400
+    added = api.post(f"/api/companies/{company}/members", headers=people["hr"], json={"email": "FOO@x.test", "role": "employee"})
+    assert added.status_code == 201
+    assert added.json()["existing_account"] is True
+    assert db.query(User).filter(User.email.ilike("foo@x.test")).count() == 1
+
+
+def test_existing_mixed_case_account_still_logs_in(api, db):
+    from app.auth.security import get_password_hash
+    db.add(User(email="Legacy@X.test", full_name="L", hashed_password=get_password_hash("pw-123456")))
+    db.commit()
+    response = api.post("/api/login", json={"email": "legacy@x.test", "password": "pw-123456"})
+    assert response.status_code == 200
+    assert api.get("/api/me", headers={"Authorization": f"Bearer {response.json()['access_token']}"}).status_code == 200
