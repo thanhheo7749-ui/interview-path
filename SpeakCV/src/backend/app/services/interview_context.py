@@ -3,7 +3,7 @@
 # See the LICENSE file in the project root for more information.
 
 import re
-from typing import Iterable, TypedDict
+from typing import Any, Iterable, TypedDict
 
 SKILL_PREFIXES = (
     "we need ",
@@ -11,7 +11,14 @@ SKILL_PREFIXES = (
     "requirements: ",
     "must have ",
     "experience with ",
+    "skills: ",
 )
+
+EMAIL_REGEX = re.compile(r"\b[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+\b")
+PHONE_REGEX = re.compile(
+    r"(?:(?:\+|00)\d{1,3}[\s.-]?)?(?:\(?\d{2,4}\)?[\s.-]?)?\d{3,4}[\s.-]?\d{3,4}\b"
+)
+
 
 class InterviewContextResult(TypedDict):
     match_score: float
@@ -22,9 +29,42 @@ class InterviewContextResult(TypedDict):
     question_plan_seed: dict[str, str | list[str]]
 
 
+def mask_pii_in_text(text: str) -> dict[str, Any]:
+    """Redact emails and phone numbers from CV/JD text before AI context analysis."""
+    raw = text or ""
+    pii_types: list[str] = []
+    redacted_count = 0
+
+    def _replace_email(_match: re.Match[str]) -> str:
+        nonlocal redacted_count
+        redacted_count += 1
+        if "email" not in pii_types:
+            pii_types.append("email")
+        return "[EMAIL_REDACTED]"
+
+    def _replace_phone(match: re.Match[str]) -> str:
+        nonlocal redacted_count
+        digits = re.sub(r"\D", "", match.group(0))
+        if len(digits) < 9 or len(digits) > 15:
+            return match.group(0)
+        redacted_count += 1
+        if "phone" not in pii_types:
+            pii_types.append("phone")
+        return "[PHONE_REDACTED]"
+
+    masked = EMAIL_REGEX.sub(_replace_email, raw)
+    masked = PHONE_REGEX.sub(_replace_phone, masked)
+
+    return {
+        "masked_text": masked,
+        "pii_redacted_count": redacted_count,
+        "pii_types": pii_types,
+    }
+
 
 def extract_skill_candidates(text: str) -> list[str]:
-    normalized_text = (text or "").strip()
+    sanitized = mask_pii_in_text(text or "")["masked_text"]
+    normalized_text = sanitized.strip()
     if not normalized_text:
         return []
 
@@ -37,6 +77,9 @@ def extract_skill_candidates(text: str) -> list[str]:
         if not cleaned:
             continue
 
+        if "[EMAIL_REDACTED]" in cleaned or "[PHONE_REDACTED]" in cleaned:
+            continue
+
         lowered = cleaned.lower()
         for prefix in SKILL_PREFIXES:
             if lowered.startswith(prefix):
@@ -44,7 +87,12 @@ def extract_skill_candidates(text: str) -> list[str]:
                 lowered = cleaned.lower()
                 break
 
-        if len(cleaned) < 2 or lowered in seen:
+        if (
+            len(cleaned) < 2
+            or lowered in seen
+            or "[email_redacted]" in lowered
+            or "[phone_redacted]" in lowered
+        ):
             continue
 
         seen.add(lowered)
@@ -62,7 +110,6 @@ def _normalize_skills(skills: Iterable[str]) -> dict[str, str]:
         key = cleaned.lower()
         normalized.setdefault(key, cleaned)
     return normalized
-
 
 
 def build_interview_context(cv_skills: list[str], jd_skills: list[str]) -> InterviewContextResult:
@@ -103,4 +150,5 @@ __all__ = [
     "analyze_interview_context",
     "build_interview_context",
     "extract_skill_candidates",
+    "mask_pii_in_text",
 ]

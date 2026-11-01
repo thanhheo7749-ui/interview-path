@@ -8,12 +8,26 @@
 
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Lightbulb, X, Menu, Sun, Moon } from "lucide-react";
+import {
+  Lightbulb,
+  X,
+  Menu,
+  Sun,
+  Moon,
+  Briefcase,
+  Sparkles,
+  ShieldCheck,
+  BarChart3,
+} from "lucide-react";
+import toast from "react-hot-toast";
 import { useTheme } from "@/context/ThemeContext";
 
 import { MicroButton } from "@/components/Interview/MicroButton";
 import { ChatBox } from "@/components/Interview/ChatBox";
-import { SetupForm } from "@/components/Interview/SetupForm";
+import {
+  SetupForm,
+  ENTERPRISE_DEMO_PRESETS,
+} from "@/components/Interview/SetupForm";
 import { TimerDisplay } from "@/components/Interview/TimerDisplay";
 import { InlineCameraWidget } from "@/components/Interview/InlineCameraWidget";
 import { PlannerSignals } from "@/components/Interview/PlannerSignals";
@@ -49,6 +63,7 @@ interface InterviewLayoutProps {
   onCloseCamera: () => void;
   audioElement?: HTMLAudioElement | null;
   isPlayingAudio: boolean;
+  onOpenInstantDemoReport?: () => void;
 }
 
 export function InterviewLayout({
@@ -80,9 +95,11 @@ export function InterviewLayout({
   onCloseCamera,
   audioElement,
   isPlayingAudio,
+  onOpenInstantDemoReport,
 }: InterviewLayoutProps) {
   const router = useRouter();
   const { theme, toggleTheme } = useTheme();
+  const [showContextSetup, setShowContextSetup] = useState(false);
 
   const isStressMode = config.mode === "stress";
 
@@ -107,8 +124,24 @@ export function InterviewLayout({
     setSwipeOffset(0);
   };
 
+  const handleQuickKTechPreset = () => {
+    const kPreset = ENTERPRISE_DEMO_PRESETS[0];
+    setConfig({
+      ...config,
+      position: kPreset.position,
+      company: kPreset.company,
+      mode: kPreset.mode,
+      voice: kPreset.voice,
+      jd: kPreset.jd,
+    });
+    toast.success("Loaded K-Tech Korean Enterprise Demo Context!");
+  };
+
+  const shouldShowSetup =
+    (config.interviewType === "timed" && !hasStarted) || showContextSetup;
+
   return (
-    <main className="flex-1 flex flex-col items-center justify-between py-8 px-6 relative bg-theme-secondary">
+    <main className="flex-1 flex flex-col items-center justify-between py-6 px-6 relative bg-theme-secondary overflow-y-auto custom-scrollbar">
       {/* Theme Toggle - Top Right */}
       <button
         onClick={toggleTheme}
@@ -128,13 +161,54 @@ export function InterviewLayout({
         <Menu size={20} />
       </button>
 
-      <header className="text-center z-10 flex flex-col items-center">
+      <header className="text-center z-10 flex flex-col items-center gap-2">
         <h1
-          className="text-6xl font-black italic bg-gradient-to-r from-blue-400 to-cyan-400 bg-clip-text text-transparent cursor-pointer"
+          className="text-5xl md:text-6xl font-black italic bg-gradient-to-r from-blue-400 to-cyan-400 bg-clip-text text-transparent cursor-pointer"
           onClick={() => router.push("/")}
         >
           SpeakCV
         </h1>
+
+        {/* Active B2B Context & Quick K-Tech Preset Bar */}
+        <div className="flex flex-wrap items-center justify-center gap-2 mt-1">
+          {config.position ? (
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-blue-500/15 border border-blue-500/30 text-blue-300">
+              <Briefcase size={12} />
+              {config.position}
+              {config.company ? ` @ ${config.company}` : ""}
+            </span>
+          ) : (
+            <button
+              type="button"
+              onClick={handleQuickKTechPreset}
+              className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-500/30 text-cyan-300 transition-all"
+            >
+              <Sparkles size={12} /> 🇰🇷 Load 1-Click K-Tech Enterprise Context
+            </button>
+          )}
+
+          <button
+            type="button"
+            onClick={() => setShowContextSetup((prev) => !prev)}
+            className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-theme-surface/80 hover:bg-theme-surface border border-theme-border text-theme-text-secondary hover:text-white transition-all"
+          >
+            {showContextSetup ? "Close Context Setup" : "🎯 Context & JD Setup"}
+          </button>
+
+          {onOpenInstantDemoReport && (
+            <button
+              type="button"
+              onClick={onOpenInstantDemoReport}
+              className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-violet-500/15 hover:bg-violet-500/25 border border-violet-500/35 text-violet-300 transition-all"
+            >
+              <BarChart3 size={12} /> 📊 Instant HR &amp; Coaching Report
+            </button>
+          )}
+
+          <span className="hidden sm:inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
+            <ShieldCheck size={12} /> PII Guard Active
+          </span>
+        </div>
 
         {config.interviewType === "timed" && hasStarted && (
           <TimerDisplay
@@ -145,11 +219,14 @@ export function InterviewLayout({
         )}
       </header>
 
-      {config.interviewType === "timed" && !hasStarted ? (
+      {shouldShowSetup ? (
         <SetupForm
           config={config}
           setConfig={setConfig}
-          onStart={startTimedInterview}
+          onStart={() => {
+            setShowContextSetup(false);
+            startTimedInterview();
+          }}
           masterCvAvailable={masterCvAvailable}
           masterCvStatus={masterCvStatus}
         />
@@ -157,7 +234,7 @@ export function InterviewLayout({
         <>
           {isCameraModeOpen && (
             <div className="w-full px-4 z-20">
-              <InlineCameraWidget 
+              <InlineCameraWidget
                 onClose={onCloseCamera}
                 audioElement={audioElement}
                 isPlayingAudio={isPlayingAudio}
@@ -165,7 +242,11 @@ export function InterviewLayout({
               />
             </div>
           )}
-          <div className={`relative group z-10 animate-in zoom-in transition-all ${isCameraModeOpen ? 'mt-2 mb-8' : 'mt-2 mb-12 md:mt-10'}`}>
+          <div
+            className={`relative group z-10 animate-in zoom-in transition-all ${
+              isCameraModeOpen ? "mt-2 mb-6" : "mt-2 mb-8 md:mt-6"
+            }`}
+          >
             <MicroButton
               status={status}
               onClick={onMicClick}
@@ -207,6 +288,7 @@ export function InterviewLayout({
             whySelected={analysis?.why_selected}
             nextSkill={analysis?.planner_decision?.next_topic || analysis?.next_topic}
             liveCues={analysis?.live_cues || []}
+            analysis={analysis}
           />
 
           <ChatBox
@@ -222,14 +304,24 @@ export function InterviewLayout({
 
           {/* Mobile Hint Modal */}
           {hint.show && (
-            <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 md:hidden" role="dialog" aria-modal="true" aria-label="AI Hint">
+            <div
+              className="fixed inset-0 z-[100] flex items-center justify-center p-4 md:hidden"
+              role="dialog"
+              aria-modal="true"
+              aria-label="AI Hint"
+            >
               <div
                 className="absolute inset-0 bg-slate-900/45 backdrop-blur-sm"
                 onClick={() => setHint({ show: false, content: "" })}
               />
               <div
                 className="relative w-full max-w-sm max-h-[80vh] flex flex-col bg-theme-primary border border-yellow-500/50 shadow-[0_0_40px_-10px_rgba(234,179,8,0.3)] rounded-2xl p-5 animate-in zoom-in-95"
-                style={{ transform: `translateY(${swipeOffset}px)`, opacity: swipeOffset > 60 ? 0.5 : 1, transition: swipeOffset === 0 ? 'transform 0.2s, opacity 0.2s' : 'none' }}
+                style={{
+                  transform: `translateY(${swipeOffset}px)`,
+                  opacity: swipeOffset > 60 ? 0.5 : 1,
+                  transition:
+                    swipeOffset === 0 ? "transform 0.2s, opacity 0.2s" : "none",
+                }}
                 onTouchStart={handleTouchStart}
                 onTouchMove={handleTouchMove}
                 onTouchEnd={handleTouchEnd}

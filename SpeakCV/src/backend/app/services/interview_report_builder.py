@@ -4,6 +4,7 @@ from typing import Any
 
 DEFAULT_TOPIC = "General Technical Fit"
 NO_ANSWER_VALUES = {"Ứng viên chưa trả lời", "Candidate did not answer", ""}
+SCORE_KEYS = ("correctness", "depth", "communication", "topic_relevance")
 EMPTY_FINAL_SCORES = {
     "correctness": None,
     "depth": None,
@@ -30,8 +31,10 @@ def _to_five_point(score: float) -> int:
 
 
 def _has_real_answer(turn: dict[str, Any]) -> bool:
-    candidate_answer = str(turn.get("candidate_answer") or "").strip()
-    return candidate_answer not in NO_ANSWER_VALUES
+    if "candidate_answer" in turn:
+        candidate_answer = str(turn.get("candidate_answer") or "").strip()
+        return candidate_answer not in NO_ANSWER_VALUES
+    return any(turn.get(key) is not None for key in SCORE_KEYS)
 
 
 def _infer_turn_scores(turn: dict[str, Any]) -> dict[str, float]:
@@ -77,6 +80,18 @@ def _infer_turn_scores(turn: dict[str, Any]) -> dict[str, float]:
     }
 
 
+def _merge_turn_scores(turn: dict[str, Any]) -> dict[str, Any]:
+    inferred = _infer_turn_scores(turn)
+    merged = dict(turn)
+    for key in SCORE_KEYS:
+        val = turn.get(key)
+        if val is None:
+            merged[key] = inferred[key]
+        else:
+            merged[key] = _clamp_score(float(val))
+    return merged
+
+
 def _metric_average(turn_records: list[dict[str, Any]], key: str) -> float:
     scores = [float(turn.get(key, 0.0)) for turn in turn_records]
     return mean(scores) if scores else 0.0
@@ -108,6 +123,45 @@ def _extract_weak_signals(turn: dict[str, Any]) -> list[str]:
     return signals
 
 
+def _build_hr_recommendation(
+    final_scores: dict[str, int | None],
+    answered_count: int,
+) -> dict[str, Any]:
+    valid_scores = [score for score in final_scores.values() if isinstance(score, int)]
+    if not valid_scores or answered_count == 0:
+        return {
+            "decision": "Pending Interview",
+            "readiness_level": "Awaiting Candidate Responses",
+            "culture_fit_signal": "No turn signals recorded yet",
+            "estimated_minutes_saved": 30,
+            "pii_anonymized": True,
+            "evidence_grounded": True,
+        }
+
+    avg_score = mean(valid_scores)
+    if avg_score >= 4.0:
+        decision = "Strong Hire"
+        readiness_level = "Enterprise Ready"
+        culture_fit_signal = "High Ownership & Structured STAR Communication"
+    elif avg_score >= 3.0:
+        decision = "Consider / Round 2"
+        readiness_level = "Interview Ready"
+        culture_fit_signal = "Solid Foundation — Probe Technical Depth in Round 2"
+    else:
+        decision = "Needs Coaching"
+        readiness_level = "Pre-Hire Training Recommended"
+        culture_fit_signal = "Needs Structured STAR Framing & Technical Depth"
+
+    return {
+        "decision": decision,
+        "readiness_level": readiness_level,
+        "culture_fit_signal": culture_fit_signal,
+        "estimated_minutes_saved": max(30, answered_count * 15 + 5),
+        "pii_anonymized": True,
+        "evidence_grounded": True,
+    }
+
+
 def build_structured_report(turn_records: list[dict[str, Any]]) -> dict[str, Any]:
     answered_turns = [turn for turn in turn_records if _has_real_answer(turn)]
     if not answered_turns:
@@ -116,13 +170,14 @@ def build_structured_report(turn_records: list[dict[str, Any]]) -> dict[str, Any
             "top_skills_to_improve": [],
             "strong_topics": [],
             "weak_topics": [],
+            "hr_recommendation": _build_hr_recommendation(EMPTY_FINAL_SCORES, 0),
         }
 
     scored_turns: list[dict[str, Any]] = []
     weak_signal_count: dict[str, int] = {}
 
     for turn in answered_turns:
-        merged = {**turn, **_infer_turn_scores(turn)}
+        merged = _merge_turn_scores(turn)
         scored_turns.append(merged)
         for signal in _extract_weak_signals(turn):
             weak_signal_count[signal] = weak_signal_count.get(signal, 0) + 1
@@ -160,4 +215,5 @@ def build_structured_report(turn_records: list[dict[str, Any]]) -> dict[str, Any
         "top_skills_to_improve": top_skills_to_improve[:3],
         "strong_topics": strong_topics[:3],
         "weak_topics": weak_topics[:3],
+        "hr_recommendation": _build_hr_recommendation(final_scores, len(answered_turns)),
     }

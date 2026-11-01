@@ -384,6 +384,11 @@ Bạn nghiêm khắc nhưng công bằng, chuyên nghiệp và trực tiếp. Tr
 
     # Add context about position and mode
     base_prompt += f"\n\nInterview Position: {request.jd_text}\nInterview Mode: {request.mode}"
+    if request.mode == "k_culture_fit":
+        base_prompt += (
+            "\n\n[KOREAN / FDI ENTERPRISE EVALUATION MODE] Evaluate both technical competence and "
+            "enterprise core values (Ownership, Integrity, Teamwork, Humility, and Structured STAR Communication)."
+        )
 
     if request.interview_context:
         context_strengths = ", ".join((request.interview_context or {}).get("highlighted_strengths", []))
@@ -658,6 +663,7 @@ async def end_interview(request: models.ReportRequest, current_user: sql_models.
             report_data["top_skills_to_improve"] = structured_report["top_skills_to_improve"]
             report_data["strong_topics"] = structured_report["strong_topics"]
             report_data["weak_topics"] = structured_report["weak_topics"]
+            report_data["hr_recommendation"] = structured_report["hr_recommendation"]
 
             inferred_position = report_data.get("inferred_position", "").strip()
 

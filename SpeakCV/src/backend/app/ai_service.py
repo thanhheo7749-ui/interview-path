@@ -136,6 +136,22 @@ def _call_openai(messages, model, temperature, max_tokens, response_format=None,
     res = requests.post(f"{OPENAI_BASE_URL.rstrip('/')}/chat/completions", headers=headers, json=data, timeout=timeout)
 
     if res.status_code == 200:
+        raw_text = res.text or ""
+        if raw_text.lstrip().startswith("data:"):
+            chunks = []
+            for line in raw_text.splitlines():
+                line = line.strip()
+                if line.startswith("data:") and line != "data: [DONE]":
+                    try:
+                        chunk_data = json.loads(line[5:].strip())
+                        choices = chunk_data.get("choices") or []
+                        if choices:
+                            delta_content = (choices[0].get("delta") or {}).get("content") or ""
+                            if delta_content:
+                                chunks.append(delta_content)
+                    except json.JSONDecodeError:
+                        continue
+            return "".join(chunks).strip()
         body = res.json()
         msg = (((body.get("choices") or [{}])[0]).get("message") or {})
         content = (msg.get("content") or "").strip()

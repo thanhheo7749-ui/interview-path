@@ -362,3 +362,34 @@ def test_report_modal_contract_uses_one_to_five_scale():
 
     # UI displays these values with a /5 suffix, so the backend contract must stay 1-5.
     assert "/5" == "/5"
+
+
+def test_build_structured_report_includes_b2b_hr_recommendation_and_time_saved():
+    report = build_structured_report(
+        turn_records=[
+            make_turn_record(
+                topic="FastAPI & Microservices",
+                correctness=0.85,
+                depth=0.8,
+                communication=0.9,
+                topic_relevance=0.85,
+                candidate_answer="I designed a FastAPI service handling 5,000 RPS with Redis caching and reduced latency by 40%.",
+            ),
+            make_turn_record(
+                topic="Teamwork & Ownership",
+                correctness=0.8,
+                depth=0.75,
+                communication=0.85,
+                topic_relevance=0.8,
+                candidate_answer="In our 4-person sprint, I took ownership of the API contract and resolved 12 integration bugs before deadline.",
+            ),
+        ]
+    )
+
+    assert "hr_recommendation" in report
+    hr_rec = report["hr_recommendation"]
+    assert hr_rec["decision"] == "Strong Hire"
+    assert hr_rec["readiness_level"] == "Enterprise Ready"
+    assert hr_rec["estimated_minutes_saved"] >= 30
+    assert hr_rec["pii_anonymized"] is True
+    assert hr_rec["evidence_grounded"] is True

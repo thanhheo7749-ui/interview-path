@@ -116,7 +116,12 @@ app.add_middleware(
     allow_credentials=True,      
     allow_methods=["*"],       
     allow_headers=["*"],
-    expose_headers=["X-AI-Response-Text"]
+    expose_headers=[
+        "X-AI-Response-Text",
+        "X-Interview-Trace-Id",
+        "X-Interview-Analysis",
+        "X-Interview-Usage",
+    ],
 )
 
 app.include_router(profile.router)

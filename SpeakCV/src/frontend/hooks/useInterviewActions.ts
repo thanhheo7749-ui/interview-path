@@ -313,6 +313,10 @@ export function useInterviewActions(params: UseInterviewActionsParams) {
         detailsContainer?.dimension_scores,
       learning_plan:
         h.learning_plan || h.report?.learning_plan || detailsContainer?.learning_plan,
+      hr_recommendation:
+        h.hr_recommendation ||
+        h.report?.hr_recommendation ||
+        detailsContainer?.hr_recommendation,
     };
   };
 

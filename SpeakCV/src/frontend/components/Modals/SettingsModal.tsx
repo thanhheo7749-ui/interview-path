@@ -172,6 +172,9 @@ export default function SettingsModal({
                   value={mode}
                   onChange={(e) => setMode(e.target.value)}
                 >
+                  <option value="k_culture_fit">
+                    Korean / FDI Enterprise (Tech + Ownership)
+                  </option>
                   <option value="general">Friendly, General</option>
                   <option value="technical">Technical, In-depth</option>
                   <option value="behavioral">Behavioral (Situational)</option>

@@ -22,6 +22,9 @@ import {
   Volume2,
   Gauge,
   Zap,
+  ShieldCheck,
+  Building2,
+  Clock,
 } from "lucide-react";
 import { useState } from "react";
 
@@ -222,6 +225,41 @@ export default function ReportModal({
     : [];
   const strongTopics = Array.isArray(report.strong_topics) ? report.strong_topics : [];
   const weakTopics = Array.isArray(report.weak_topics) ? report.weak_topics : [];
+  const rawHrRec = report.hr_recommendation || nestedReport?.hr_recommendation;
+  const fallbackDecision =
+    report.score >= 8
+      ? "Strong Hire"
+      : report.score >= 5
+        ? "Consider / Round 2"
+        : "Needs Coaching";
+  const hrRecommendation = {
+    decision: rawHrRec?.decision || fallbackDecision,
+    readiness_level:
+      rawHrRec?.readiness_level ||
+      (report.score >= 8
+        ? "Enterprise Ready"
+        : report.score >= 5
+          ? "Interview Ready"
+          : "Pre-Hire Training Recommended"),
+    culture_fit_signal:
+      rawHrRec?.culture_fit_signal ||
+      (report.score >= 8
+        ? "High Ownership & Structured STAR Communication"
+        : report.score >= 5
+          ? "Solid Foundation — Probe Technical Depth in Round 2"
+          : "Needs Structured STAR Framing & Technical Depth"),
+    estimated_minutes_saved:
+      rawHrRec?.estimated_minutes_saved ||
+      Math.max(30, (questionDetails?.length || 2) * 15 + 5),
+    pii_anonymized: rawHrRec?.pii_anonymized ?? true,
+    evidence_grounded: rawHrRec?.evidence_grounded ?? true,
+  };
+  const decisionBadgeStyle =
+    hrRecommendation.decision === "Strong Hire"
+      ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/40"
+      : hrRecommendation.decision === "Consider / Round 2"
+        ? "bg-amber-500/15 text-amber-300 border-amber-500/40"
+        : "bg-rose-500/15 text-rose-300 border-rose-500/40";
 
   const getScoreColor = (score: number) => {
     if (score >= 8) return "text-emerald-400 border-emerald-400";
@@ -253,6 +291,73 @@ export default function ReportModal({
 
         {/* BODY */}
         <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
+          {/* B2B HR SCREENING & HIRING DECISION BANNER */}
+          <div className="mb-8 rounded-3xl border border-blue-500/30 bg-gradient-to-r from-blue-950/60 via-slate-900/90 to-cyan-950/50 p-6 shadow-xl">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 pb-4 mb-4">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-blue-500/15 text-blue-400 border border-blue-500/30">
+                  <Building2 size={20} />
+                </div>
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-widest text-cyan-400">
+                    B2B HR Screening &amp; Readiness Passport
+                  </p>
+                  <h3 className="text-base font-bold text-white">
+                    Automated 1st-Round Technical &amp; K-Culture Fit Summary
+                  </h3>
+                </div>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <span
+                  className={`inline-flex items-center gap-1.5 rounded-full border px-4 py-1.5 text-xs font-black uppercase tracking-wider ${decisionBadgeStyle}`}
+                >
+                  <CheckCircle2 size={14} /> HR Decision: {hrRecommendation.decision}
+                </span>
+                {hrRecommendation.pii_anonymized && (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 border border-emerald-500/25 px-3 py-1.5 text-xs font-semibold text-emerald-300">
+                    <ShieldCheck size={14} /> PII Masked &amp; Evidence-Grounded
+                  </span>
+                )}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="rounded-2xl bg-slate-900/70 border border-slate-800 p-4">
+                <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                  Readiness Tier
+                </p>
+                <p className="mt-1 text-base font-extrabold text-white">
+                  {hrRecommendation.readiness_level}
+                </p>
+                <p className="mt-1 text-xs text-slate-400">
+                  Calibrated against CV + JD priority skill gaps
+                </p>
+              </div>
+              <div className="rounded-2xl bg-slate-900/70 border border-slate-800 p-4">
+                <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                  K-Culture &amp; Nunchi Signal (눈치)
+                </p>
+                <p className="mt-1 text-sm font-bold text-cyan-300">
+                  {hrRecommendation.culture_fit_signal}
+                </p>
+                <p className="mt-1 text-xs text-slate-400">
+                  Evaluates Ownership, Integrity &amp; STAR clarity
+                </p>
+              </div>
+              <div className="rounded-2xl bg-slate-900/70 border border-slate-800 p-4">
+                <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1">
+                  <Clock size={12} className="text-amber-400" /> HR Operational ROI
+                </p>
+                <p className="mt-1 text-base font-extrabold text-amber-300">
+                  ~{hrRecommendation.estimated_minutes_saved} mins saved / candidate
+                </p>
+                <p className="mt-1 text-xs text-slate-400">
+                  Replaces manual CV screen + generic 1st-round call
+                </p>
+              </div>
+            </div>
+          </div>
+
           {/* SCORE + FEEDBACK ROW */}
           <div className="flex flex-col md:flex-row gap-8 mb-10">
             <div

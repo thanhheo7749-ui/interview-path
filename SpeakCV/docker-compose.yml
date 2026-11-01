@@ -11,7 +11,7 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     ports:
-      - "8000:8000"
+      - "${SPEAKCV_BACKEND_PORT:-8001}:8000"
     environment:
       - DATABASE_URL=${DATABASE_URL}
       - GEMINI_API_KEY=${GEMINI_API_KEY}
@@ -20,22 +20,27 @@ services:
       - OPENAI_MODEL_GPT4O_MINI=${OPENAI_MODEL_GPT4O_MINI}
       - OPENAI_MODEL_GPT4O=${OPENAI_MODEL_GPT4O}
       - GROQ_API_KEY=${GROQ_API_KEY}
+    depends_on:
+      db:
+        condition: service_healthy
 
   # --- FRONTEND ---
   frontend:
     build:
       context: ./src/frontend
       args:
-        - NEXT_PUBLIC_API_URL=http://localhost:8000
+        - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://localhost:8001}
         - NEXT_PUBLIC_GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
     container_name: speakcv_frontend
     restart: unless-stopped
     ports:
-      - "3000:3000"
+      - "${SPEAKCV_FRONTEND_PORT:-3000}:3000"
     environment:
-      - NEXT_PUBLIC_API_URL=http://localhost:8000
+      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://localhost:8001}
       - NEXT_PUBLIC_GOOGLE_CLIENT_ID=${NEXT_PUBLIC_GOOGLE_CLIENT_ID}
       - NODE_ENV=production
+    depends_on:
+      - backend
 
   # --- DATABASE ---
   db:
@@ -43,8 +48,13 @@ services:
     container_name: speakcv_db
     restart: always
     environment:
-      MYSQL_ROOT_PASSWORD: "123"
-      MYSQL_DATABASE: "speakcv"
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-123}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-speakcv}
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
     volumes:
       - db_data:/var/lib/mysql
 
