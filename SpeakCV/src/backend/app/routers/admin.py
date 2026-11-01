@@ -17,6 +17,7 @@ from .. import models
 from ..database import sql_models
 from ..database.database import get_db
 from .profile import get_current_user
+from ..core.uploads import DOCUMENT_TYPES, read_upload
 from ..auth import security
 
 router = APIRouter()
@@ -702,7 +703,7 @@ async def ai_brain_upload_file(
     db: Session = Depends(get_db),
 ):
     _ensure_admin(current_user)
-    content = await file.read()
+    content = await read_upload(file, DOCUMENT_TYPES)
     text = _extract_text_from_upload(file, content)
     file_key = f"f_{uuid.uuid4().hex[:12]}"
 

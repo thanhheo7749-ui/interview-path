@@ -22,7 +22,7 @@ import {
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
 import toast from "react-hot-toast";
-import { API_URL } from "@/services/api";
+import { API_URL, authHeader } from "@/services/api";
 import { TailorJDModal } from "./index";
 import {
   HINTS,
@@ -189,7 +189,7 @@ export default function GenCVModal({ show, onClose, userProfile }: any) {
 
       const res = await fetch(`${API_URL}/cv/tailor`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...authHeader() },
         body: JSON.stringify({ master_cv_json: masterCvJson, jd_text: jdText }),
       });
 

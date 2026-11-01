@@ -7,10 +7,13 @@ import json
 
 import pdfplumber
 import docx
-from fastapi import APIRouter, File, Form, UploadFile, HTTPException
+from fastapi import APIRouter, Depends, File, Form, UploadFile, HTTPException
 from fastapi.responses import StreamingResponse
 
 from .. import models
+from ..core.uploads import CV_TYPES, read_upload
+from ..database import sql_models
+from .profile import get_current_user
 from ..ai.types import AIError
 from ..ai_service import call_ai_chat, call_ai_chat_stream
 from ..services.interview_context import analyze_interview_context
@@ -25,8 +28,8 @@ router = APIRouter()
 
 async def extract_text_from_cv(file: UploadFile) -> str:
     """Extract plain text from PDF or Word (DOCX) CV files."""
-    content = await file.read()
-    filename = file.filename.lower()
+    content = await read_upload(file, CV_TYPES)
+    filename = (file.filename or "").lower()
     
     extracted_text = ""
     
@@ -87,14 +90,14 @@ async def parse_master_cv_route(request: models.CVParseMasterCVRequest):
 
 
 @router.post("/api/cv/interview-context", response_model=models.InterviewContextResponse)
-async def analyze_interview_context_route(request: models.InterviewContextRequest):
+async def analyze_interview_context_route(request: models.InterviewContextRequest, current_user: sql_models.User = Depends(get_current_user)):
     return {
         "interview_context": analyze_interview_context(request.cv_text, request.jd_text),
     }
 
 
 @router.post("/api/cv/extract-text")
-async def extract_cv_text(file: UploadFile = File(...)):
+async def extract_cv_text(file: UploadFile = File(...), current_user: sql_models.User = Depends(get_current_user)):
     extracted_text = await extract_text_from_cv(file)
     return {"extracted_text": extracted_text}
 
@@ -104,7 +107,7 @@ async def extract_cv_text(file: UploadFile = File(...)):
 # ──────────────────────────────────────────────
 
 @router.post("/api/generate-cv")
-async def generate_cv(request: models.CVGenRequest): 
+async def generate_cv(request: models.CVGenRequest, current_user: sql_models.User = Depends(get_current_user)): 
     try:
         print(f"⏳ Generating CV for {request.position} | Style: {request.style_instruction}")
         
@@ -128,7 +131,7 @@ async def generate_cv(request: models.CVGenRequest):
 # ──────────────────────────────────────────────
 
 @router.post("/api/review-cv")
-async def review_cv(file: UploadFile = File(...), jd_text: str = Form("Không có JD")):
+async def review_cv(file: UploadFile = File(...), jd_text: str = Form("Không có JD"), current_user: sql_models.User = Depends(get_current_user)):
     try:
         print(f"⏳ Extracting text from CV: {file.filename}")
         
@@ -164,7 +167,7 @@ async def review_cv(file: UploadFile = File(...), jd_text: str = Form("Không c�
 # ──────────────────────────────────────────────
 
 @router.post("/api/cv/upload-makeover")
-async def upload_makeover_cv(file: UploadFile = File(...), industry: str = Form("tech")):
+async def upload_makeover_cv(file: UploadFile = File(...), industry: str = Form("tech"), current_user: sql_models.User = Depends(get_current_user)):
     try:
         print(f"⏳ CV Makeover — Extracting text from: {file.filename} | Industry: {industry}")
 
@@ -209,7 +212,7 @@ async def upload_makeover_cv(file: UploadFile = File(...), industry: str = Form(
 # ──────────────────────────────────────────────
 
 @router.post("/api/cv/tailor")
-async def tailor_cv(request: models.CVTailorRequest):
+async def tailor_cv(request: models.CVTailorRequest, current_user: sql_models.User = Depends(get_current_user)):
     try:
         jd_text = request.jd_text.strip()
         if not jd_text:

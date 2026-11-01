@@ -18,6 +18,7 @@ from ..database.database import get_db
 from .profile import get_current_user
 from ..ai import gateway
 from ..ai.types import AIError
+from ..core.uploads import AUDIO_TYPES, read_upload
 from ..ai_service import call_ai_chat, call_ai_chat_with_meta
 from ..core.brain_retrieval import retrieve_subgraph_context
 from ..services.orchestrator import build_interview_result, new_trace_id
@@ -40,9 +41,6 @@ from ..services.question_planner import plan_next_question
 from ..services.interview_report_builder import build_structured_report
 
 router = APIRouter()
-
-guest_ip_tracker = {}
-
 
 def is_english_voice(voice_id: str | None) -> bool:
     if not voice_id:
@@ -90,9 +88,10 @@ async def transcribe_audio(
     file: UploadFile = File(...),
     position: str = Form("Chung"),
     lang: str = Form("vi"),
-    currentQuestion: str = Form("")
+    currentQuestion: str = Form(""),
+    current_user: sql_models.User = Depends(get_current_user),
 ):
-    content = await file.read()
+    content = await read_upload(file, AUDIO_TYPES)
 
     result = gateway.transcribe(content, file.content_type or "audio/webm", [lang], feature="legacy_interview_stt")
     text = result.text.strip()
@@ -112,35 +111,16 @@ async def transcribe_audio(
     return {"text": text}
 
 @router.post("/api/chat")
-async def chat(request: models.ChatRequest, http_req: Request, db: Session = Depends(get_db)):
-    client_ip = http_req.client.host
-
-    user = None
-    auth_header = http_req.headers.get("Authorization")
-    if not auth_header or auth_header == "Bearer null":
-        current_count = guest_ip_tracker.get(client_ip, 0)
-
-        if current_count >= 20:
-            print(f"[!] Blocked IP {client_ip} - exceeded 20 free turns.")
-            raise HTTPException(status_code=429, detail="Bạn đã dùng hết 20 lượt miễn phí. Vui lòng đăng nhập!")
-
-        guest_ip_tracker[client_ip] = current_count + 1
-        print(f"[INFO] IP {client_ip} using turn {guest_ip_tracker[client_ip]}/20")
-    else:
-        token_str = auth_header.replace("Bearer ", "").strip()
-        try:
-            from ..auth import security
-            email = security.verify_token(token_str)
-            if email:
-                user = db.query(sql_models.User).filter(sql_models.User.email == email).first()
-                if user:
-                    from app.utils import sync_user_tokens
-                    sync_user_tokens(user, db)
-
-                    if user.credits < 1:
-                        raise HTTPException(status_code=403, detail="Bạn đã hết số lượng token trong ngày. Vui lòng thử lại vào ngày mai hoặc nâng cấp Pro.")
-        except Exception as e:
-            print(f"Auth error in chat: {e}")
+async def chat(
+    request: models.ChatRequest,
+    current_user: sql_models.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    user = current_user
+    from app.utils import sync_user_tokens
+    sync_user_tokens(user, db)
+    if user.credits < 1:
+        raise HTTPException(status_code=403, detail="Bạn đã hết số lượng token trong ngày. Vui lòng thử lại vào ngày mai hoặc nâng cấp Pro.")
 
     safe_user_text = request.user_text.encode('ascii', 'ignore').decode('ascii')
     print(f"[User Msg] User: {safe_user_text} | Voice: {request.voice_id}")
@@ -530,7 +510,7 @@ Bạn nghiêm khắc nhưng công bằng, chuyên nghiệp và trực tiếp. Tr
         )
 
 @router.post("/api/hint")
-async def get_hint(request: models.HintRequest):
+async def get_hint(request: models.HintRequest, current_user: sql_models.User = Depends(get_current_user)):
     try:
         is_en = (request.lang or "").strip().lower().startswith("en")
         if is_en:
