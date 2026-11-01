@@ -130,7 +130,7 @@ def _allowed_chunks_query(db: Session, audience: Audience, *columns):
     return (
         db.query(*columns)
         .join(KbDocument, KbChunk.document_id == KbDocument.id)
-        .filter(KbChunk.company_id == audience.company_id, aud.document_filter(audience))
+        .filter(aud.chunk_filter(audience))
     )
 
 
