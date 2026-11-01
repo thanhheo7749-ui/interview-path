@@ -199,7 +199,7 @@ def resolve(db: Session, conflict: KbConflict, action: str, user_id: int) -> KbC
 
 
 def on_node_rejected(db: Session, node_id: int) -> None:
-    """Dismiss the open conflicts of a node that was rejected in review. Commits when it changed anything."""
+    """Dismiss the open conflicts of a node that was rejected in review. Flushes only; the caller commits."""
     rows = db.query(KbConflict).filter(
         KbConflict.status == "open", or_(KbConflict.node_a_id == node_id, KbConflict.node_b_id == node_id)
     ).all()
@@ -208,4 +208,4 @@ def on_node_rejected(db: Session, node_id: int) -> None:
         row.resolved_at = func.now()
         _bump_version(db, row.company_id)
     if rows:
-        db.commit()
+        db.flush()
