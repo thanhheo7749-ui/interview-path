@@ -1,7 +1,7 @@
 """Compatibility layer for legacy routes. New code calls app.ai.gateway directly."""
 from app.ai import gateway
 
-DEFAULT_MAX_OUTPUT_TOKENS = 2000
+DEFAULT_MAX_OUTPUT_TOKENS = 8000
 JSON_INSTRUCTION = "Return only one valid JSON object and no other text."
 
 
@@ -25,7 +25,3 @@ def call_ai_chat_with_meta(messages, slot="bulk", max_tokens=None, response_form
 
 def call_ai_chat(messages, slot="bulk", max_tokens=None, response_format=None, feature="legacy") -> str:
     return call_ai_chat_with_meta(messages, slot, max_tokens, response_format, feature)["content"]
-
-
-def call_ai_chat_stream(messages, slot="reasoning", feature="legacy"):
-    yield call_ai_chat(messages, slot=slot, feature=feature)

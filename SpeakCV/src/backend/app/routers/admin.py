@@ -739,7 +739,7 @@ async def ai_brain_upload_file(
 
 
 @legacy_brain_router.post("/api/admin/ai-brain/ingestion/jobs")
-async def ai_brain_start_job(
+def ai_brain_start_job(
     request: models.AIBrainIngestionStartRequest,
     current_user: sql_models.User = Depends(get_current_user),
     db: Session = Depends(get_db),

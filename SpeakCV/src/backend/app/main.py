@@ -62,6 +62,7 @@ def _include_legacy_routers(app: FastAPI) -> None:
     from .routers import interview, payment, questions, stats, support
 
     app.include_router(profile.legacy_router)
+    app.include_router(cv.legacy_router)
     app.include_router(admin.legacy_brain_router)
     for module in (interview, support, payment, stats, questions):
         app.include_router(module.router)

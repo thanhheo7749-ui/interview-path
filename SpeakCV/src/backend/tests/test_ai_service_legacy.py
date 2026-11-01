@@ -1,5 +1,5 @@
 from app.ai.providers import fake
-from app.ai_service import call_ai_chat, call_ai_chat_stream, call_ai_chat_with_meta
+from app.ai_service import call_ai_chat, call_ai_chat_with_meta
 from app.database.sql_models import AIUsageLog
 
 
@@ -18,11 +18,6 @@ def test_with_meta_keeps_its_shape():
     meta = call_ai_chat_with_meta([{"role": "user", "content": "hi"}])
     assert set(meta) == {"content", "provider", "model", "latency_ms"}
     assert meta["provider"] == "fake"
-
-
-def test_stream_yields_the_whole_text():
-    chunks = list(call_ai_chat_stream([{"role": "user", "content": "hi"}]))
-    assert len(chunks) == 1 and "hi" in chunks[0]
 
 
 def test_json_response_format_is_requested_in_the_system_prompt(monkeypatch):

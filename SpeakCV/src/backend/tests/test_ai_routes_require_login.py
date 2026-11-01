@@ -9,11 +9,11 @@ PROTECTED = [
     (interview.router, "post", "/api/chat"),
     (interview.router, "post", "/api/hint"),
     (interview.router, "post", "/api/end-interview"),
-    (cv.router, "post", "/api/cv/interview-context"),
-    (cv.router, "post", "/api/generate-cv"),
-    (cv.router, "post", "/api/review-cv"),
-    (cv.router, "post", "/api/cv/upload-makeover"),
-    (cv.router, "post", "/api/cv/tailor"),
+    (cv.legacy_router, "post", "/api/cv/interview-context"),
+    (cv.legacy_router, "post", "/api/generate-cv"),
+    (cv.legacy_router, "post", "/api/review-cv"),
+    (cv.legacy_router, "post", "/api/cv/upload-makeover"),
+    (cv.legacy_router, "post", "/api/cv/tailor"),
     (cv.router, "post", "/api/cv/extract-text"),
 ]
 

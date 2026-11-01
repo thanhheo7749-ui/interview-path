@@ -14,6 +14,11 @@ LEGACY_PATHS = [
     ("get", "/api/questions"),
     ("get", "/api/admin/ai-brain/versions"),
     ("post", "/api/admin/ai-brain/ingestion/jobs"),
+    ("post", "/api/generate-cv"),
+    ("post", "/api/review-cv"),
+    ("post", "/api/cv/upload-makeover"),
+    ("post", "/api/cv/tailor"),
+    ("post", "/api/cv/interview-context"),
 ]
 
 
@@ -37,6 +42,7 @@ def test_flag_off_mounts_no_payment_or_support_routes():
 def test_flag_on_mounts_legacy_routes():
     paths = _paths(create_app(legacy_b2c=True))
     assert {"/api/chat", "/api/upgrade-pro", "/api/admin/ai-brain/versions"} <= paths
+    assert {"/api/generate-cv", "/api/review-cv", "/api/cv/upload-makeover", "/api/cv/tailor", "/api/cv/interview-context"} <= paths
     assert [p for p in paths if "/ws/" in p], "the walk must see websocket routes"
 
 
