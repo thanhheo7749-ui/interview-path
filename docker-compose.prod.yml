@@ -76,6 +76,7 @@ services:
       # .env holds localhost values; these come from scripts/vps-deploy.sh, which resolves the real ones.
       ALLOWED_ORIGINS: ${ALLOWED_ORIGINS}
       FORWARDED_ALLOW_IPS: ${FORWARDED_ALLOW_IPS}
+      SPEAKCV_PUBLIC_URL: ${VITE_SPEAKCV_URL}
     volumes:
       - speakcv_storage:/data/storage
       - speakcv_recordings:/data/recordings
