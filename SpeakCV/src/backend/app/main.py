@@ -18,7 +18,7 @@ from slowapi.errors import RateLimitExceeded
 
 from .core import settings
 from .core.rate_limit import limiter
-from .routers import profile, auth, cv, admin, interview, support, payment, jobs, stats, questions
+from .routers import profile, auth, cv, admin
 from .database import sql_models
 from .database.database import SessionLocal
 from .auth.security import get_password_hash
@@ -56,7 +56,16 @@ async def lifespan(app: FastAPI):
     yield
 
 
-def create_app() -> FastAPI:
+def _include_legacy_routers(app: FastAPI) -> None:
+    from .routers import interview, jobs, payment, questions, stats, support
+
+    app.include_router(profile.legacy_router)
+    app.include_router(admin.legacy_brain_router)
+    for module in (interview, support, payment, jobs, stats, questions):
+        app.include_router(module.router)
+
+
+def create_app(legacy_b2c: bool | None = None) -> FastAPI:
     load_config()  # bad AI configuration must fail startup
     app = FastAPI(lifespan=lifespan)
     app.state.limiter = limiter
@@ -88,12 +97,9 @@ def create_app() -> FastAPI:
     app.include_router(auth.router)
     app.include_router(cv.router)
     app.include_router(admin.router)
-    app.include_router(interview.router)
-    app.include_router(support.router)
-    app.include_router(payment.router)
-    app.include_router(jobs.router)
-    app.include_router(stats.router)
-    app.include_router(questions.router)
+    enabled = settings.flag("LEGACY_B2C_ENABLED") if legacy_b2c is None else legacy_b2c
+    if enabled:
+        _include_legacy_routers(app)
     return app
 
 

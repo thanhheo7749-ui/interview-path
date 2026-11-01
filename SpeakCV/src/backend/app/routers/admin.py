@@ -20,6 +20,7 @@ from .profile import get_current_user
 from ..auth import security
 
 router = APIRouter()
+legacy_brain_router = APIRouter()
 
 @router.get("/api/admin/dashboard")
 async def get_admin_dashboard(current_user: sql_models.User = Depends(get_current_user), db: Session = Depends(get_db)):
@@ -694,7 +695,7 @@ def _get_or_create_version(db: Session, version: str, user_id: int | None = None
     return item
 
 
-@router.post("/api/admin/ai-brain/ingestion/upload")
+@legacy_brain_router.post("/api/admin/ai-brain/ingestion/upload")
 async def ai_brain_upload_file(
     file: UploadFile = File(...),
     current_user: sql_models.User = Depends(get_current_user),
@@ -717,7 +718,7 @@ async def ai_brain_upload_file(
     return {"file_key": file_key, "filename": rec.filename, "chars": len(text)}
 
 
-@router.post("/api/admin/ai-brain/ingestion/jobs")
+@legacy_brain_router.post("/api/admin/ai-brain/ingestion/jobs")
 async def ai_brain_start_job(
     request: models.AIBrainIngestionStartRequest,
     current_user: sql_models.User = Depends(get_current_user),
@@ -780,7 +781,7 @@ async def ai_brain_start_job(
     return {"job_id": job_key, "status": job.status, "summary": job.summary, "version": version.version}
 
 
-@router.get("/api/admin/ai-brain/ingestion/jobs/{job_id}")
+@legacy_brain_router.get("/api/admin/ai-brain/ingestion/jobs/{job_id}")
 async def ai_brain_job_status(
     job_id: str,
     current_user: sql_models.User = Depends(get_current_user),
@@ -810,7 +811,7 @@ async def ai_brain_job_status(
     }
 
 
-@router.post("/api/admin/ai-brain/ingestion/jobs/{job_id}/apply-draft")
+@legacy_brain_router.post("/api/admin/ai-brain/ingestion/jobs/{job_id}/apply-draft")
 async def ai_brain_apply_draft(
     job_id: str,
     request: models.AIBrainApplyDraftRequest,
@@ -872,7 +873,7 @@ async def ai_brain_apply_draft(
     return {"message": "Applied to draft", "accepted_nodes": accepted_nodes, "accepted_edges": accepted_edges}
 
 
-@router.post("/api/admin/ai-brain/ingestion/jobs/{job_id}/reject")
+@legacy_brain_router.post("/api/admin/ai-brain/ingestion/jobs/{job_id}/reject")
 async def ai_brain_reject_job(
     job_id: str,
     request: models.AIBrainRejectJobRequest,
@@ -891,7 +892,7 @@ async def ai_brain_reject_job(
     return {"message": "Job rejected", "job_id": job_id, "reason": request.reason}
 
 
-@router.post("/api/admin/ai-brain/publish/{version}")
+@legacy_brain_router.post("/api/admin/ai-brain/publish/{version}")
 async def ai_brain_publish(
     version: str,
     current_user: sql_models.User = Depends(get_current_user),
@@ -908,7 +909,7 @@ async def ai_brain_publish(
     return {"message": "Published", "version": version}
 
 
-@router.post("/api/admin/ai-brain/assemble-prompt")
+@legacy_brain_router.post("/api/admin/ai-brain/assemble-prompt")
 async def ai_brain_assemble_prompt(
     request: models.AIBrainAssemblePromptRequest,
     current_user: sql_models.User = Depends(get_current_user),
@@ -952,7 +953,7 @@ async def ai_brain_assemble_prompt(
     return {"version": version.version, "prompt": prompt, "selected_nodes": selected}
 
 
-@router.get("/api/admin/ai-brain/versions")
+@legacy_brain_router.get("/api/admin/ai-brain/versions")
 async def ai_brain_versions(
     current_user: sql_models.User = Depends(get_current_user),
     db: Session = Depends(get_db),

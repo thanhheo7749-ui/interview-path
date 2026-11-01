@@ -12,6 +12,7 @@ from ..auth import security
 from app.utils import sync_user_tokens
 
 router = APIRouter(prefix="/api", tags=["profile"])
+legacy_router = APIRouter(prefix="/api", tags=["profile"])
 
 def get_current_user(token: str = Depends(security.oauth2_scheme), db: Session = Depends(database.get_db)):
     email = security.verify_token(token)
@@ -104,7 +105,7 @@ def delete_experience(exp_id: int, current_user: sql_models.User = Depends(get_c
 
 PRO_CREDITS = 10000
 
-@router.post("/upgrade-pro")
+@legacy_router.post("/upgrade-pro")
 def upgrade_to_pro(current_user: sql_models.User = Depends(get_current_user), db: Session = Depends(database.get_db)):
     current_user.credits = PRO_CREDITS
     current_user.plan = "pro"
