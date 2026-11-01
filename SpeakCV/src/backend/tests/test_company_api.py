@@ -301,6 +301,7 @@ def test_temporary_password_logs_in(api, company, people):
     assert (refused.status_code, refused.json()["detail"]) == (403, "password_change_required")
     changed = api.post("/api/me/password", headers=headers, json={"current_password": password, "new_password": "my-own-password"})
     assert changed.status_code == 200
+    headers = {"Authorization": f"Bearer {changed.json()['access_token']}"}
     assert api.get(f"/api/companies/{company}", headers=headers).status_code == 200
 
 

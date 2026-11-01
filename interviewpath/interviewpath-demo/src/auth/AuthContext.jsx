@@ -63,11 +63,14 @@ export function AuthProvider({ children }) {
 
   const changePassword = useCallback(async (currentPassword, newPassword) => {
     // A 401 here means a wrong current password, which must not end the session.
-    await api('/api/me/password', {
+    const result = await api('/api/me/password', {
       method: 'POST',
       body: { current_password: currentPassword, new_password: newPassword },
       skipAuthRedirect: true,
     });
+    // The change ended the old session, so the old token would get a 401 from here on.
+    setToken(result.access_token);
+    setTokenState(result.access_token);
     setUser((current) => current && { ...current, must_change_password: false });
   }, []);
 

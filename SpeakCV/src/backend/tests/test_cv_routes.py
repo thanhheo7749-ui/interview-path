@@ -1,5 +1,6 @@
 import asyncio
 import inspect
+import json
 
 import pytest
 from fastapi.testclient import TestClient
@@ -10,7 +11,7 @@ from app.database.sql_models import AIUsageLog, User
 from app.main import create_app
 from app.routers import admin, cv, interview
 from app.routers.profile import get_current_user
-from tests.helpers import iter_routes, route_path
+from tests.helpers import auth_header, iter_routes, make_user, route_path
 
 PDF = ("resume.pdf", b"%PDF-fake", "application/pdf")
 SECRET_TEXT = "secret-internal-detail"
@@ -180,3 +181,68 @@ def test_transcribe_calls_ai_off_the_event_loop(api, monkeypatch):
 def test_review_usage_is_logged_once(api, readable_cv, db):
     assert api.post("/api/review-cv", files={"file": PDF}).status_code == 200
     assert db.query(AIUsageLog).count() == 1
+
+
+# AI output can repeat CV data, so it never goes to the logs.
+
+CV_DATA = "Nguyen Van Candidate 0912345678"
+
+
+def _assert_only_length_and_type_logged(capsys, output, exception_type):
+    logged = capsys.readouterr().out
+    assert CV_DATA not in logged
+    assert "Candidate" not in logged
+    assert f"length={len(output)}" in logged
+    assert f"type={exception_type}" in logged
+
+
+def test_makeover_parse_failure_logs_no_ai_output(api, readable_cv, capsys):
+    output = f"not json: {CV_DATA}"
+    fake.enqueue("legacy", output)
+    assert api.post("/api/cv/upload-makeover", files={"file": PDF}).status_code == 502
+    _assert_only_length_and_type_logged(capsys, output, "JSONDecodeError")
+
+
+def test_makeover_validation_failure_logs_no_ai_output(api, readable_cv, capsys):
+    # A pydantic error quotes the input values it rejects, so the exception text is unsafe as well.
+    output = json.dumps({"personal_info": CV_DATA})
+    fake.enqueue("legacy", output)
+    assert api.post("/api/cv/upload-makeover", files={"file": PDF}).status_code == 502
+    _assert_only_length_and_type_logged(capsys, output, "ValidationError")
+
+
+def test_tailor_parse_failure_logs_no_ai_output(api, capsys):
+    output = f"not json: {CV_DATA}"
+    fake.enqueue("legacy", output)
+    assert api.post("/api/cv/tailor", json={"master_cv_json": {}, "jd_text": "Engineer"}).status_code == 502
+    _assert_only_length_and_type_logged(capsys, output, "JSONDecodeError")
+
+
+def test_tailor_validation_failure_logs_no_ai_output(api, capsys):
+    output = json.dumps({"personal_info": CV_DATA})
+    fake.enqueue("legacy", output)
+    assert api.post("/api/cv/tailor", json={"master_cv_json": {}, "jd_text": "Engineer"}).status_code == 502
+    _assert_only_length_and_type_logged(capsys, output, "ValidationError")
+
+
+def test_interview_json_parse_failure_logs_no_ai_output(capsys):
+    output = f"not json: {CV_DATA}"
+    with pytest.raises(ValueError):
+        interview.clean_and_parse_json(output)
+    _assert_only_length_and_type_logged(capsys, output, "JSONDecodeError")
+
+
+def test_ai_service_prints_nothing():
+    assert "print(" not in inspect.getsource(ai_service)
+
+
+def test_chat_logs_the_length_of_the_ai_reply_not_its_text(db, capsys):
+    user = make_user(db, "chat@example.test")
+    fake.enqueue("legacy", CV_DATA)
+    response = TestClient(create_app(legacy_b2c=True)).post(
+        "/api/chat", headers=auth_header(user.email), json={"user_text": "Hello there"},
+    )
+    assert response.status_code == 200
+    logged = capsys.readouterr().out
+    assert CV_DATA not in logged
+    assert f"[AI Reply] length={len(CV_DATA)}" in logged

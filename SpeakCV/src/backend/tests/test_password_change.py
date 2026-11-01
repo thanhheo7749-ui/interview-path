@@ -1,6 +1,19 @@
-import pytest
+import time
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
 
-from app.auth.security import get_password_hash, verify_password
+import pytest
+from jose import jwt
+
+from app.auth.security import (
+    ALGORITHM,
+    SECRET_KEY,
+    create_access_token,
+    get_password_hash,
+    mark_password_changed,
+    token_predates_password_change,
+    verify_password,
+)
 from app.cli import main
 from app.core.rate_limit import limiter
 from app.database.sql_models import Company, CompanyMember, User
@@ -8,6 +21,7 @@ from tests.helpers import auth_header, make_user
 
 TEMP = "temporary-pass-123"
 NEW = "brand-new-password"
+BACKEND_APP = Path(__file__).resolve().parents[1] / "app"
 
 
 @pytest.fixture
@@ -49,6 +63,7 @@ def test_change_clears_the_flag_and_replaces_the_password(client, flagged):
     headers = auth_header(email)
     response = client.post("/api/me/password", headers=headers, json={"current_password": TEMP, "new_password": NEW})
     assert response.status_code == 200
+    headers = {"Authorization": f"Bearer {response.json()['access_token']}"}
     assert client.get("/api/me", headers=headers).json()["must_change_password"] is False
     assert client.get(f"/api/companies/{company_id}", headers=headers).status_code == 200
     assert client.post("/api/login", json={"email": email, "password": TEMP}).status_code == 401
@@ -161,3 +176,174 @@ def test_registration_requires_ten_characters_with_a_readable_error(client, db):
     assert isinstance(response.json()["detail"], str)
     assert "10" in response.json()["detail"]
     assert db.query(User).filter_by(email="c@example.test").first() is None
+
+
+# Sessions and password changes
+
+def _token(email, issued_ago=None):
+    """A signed token. issued_ago=None leaves out iat, as tokens from before this claim existed do."""
+    claims = {"sub": email, "exp": int(time.time()) + 3600}
+    if issued_ago is not None:
+        claims["iat"] = int(time.time()) - issued_ago
+    return {"Authorization": f"Bearer {jwt.encode(claims, SECRET_KEY, algorithm=ALGORITHM)}"}
+
+
+def _bearer(token):
+    return {"Authorization": f"Bearer {token}"}
+
+
+def _statuses(client, headers, company_id):
+    return [
+        client.get("/api/me", headers=headers).status_code,
+        client.get(f"/api/companies/{company_id}", headers=headers).status_code,
+        client.get("/api/my-profile", headers=headers).status_code,
+    ]
+
+
+def _clear_flag(db, email):
+    db.query(User).filter_by(email=email).one().must_change_password = False
+    db.commit()
+
+
+def _admin_headers(db):
+    make_user(db, "root@example.test", role="admin")
+    return auth_header("root@example.test")
+
+
+def test_token_has_an_integer_issued_at():
+    before = int(time.time())
+    claims = jwt.decode(create_access_token({"sub": "a@example.test"}), SECRET_KEY, algorithms=[ALGORITHM])
+    assert isinstance(claims["iat"], int)
+    assert before <= claims["iat"] <= int(time.time())
+
+
+def test_a_change_refuses_older_tokens_and_returns_one_that_works(client, flagged, db):
+    email, company_id = flagged
+    old = _token(email, issued_ago=60)
+    response = client.post("/api/me/password", headers=old, json={"current_password": TEMP, "new_password": NEW})
+    assert response.status_code == 200
+    body = response.json()
+    assert body["token_type"] == "bearer"
+    assert _statuses(client, old, company_id) == [401, 401, 401]
+    assert client.post(
+        "/api/me/password", headers=old, json={"current_password": NEW, "new_password": "yet-another-password"},
+    ).status_code == 401
+    assert _statuses(client, _bearer(body["access_token"]), company_id) == [200, 200, 200]
+    db.expire_all()
+    assert db.query(User).filter_by(email=email).one().password_changed_at is not None
+
+
+def test_signing_in_after_the_change_works(client, flagged):
+    email, company_id = flagged
+    client.post("/api/me/password", headers=_token(email, 60), json={"current_password": TEMP, "new_password": NEW})
+    login = client.post("/api/login", json={"email": email, "password": NEW})
+    assert _statuses(client, _bearer(login.json()["access_token"]), company_id) == [200, 200, 200]
+
+
+def test_a_refused_change_leaves_the_session_alone(client, flagged, db):
+    email, _ = flagged
+    old = _token(email, issued_ago=60)
+    assert client.post(
+        "/api/me/password", headers=old, json={"current_password": "wrong-password", "new_password": NEW},
+    ).status_code == 401
+    assert client.get("/api/me", headers=old).status_code == 200
+    db.expire_all()
+    assert db.query(User).filter_by(email=email).one().password_changed_at is None
+
+
+def test_a_user_who_never_changed_a_password_is_unaffected(client, flagged, db):
+    email, company_id = flagged
+    _clear_flag(db, email)
+    assert _statuses(client, _token(email, issued_ago=86400), company_id) == [200, 200, 200]
+    assert _statuses(client, _token(email), company_id) == [200, 200, 200]
+
+
+def test_a_token_without_issued_at_is_refused_only_once_a_change_is_recorded(client, flagged, db):
+    email, company_id = flagged
+    _clear_flag(db, email)
+    no_iat = _token(email)
+    assert _statuses(client, no_iat, company_id) == [200, 200, 200]
+    db.query(User).filter_by(email=email).one().password_changed_at = datetime.now(timezone.utc) - timedelta(days=1)
+    db.commit()
+    assert _statuses(client, no_iat, company_id) == [401, 401, 401]
+
+
+@pytest.mark.parametrize("zone", ["UTC", "Asia/Ho_Chi_Minh", "America/New_York"])
+def test_a_naive_change_time_is_read_as_utc_in_any_server_timezone(monkeypatch, zone):
+    monkeypatch.setenv("TZ", zone)
+    time.tzset()
+    try:
+        changed = int(datetime(2026, 1, 1, 12, 0, 0, tzinfo=timezone.utc).timestamp())
+        naive = datetime(2026, 1, 1, 12, 0, 0)
+        assert token_predates_password_change({"iat": changed - 1}, naive) is True
+        assert token_predates_password_change({"iat": changed}, naive) is False
+    finally:
+        monkeypatch.delenv("TZ")
+        time.tzset()
+
+
+def test_an_aware_change_time_is_compared_by_its_instant():
+    aware = datetime(2026, 1, 1, 19, 0, 0, tzinfo=timezone(timedelta(hours=7)))
+    changed = int(datetime(2026, 1, 1, 12, 0, 0, tzinfo=timezone.utc).timestamp())
+    assert token_predates_password_change({"iat": changed - 1}, aware) is True
+    assert token_predates_password_change({"iat": changed}, aware) is False
+
+
+def test_the_change_time_has_no_fraction_a_database_could_round_up(db):
+    # MySQL DATETIME rounds fractions to the nearest second, which could land after the token issued next.
+    user = make_user(db, "round@example.test")
+    mark_password_changed(user)
+    assert user.password_changed_at.microsecond == 0
+
+
+def test_only_the_security_module_decodes_tokens():
+    offenders = [
+        str(path.relative_to(BACKEND_APP)) for path in BACKEND_APP.rglob("*.py")
+        if "jwt.decode" in path.read_text(encoding="utf-8") and path.name != "security.py"
+    ]
+    assert offenders == []
+
+
+def test_an_admin_password_change_ends_older_sessions(client, db):
+    headers = _admin_headers(db)
+    target = make_user(db, "member@example.test")
+    old = _token(target.email, issued_ago=60)
+    response = client.put(f"/api/admin/users/{target.id}", headers=headers, json={"password": "chosen-by-admin"})
+    assert response.status_code == 200
+    db.expire_all()
+    assert db.get(User, target.id).password_changed_at is not None
+    assert client.get("/api/me", headers=old).status_code == 401
+
+
+# Passwords chosen by an admin
+
+def test_admin_creating_a_user_forces_a_password_change(client, db):
+    response = client.post(
+        "/api/admin/users", headers=_admin_headers(db),
+        json={"email": "made@example.test", "password": "chosen-by-admin", "full_name": "Made"},
+    )
+    assert response.status_code == 200
+    assert db.query(User).filter_by(email="made@example.test").one().must_change_password is True
+
+
+def test_admin_changing_a_password_forces_a_password_change(client, db):
+    headers = _admin_headers(db)
+    target = make_user(db, "member@example.test")
+    assert client.put(f"/api/admin/users/{target.id}", headers=headers, json={"password": "chosen-by-admin"}).status_code == 200
+    db.expire_all()
+    assert db.get(User, target.id).must_change_password is True
+    login = client.post("/api/login", json={"email": target.email, "password": "chosen-by-admin"})
+    assert login.json()["must_change_password"] is True
+
+
+@pytest.mark.parametrize("payload", [{"full_name": "Renamed"}, {"password": ""}])
+def test_admin_edit_without_a_new_password_touches_neither_field(client, db, payload):
+    headers = _admin_headers(db)
+    target = make_user(db, "member@example.test")
+    old = _token(target.email, issued_ago=60)
+    assert client.put(f"/api/admin/users/{target.id}", headers=headers, json=payload).status_code == 200
+    db.expire_all()
+    user = db.get(User, target.id)
+    assert user.must_change_password is False
+    assert user.password_changed_at is None
+    assert client.get("/api/me", headers=old).status_code == 200

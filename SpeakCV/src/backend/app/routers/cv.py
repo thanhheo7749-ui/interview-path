@@ -185,8 +185,8 @@ async def upload_makeover_cv(file: UploadFile = File(...), industry: str = Form(
         try:
             cv_data = parse_and_validate_cv(result)
         except (json.JSONDecodeError, Exception) as parse_err:
-            print(f"⚠️ JSON parse/validation error: {parse_err}")
-            print(f"Raw AI response: {result[:500]}")
+            # Neither the output nor the exception text: a validation error quotes the values it rejects.
+            print(f"⚠️ CV makeover output rejected: length={len(result)} type={type(parse_err).__name__}")
             raise AIOutputError("CV makeover output was not valid CV JSON") from None
 
         print("✅ CV makeover completed (JSON mode)!")
@@ -241,8 +241,7 @@ def tailor_cv(request: models.CVTailorRequest, current_user: sql_models.User = D
             validated = models.CVMakeoverData(**raw_json)
             cv_data = validated.model_dump()
         except (json.JSONDecodeError, Exception) as parse_err:
-            print(f"⚠️ JSON parse/validation error during tailoring: {parse_err}")
-            print(f"Raw AI response: {result[:500]}")
+            print(f"⚠️ CV tailor output rejected: length={len(result)} type={type(parse_err).__name__}")
             raise AIOutputError("CV tailor output was not valid CV JSON") from None
             
         print(f"✅ CV tailor completed! Score: {tailor_summary.get('overall_score', 'N/A')}%")

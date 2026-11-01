@@ -22,9 +22,11 @@ def upgrade() -> None:
     """Upgrade schema."""
     with op.batch_alter_table('users', schema=None) as batch_op:
         batch_op.add_column(sa.Column('must_change_password', sa.Boolean(), server_default=sa.false(), nullable=False))
+        batch_op.add_column(sa.Column('password_changed_at', sa.DateTime(timezone=True), nullable=True))
 
 
 def downgrade() -> None:
     """Downgrade schema."""
     with op.batch_alter_table('users', schema=None) as batch_op:
+        batch_op.drop_column('password_changed_at')
         batch_op.drop_column('must_change_password')

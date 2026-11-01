@@ -17,6 +17,7 @@ CONFLICT_COSINE = 0.80
 FACT_KINDS = ("number", "date", "boolean")
 COMPARABLE = ("draft", "published")
 MAX_CHECK_TOKENS = 300
+EDIT_RESOLVED = "edit_resolved"
 
 SYSTEM = """You compare two company facts for a contradiction check.
 
@@ -118,8 +119,10 @@ def _fact_block(db: Session, node: KbNode) -> str:
 
 
 def _already_paired(db: Session, company_id: int, first: int, second: int) -> bool:
+    """A pair closed only because an edit made its values equal may disagree again after a later edit."""
     return db.query(KbConflict.id).filter(
         KbConflict.company_id == company_id,
+        or_(KbConflict.resolution.is_(None), KbConflict.resolution != EDIT_RESOLVED),
         or_(
             (KbConflict.node_a_id == first) & (KbConflict.node_b_id == second),
             (KbConflict.node_a_id == second) & (KbConflict.node_b_id == first),
@@ -127,10 +130,12 @@ def _already_paired(db: Session, company_id: int, first: int, second: int) -> bo
     ).first() is not None
 
 
-def check_new_facts(db: Session, company_id: int, node_ids: list[int]) -> int:
+def check_new_facts(db: Session, company_id: int, node_ids: list[int], bump_version: bool = True) -> int:
     """Open a conflict for each new fact that disagrees with a similar fact. Returns how many were opened.
 
-    AIError from the check propagates; conflicts opened before it are already committed."""
+    AIError from the check propagates; conflicts opened before it are already committed.
+    bump_version=False is for a request that has already moved the version: resetting it afterwards would undo
+    a bump from another request made during the AI calls, and the vector cache is keyed on it."""
     opened = 0
     new_nodes = (
         db.query(KbNode)
@@ -174,7 +179,8 @@ def check_new_facts(db: Session, company_id: int, node_ids: list[int]) -> int:
             ).value
             if result.same_topic and result.same_scope:
                 db.add(KbConflict(company_id=company_id, node_a_id=other.id, node_b_id=node.id, status="open"))
-                _bump_version(db, company_id)
+                if bump_version:
+                    _bump_version(db, company_id)
                 db.commit()
                 opened += 1
     return opened
@@ -196,6 +202,32 @@ def resolve(db: Session, conflict: KbConflict, action: str, user_id: int) -> KbC
     db.commit()
     db.refresh(conflict)
     return conflict
+
+
+def close_conflicts_settled_by_edit(db: Session, node: KbNode, user_id: int) -> int:
+    """Dismiss the open conflicts of an edited fact whose two values now normalise as equal. Returns how many.
+
+    Flushes only; the caller commits and moves the version."""
+    mine = normalise_fact_value(node.fact_kind, node.fact_value)
+    if mine is None:
+        return 0
+    rows = db.query(KbConflict).filter(
+        KbConflict.company_id == node.company_id, KbConflict.status == "open",
+        or_(KbConflict.node_a_id == node.id, KbConflict.node_b_id == node.id),
+    ).all()
+    closed = 0
+    for row in rows:
+        other = db.get(KbNode, row.node_b_id if row.node_a_id == node.id else row.node_a_id)
+        if other is None or other.fact_kind != node.fact_kind:
+            continue
+        if normalise_fact_value(other.fact_kind, other.fact_value) == mine:
+            row.status, row.resolution = "dismissed", EDIT_RESOLVED
+            row.resolved_by = user_id
+            row.resolved_at = func.now()
+            closed += 1
+    if closed:
+        db.flush()
+    return closed
 
 
 def on_node_rejected(db: Session, node_id: int) -> None:

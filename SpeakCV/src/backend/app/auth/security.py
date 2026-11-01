@@ -26,18 +26,31 @@ def get_password_hash(password):
 
 def create_access_token(data: dict):
     to_encode = data.copy()
-    expire = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    to_encode.update({"exp": expire})
+    now = datetime.now(timezone.utc)
+    expire = now + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    to_encode.update({"exp": expire, "iat": int(now.timestamp())})
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
 
-# Decode and verify JWT token
-def verify_token(token: str):
+# Decode and verify JWT token. Use through auth.dependencies.user_from_token, which also checks revocation.
+def decode_access_token(token: str) -> dict | None:
     try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        email: str = payload.get("sub")
-        if email is None:
-            return None
-        return email
+        return jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
     except JWTError:
         return None
+
+def mark_password_changed(user) -> None:
+    """Ends the sessions issued before now. Whole seconds: MySQL DATETIME would round a fraction, possibly up,
+    past the iat of the token issued right after."""
+    user.password_changed_at = datetime.now(timezone.utc).replace(microsecond=0)
+
+def token_predates_password_change(payload: dict, password_changed_at: datetime | None) -> bool:
+    if password_changed_at is None:
+        return False
+    issued_at = payload.get("iat")
+    if not isinstance(issued_at, (int, float)):
+        return True
+    # SQLite and MySQL return naive datetimes; they hold UTC.
+    if password_changed_at.tzinfo is None:
+        password_changed_at = password_changed_at.replace(tzinfo=timezone.utc)
+    return issued_at < int(password_changed_at.timestamp())

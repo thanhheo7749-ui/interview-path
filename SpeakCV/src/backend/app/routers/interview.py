@@ -65,8 +65,7 @@ def clean_and_parse_json(raw_text: str):
     try:
         return json.loads(cleaned)
     except json.JSONDecodeError as e:
-        print(f"JSON Parse Error: {e}")
-        print(f"Cleaned raw string: {cleaned}")
+        print(f"AI output rejected: length={len(cleaned)} type={type(e).__name__}")
         raise ValueError("AI returned invalid JSON format.")
 
 
@@ -467,8 +466,7 @@ Bạn nghiêm khắc nhưng công bằng, chuyên nghiệp và trực tiếp. Tr
             time.sleep(2)
 
     ai_text = str(ai_text).strip() or "Network is unstable, please say that again."
-    safe_ai_text = ai_text.encode('ascii', 'ignore').decode('ascii')
-    print(f"[AI Reply] AI: {safe_ai_text}")
+    print(f"[AI Reply] length={len(ai_text)}")
 
     final_result = build_interview_result(
         ai_text=ai_text,
