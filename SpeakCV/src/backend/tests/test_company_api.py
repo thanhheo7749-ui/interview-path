@@ -295,8 +295,13 @@ def test_temporary_password_logs_in(api, company, people):
     password = api.post(url, headers=people["hr"], json={"email": "login@example.test", "role": "employee"}).json()["temporary_password"]
     login = api.post("/api/login", json={"email": "login@example.test", "password": password})
     assert login.status_code == 200
-    token = login.json()["access_token"]
-    assert api.get(f"/api/companies/{company}", headers={"Authorization": f"Bearer {token}"}).status_code == 200
+    assert login.json()["must_change_password"] is True
+    headers = {"Authorization": f"Bearer {login.json()['access_token']}"}
+    refused = api.get(f"/api/companies/{company}", headers=headers)
+    assert (refused.status_code, refused.json()["detail"]) == (403, "password_change_required")
+    changed = api.post("/api/me/password", headers=headers, json={"current_password": password, "new_password": "my-own-password"})
+    assert changed.status_code == 200
+    assert api.get(f"/api/companies/{company}", headers=headers).status_code == 200
 
 
 def test_an_invalid_token_gets_401(api, company):
@@ -345,10 +350,10 @@ def test_admin_can_delete_one_of_several_hr_members(api, db, company, people):
 
 
 def test_emails_are_case_insensitive_across_register_login_and_members(api, db, company, people):
-    assert api.post("/api/register", json={"email": "Foo@X.test", "password": "pw-123456", "full_name": "Foo"}).status_code == 200
-    assert api.post("/api/login", json={"email": "foo@x.test", "password": "pw-123456"}).status_code == 200
-    assert api.post("/api/login", json={"email": "FOO@x.test", "password": "pw-123456"}).status_code == 200
-    assert api.post("/api/register", json={"email": "foo@x.test", "password": "pw-123456", "full_name": "Foo"}).status_code == 400
+    assert api.post("/api/register", json={"email": "Foo@X.test", "password": "pw-1234567", "full_name": "Foo"}).status_code == 200
+    assert api.post("/api/login", json={"email": "foo@x.test", "password": "pw-1234567"}).status_code == 200
+    assert api.post("/api/login", json={"email": "FOO@x.test", "password": "pw-1234567"}).status_code == 200
+    assert api.post("/api/register", json={"email": "foo@x.test", "password": "pw-1234567", "full_name": "Foo"}).status_code == 400
     added = api.post(f"/api/companies/{company}/members", headers=people["hr"], json={"email": "FOO@x.test", "role": "employee"})
     assert added.status_code == 201
     assert added.json()["existing_account"] is True
@@ -357,8 +362,36 @@ def test_emails_are_case_insensitive_across_register_login_and_members(api, db, 
 
 def test_existing_mixed_case_account_still_logs_in(api, db):
     from app.auth.security import get_password_hash
-    db.add(User(email="Legacy@X.test", full_name="L", hashed_password=get_password_hash("pw-123456")))
+    db.add(User(email="Legacy@X.test", full_name="L", hashed_password=get_password_hash("pw-1234567")))
     db.commit()
-    response = api.post("/api/login", json={"email": "legacy@x.test", "password": "pw-123456"})
+    response = api.post("/api/login", json={"email": "legacy@x.test", "password": "pw-1234567"})
     assert response.status_code == 200
     assert api.get("/api/me", headers={"Authorization": f"Bearer {response.json()['access_token']}"}).status_code == 200
+
+
+@pytest.mark.parametrize("field,blank", [("name", "   "), ("default_locale", "   ")])
+def test_company_fields_blank_after_stripping_are_refused(api, company, people, field, blank):
+    response = api.patch(f"/api/companies/{company}", headers=people["hr"], json={field: blank})
+    assert response.status_code == 422
+
+
+def test_company_name_and_locale_are_stripped(api, company, people):
+    response = api.patch(f"/api/companies/{company}", headers=people["hr"], json={"name": "  Acme Two ", "default_locale": " vi "})
+    assert response.status_code == 200
+    assert (response.json()["name"], response.json()["default_locale"]) == ("Acme Two", "vi")
+
+
+def test_department_name_is_stripped_and_blank_is_refused(api, company, people):
+    base = f"/api/companies/{company}/departments"
+    assert api.post(base, headers=people["hr"], json={"name": "   "}).status_code == 422
+    created = api.post(base, headers=people["hr"], json={"name": "  Sales "})
+    assert created.json()["name"] == "Sales"
+    assert api.patch(f"{base}/{created.json()['id']}", headers=people["hr"], json={"name": "  "}).status_code == 422
+
+
+def test_member_name_is_stripped_and_blank_is_refused(api, company, people):
+    base = f"/api/companies/{company}/members"
+    assert api.post(base, headers=people["hr"], json={"email": "b@x.test", "role": "employee", "full_name": "  "}).status_code == 422
+    created = api.post(base, headers=people["hr"], json={"email": "n@x.test", "role": "employee", "full_name": " Nam "})
+    assert created.json()["full_name"] == "Nam"
+    assert api.post(base, headers=people["hr"], json={"email": "o@x.test", "role": "employee", "full_name": None}).status_code == 201

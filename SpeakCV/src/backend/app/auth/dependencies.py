@@ -27,6 +27,9 @@ def require_member(*roles: str):
         user: User = Depends(get_authenticated_user),
         db: Session = Depends(get_db),
     ) -> CompanyMember:
+        # Enforced here, not in get_authenticated_user, so /api/me and /api/me/password keep working.
+        if user.must_change_password:
+            raise HTTPException(status_code=403, detail="password_change_required")
         member = (
             db.query(CompanyMember)
             .filter(CompanyMember.company_id == company_id, CompanyMember.user_id == user.id)

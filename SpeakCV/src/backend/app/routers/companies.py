@@ -132,6 +132,7 @@ def get_me(user: User = Depends(get_authenticated_user), db: Session = Depends(g
         "email": user.email,
         "full_name": user.full_name,
         "role": user.role,
+        "must_change_password": user.must_change_password,
         "memberships": [
             {
                 "member_id": member.id,
@@ -275,6 +276,7 @@ def add_member(
             # /api/login cannot serve a user with no name.
             full_name=body.full_name or email.split("@")[0],
             hashed_password=security.get_password_hash(temporary_password),
+            must_change_password=True,
         )
         db.add(user)
         try:

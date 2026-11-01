@@ -43,7 +43,12 @@ def create_company(args) -> int:
         temporary_password = None
         if user is None:
             temporary_password = secrets.token_urlsafe(12)
-            user = User(email=email, full_name=args.hr_name, hashed_password=get_password_hash(temporary_password))
+            user = User(
+                email=email,
+                full_name=args.hr_name,
+                hashed_password=get_password_hash(temporary_password),
+                must_change_password=True,
+            )
             db.add(user)
             db.flush()
 

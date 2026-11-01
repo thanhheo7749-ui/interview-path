@@ -62,3 +62,25 @@ def test_cors_allows_only_configured_origins(client):
     )
     assert allowed.headers.get("access-control-allow-origin") == "http://localhost:5173"
     assert "access-control-allow-origin" not in denied.headers
+
+
+def test_google_network_failure_is_503(client, monkeypatch):
+    def down(*args, **kwargs):
+        raise auth_router.requests.ConnectionError("google is down")
+
+    monkeypatch.setattr(auth_router.requests, "get", down)
+    response = client.post("/api/auth/google", json={"token": "t"})
+    assert response.status_code == 503
+    assert "google is down" not in response.text
+
+
+def test_google_login_is_rate_limited(client, monkeypatch):
+    monkeypatch.setattr(auth_router.requests, "get", _google_stub("some-other-app"))
+    limiter.enabled = True
+    limiter.reset()
+    try:
+        codes = [client.post("/api/auth/google", json={"token": "t"}).status_code for _ in range(11)]
+    finally:
+        limiter.enabled = False
+    assert codes[:10] == [401] * 10
+    assert codes[10] == 429
