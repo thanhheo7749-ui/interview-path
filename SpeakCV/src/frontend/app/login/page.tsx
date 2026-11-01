@@ -11,6 +11,7 @@ import { loginUser, loginGoogle } from "@/services/api";
 import { useGoogleLogin } from "@react-oauth/google";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
+import { safeRedirect } from "@/lib/safeRedirect";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -21,9 +22,8 @@ export default function LoginPage() {
   const { login } = useAuth();
 
   useEffect(() => {
-    const redirect = new URLSearchParams(window.location.search).get("redirect");
-    // Only same-site absolute paths are accepted: "/x" yes, "//host" and "/\\host" no.
-    if (redirect && /^\/(?![/\\])/.test(redirect)) {
+    const redirect = safeRedirect(new URLSearchParams(window.location.search).get("redirect"), "");
+    if (redirect) {
       sessionStorage.setItem("postLoginRedirect", redirect);
     }
   }, []);

@@ -124,11 +124,11 @@ export default function RegisterPage() {
             <input
               type="password"
               required
-              minLength={6}
+              minLength={10}
               className="w-full bg-theme-secondary border border-theme-border rounded-xl p-4 text-theme-text focus:border-blue-600 outline-none transition-colors"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="Ít nhất 6 ký tự"
+              placeholder="Ít nhất 10 ký tự"
             />
           </div>
 
