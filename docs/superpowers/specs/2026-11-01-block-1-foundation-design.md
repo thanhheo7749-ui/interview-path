@@ -113,7 +113,7 @@ Starting the app fails clearly if a configured slot has no key. Default `OPENAI_
 
 Use each vendor's official SDK, never an OpenAI-compatible shim for another vendor. Implementers must read current vendor docs first.
 
-- **Anthropic**: the implementer reads the `claude-api` skill. Use `client.messages.parse()` for structured output. Handle `stop_reason == "refusal"` before reading content. Do not send a disabled-thinking setting. Set `output_config.effort` explicitly. Enable server-side `fallbacks` by default where the skill calls for it, for Opus and Sonnet.
+- **Anthropic**: the implementer reads the `claude-api` skill. Send `output_config.format` with the strict schema and return the raw text, so the gateway's validation and retry apply as they do for every vendor; `client.messages.parse()` raises on a Pydantic failure without exposing the text, which would skip the retry. Handle `stop_reason == "refusal"` before reading content. Do not send a disabled-thinking setting. Set `output_config.effort` explicitly. Enable server-side `fallbacks` by default where the skill calls for it, for Opus and Sonnet.
 - **OpenAI**: read the structured-outputs guide before coding, since this spec's research did not confirm its current Python shape. For STT use `gpt-transcribe`; older transcribe models shut down on 2027-02-26. It takes a `languages` array.
 - **Gemini**: `google-genai` replaces the deprecated `google-generativeai`. The docs show `client.interactions.create` with `response_format`.
 - **Voyage**: for embeddings when Claude handles text. Pass `input_type` from `kind`.
