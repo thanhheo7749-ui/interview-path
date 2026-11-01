@@ -29,7 +29,7 @@ MAX_MESSAGE_CHARS = 2000
 PROPOSAL = "proposal"
 PROPOSAL_DONE = "proposal_confirmed"
 CONFIRMED_LABEL = "Confirmed by HR"
-RESETS_ON_EDIT = ("manager_review", "approved")
+RESETS_ON_EDIT = ("manager_review", "approved", "published")
 
 GENERATE_SYSTEM = """You write a job description for candidates, in English, Vietnamese and Korean.
 
