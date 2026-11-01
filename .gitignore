@@ -44,3 +44,7 @@ storage/
 # Company Brain evaluation reports are generated. The team commits a chosen one deliberately with git add -f.
 SpeakCV/src/backend/eval/reports/*
 !SpeakCV/src/backend/eval/reports/.gitkeep
+
+# Speech-to-text benchmark: the team records the clips and keeps them out of git.
+SpeakCV/src/backend/eval/stt/clips/*
+!SpeakCV/src/backend/eval/stt/clips/.gitkeep

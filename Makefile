@@ -1,4 +1,4 @@
-.PHONY: eval-brain seed-samples docker-build docker-up docker-down docker-logs docker-ps docker-build-speakcv docker-up-speakcv docker-restart test reembed
+.PHONY: eval-brain eval-sttseed-samples docker-build docker-up docker-down docker-logs docker-ps docker-build-speakcv docker-up-speakcv docker-restart test reembed
 
 BACKEND_DIR = SpeakCV/src/backend
 BACKEND_PY = $(if $(wildcard $(BACKEND_DIR)/.venv/bin/python),.venv/bin/python,python3)
@@ -69,3 +69,8 @@ seed-samples:
 # Pass ARGS=--dry-run, ARGS=--yes or ARGS="--profile fake".
 eval-brain:
 	cd $(BACKEND_DIR) && $(BACKEND_PY) -m eval.brain.run $(ARGS)
+
+# Benchmarks speech-to-text on the clips in eval/stt/clips. Prints an estimated cost first and asks before spending.
+# Pass ARGS=--dry-run, ARGS=--yes or ARGS="--profile fake" (the fake profile measures nothing).
+eval-stt:
+	cd $(BACKEND_DIR) && $(BACKEND_PY) -m eval.stt.run $(ARGS)
