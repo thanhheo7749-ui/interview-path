@@ -169,6 +169,37 @@ def test_a_canary_in_a_candidate_visible_node_is_counted_as_a_leak(tmp_path):
     assert planted in leaked[0]["permission_leak"]
 
 
+def test_public_document_probes_reach_a_real_chunk_and_find_no_leak(tmp_path):
+    report = _evaluate(tmp_path)
+
+    assert report["public_document_probe_reachable"] is True
+    probes = report["public_document_probes"]
+    assert len(probes) == 4
+    assert {(p["company"], p["audience"]) for p in probes} == {
+        (slug, kind) for slug in ("sori-labs", "daehan-precision") for kind in ("candidate", "employee")
+    }
+    assert all(p["leaked"] == [] for p in probes)
+    assert report["questions"] == 30
+
+
+def test_the_leak_check_catches_a_chunk_filter_that_only_looks_at_the_document(tmp_path, monkeypatch):
+    from sqlalchemy import and_
+
+    from app.brain import audience as aud
+    from app.database.sql_models import KbChunk
+
+    monkeypatch.setattr(aud, "chunk_filter", lambda a: and_(KbChunk.company_id == a.company_id, aud.document_filter(a)))
+    report = _evaluate(tmp_path)
+
+    probes = report["public_document_probes"]
+    assert report["permission_leak"] == (sum(1 for r in report["results"] if r["permission_leak"])
+                                         + sum(1 for p in probes if p["leaked"])) > 0
+    assert all(p["leaked"] for p in probes)
+    leaked = [canary for probe in probes for canary in probe["leaked"]]
+    assert any("CONFIDENTIAL" in canary for canary in leaked)
+    assert any("REJECTED" in canary for canary in leaked)
+
+
 def test_isolation_check_flags_text_that_only_the_other_company_holds():
     truth = run.load_truth()
     markers = run.isolation_markers(truth, "daehan-precision")

@@ -17,7 +17,7 @@ from app.ai.config import get_config
 from app.brain import audience as aud
 from app.brain import vectors
 from app.brain.audience import Audience
-from app.brain.text import keyword_scores, tokenise
+from app.brain.text import keyword_coverage, keyword_scores, tokenise
 from app.database.sql_models import Company, KbChunk, KbConflict, KbDocument, KbEdge, KbNode, KbNodeSource
 
 VECTOR_WEIGHT = 0.7
@@ -47,6 +47,11 @@ class ContextItem:
     score: float
     node_type: str | None
     citations: tuple[Citation, ...]
+    cosine: float = 0.0  # raw, unlike score. 0.0 for a row with no comparable vector.
+    keyword_coverage: float = 0.0  # raw, unlike score: the share of the query's non-stop tokens found in the item.
+    # The same two signals for the fact in a conflict this audience can see: the node itself, or one a chunk sources.
+    conflict_cosine: float = 0.0
+    conflict_keyword_coverage: float = 0.0
 
 
 @dataclass(frozen=True)
@@ -54,6 +59,8 @@ class ContextBundle:
     items: tuple[ContextItem, ...]
     best_score: float
     conflicted_refs: frozenset[str]
+    best_cosine: float = 0.0
+    best_keyword_coverage: float = 0.0
 
 
 @dataclass(frozen=True)
@@ -119,7 +126,7 @@ def _load_vectors(cached: dict[int, np.ndarray], wanted: list[int], fetch_blobs)
 def _allowed_nodes(db: Session, audience: Audience):
     return (
         db.query(KbNode.id, KbNode.title, KbNode.body, KbNode.type, KbNode.visibility, KbNode.department_id,
-                 KbNode.embedding_model)
+                 KbNode.fact_value, KbNode.fact_unit, KbNode.scope_text, KbNode.embedding_model)
         .filter(aud.node_filter(audience))
         .order_by(KbNode.id)
         .all()
@@ -130,7 +137,7 @@ def _allowed_chunks_query(db: Session, audience: Audience, *columns):
     return (
         db.query(*columns)
         .join(KbDocument, KbChunk.document_id == KbDocument.id)
-        .filter(KbChunk.company_id == audience.company_id, aud.document_filter(audience))
+        .filter(aud.chunk_filter(audience))
     )
 
 
@@ -158,8 +165,10 @@ def _visible_edges(db: Session, audience: Audience) -> list[KbEdge]:
     )
 
 
-def _node_text(row) -> str:
-    return f"{row.title}\n{row.body}" if row.body else row.title
+def node_text(node) -> str:
+    """A node as prompts, keyword scoring and embeddings read it. Takes a KbNode or a row with the same columns."""
+    fact = " ".join(part for part in (node.fact_value, node.fact_unit) if part)
+    return "\n".join(part for part in (node.title, node.body, fact, node.scope_text) if part)
 
 
 def search(db: Session, audience: Audience, query: str, top_k: int = 8, char_budget: int = 6000,
@@ -198,13 +207,15 @@ def search(db: Session, audience: Audience, query: str, top_k: int = 8, char_bud
             raise NoEmbeddingsError(f"No embeddings for model {model}. Run make reembed.")
         return ContextBundle((), 0.0, frozenset())
 
-    texts = {f"n{row.id}": _node_text(row) for row in nodes.values()}
+    texts = {f"n{row.id}": node_text(row) for row in nodes.values()}
     texts.update({f"c{row.id}": row.text for row in chunks.values()})
 
     refs = [ref for ref, _ in comparable]
     cosine = vectors.cosine_matrix(query_array, np.stack([vector for _, vector in comparable]))
-    keyword = keyword_scores(tokenise(query), [tokenise(texts[ref]) for ref in refs])
+    query_tokens = tokenise(query)
+    keyword = keyword_scores(query_tokens, [tokenise(texts[ref]) for ref in refs])
     combined = {ref: float(VECTOR_WEIGHT * cosine[i] + KEYWORD_WEIGHT * keyword[i]) for i, ref in enumerate(refs)}
+    raw_cosine = {ref: float(cosine[i]) for i, ref in enumerate(refs)}
 
     top = sorted(refs, key=lambda ref: (-combined[ref], ref))[:max(top_k, 0)]
     scores = {ref: combined[ref] for ref in top}
@@ -218,20 +229,36 @@ def search(db: Session, audience: Audience, query: str, top_k: int = 8, char_bud
     node_ids = [int(ref[1:]) for ref in selected if ref.startswith("n")]
     node_citations = _node_citations(db, audience, node_ids)
 
+    def coverage_of(ref: str) -> float:
+        return keyword_coverage(query_tokens, tokenise(texts[ref]))
+
+    # What a visible conflict behind a ref is about. A chunk can match a question while the conflicted fact it also
+    # states is on another topic, so this is judged on the fact and not on the chunk.
+    behind = _nodes_behind_refs(db, selected)
+    in_visible_conflict = {node_id for row in _visible_conflict_rows(db, audience, behind) for node_id in row}
+
+    def conflict_signals(ref: str) -> tuple[float, float]:
+        facts = [f"n{node_id}" for node_id in behind.get(ref, ()) if node_id in in_visible_conflict and node_id in nodes]
+        return (max((raw_cosine.get(fact, 0.0) for fact in facts), default=0.0),
+                max((coverage_of(fact) for fact in facts), default=0.0))
+
     items = []
     for ref, text in selected.items():
         row_id = int(ref[1:])
+        signals = (raw_cosine.get(ref, 0.0), coverage_of(ref), *conflict_signals(ref))
         if ref.startswith("n"):
-            items.append(ContextItem(ref, "node", text, scores[ref], nodes[row_id].type, node_citations.get(row_id, ())))
+            items.append(ContextItem(ref, "node", text, scores[ref], nodes[row_id].type, node_citations.get(row_id, ()), *signals))
         else:
             row = chunks[row_id]
             citation = Citation(row.document_title, row.page, row.effective_date, True)
-            items.append(ContextItem(ref, "chunk", text, scores[ref], None, (citation,)))
+            items.append(ContextItem(ref, "chunk", text, scores[ref], None, (citation,), *signals))
 
     return ContextBundle(
         items=tuple(items),
         best_score=items[0].score if items else 0.0,
-        conflicted_refs=_conflicted_refs(db, audience, node_ids),
+        conflicted_refs=_conflicted_refs(db, audience, selected),
+        best_cosine=max((item.cosine for item in items), default=0.0),
+        best_keyword_coverage=max((item.keyword_coverage for item in items), default=0.0),
     )
 
 
@@ -302,7 +329,19 @@ def _node_citations(db: Session, audience: Audience, node_ids: list[int]) -> dic
     return {node_id: tuple(found) for node_id, found in citations.items()}
 
 
-def _conflicted_refs(db: Session, audience: Audience, node_ids: list[int]) -> frozenset[str]:
+def _nodes_behind_refs(db: Session, refs) -> dict[str, set[int]]:
+    """The nodes each ref speaks for: a node itself, and the nodes extracted from a chunk."""
+    behind = {ref: {int(ref[1:])} for ref in refs if ref.startswith("n")}
+    chunk_ids = [int(ref[1:]) for ref in refs if ref.startswith("c")]
+    if chunk_ids:
+        for chunk_id, node_id in db.query(KbNodeSource.chunk_id, KbNodeSource.node_id).filter(KbNodeSource.chunk_id.in_(chunk_ids)):
+            behind.setdefault(f"c{chunk_id}", set()).add(node_id)
+    return behind
+
+
+def _conflicted_refs(db: Session, audience: Audience, refs) -> frozenset[str]:
+    behind = _nodes_behind_refs(db, refs)
+    node_ids = list({node_id for nodes in behind.values() for node_id in nodes})
     if not node_ids:
         return frozenset()
     rows = (
@@ -315,20 +354,15 @@ def _conflicted_refs(db: Session, audience: Audience, node_ids: list[int]) -> fr
         .all()
     )
     in_conflict = {node_id for row in rows for node_id in row}
-    return frozenset(f"n{node_id}" for node_id in node_ids if node_id in in_conflict)
+    return frozenset(ref for ref, nodes in behind.items() if nodes & in_conflict)
 
 
-def visible_conflicts(db: Session, audience: Audience, refs) -> dict[str, tuple[Citation, ...]]:
-    """For each ref in an open conflict whose two sides this audience may both read, the citations of both sides.
-
-    conflicted_refs also flags a node whose other side is hidden. Such a conflict is left out here, so that
-    neither its existence nor its source can reach this audience.
-    """
-    node_ids = {int(ref[1:]) for ref in refs if ref.startswith("n")}
+def _visible_conflict_rows(db: Session, audience: Audience, behind: dict[str, set[int]]) -> list:
+    node_ids = list({node_id for nodes in behind.values() for node_id in nodes})
     if not node_ids:
-        return {}
+        return []
     visible = aud.visible_node_ids_query(db, audience)
-    rows = (
+    return (
         db.query(KbConflict.node_a_id, KbConflict.node_b_id)
         .filter(
             KbConflict.company_id == audience.company_id,
@@ -340,12 +374,24 @@ def visible_conflicts(db: Session, audience: Audience, refs) -> dict[str, tuple[
         .order_by(KbConflict.id)
         .all()
     )
+
+
+def visible_conflicts(db: Session, audience: Audience, refs) -> dict[str, tuple[Citation, ...]]:
+    """For each ref in an open conflict whose two sides this audience may both read, the citations of both sides.
+
+    A chunk ref counts through the nodes extracted from it, since it says the same value as they do.
+    conflicted_refs also flags a ref whose other side is hidden. Such a conflict is left out here, so that
+    neither its existence nor its source can reach this audience.
+    """
+    behind = _nodes_behind_refs(db, refs)
+    rows = _visible_conflict_rows(db, audience, behind)
     citations = _node_citations(db, audience, list({node_id for row in rows for node_id in row}))
     found: dict[str, dict[Citation, None]] = {}
     for node_a, node_b in rows:
         both = dict.fromkeys((*citations.get(node_a, ()), *citations.get(node_b, ())))
-        for node_id in {node_a, node_b} & node_ids:
-            found.setdefault(f"n{node_id}", {}).update(both)
+        for ref, nodes in behind.items():
+            if nodes & {node_a, node_b}:
+                found.setdefault(ref, {}).update(both)
     return {ref: tuple(sources) for ref, sources in found.items()}
 
 

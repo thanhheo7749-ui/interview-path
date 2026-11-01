@@ -95,6 +95,30 @@ def test_visible_node_ids_query_matches_filter(db, world):
     assert ids == {r.id for r in db.query(KbNode).filter(aud.node_filter(a)).all()}
 
 
-def test_document_filter_compiles_for_every_kind(db, world):
-    for kind in aud.KINDS:
-        db.query(KbDocument).filter(aud.document_filter(aud.Audience(world["company"].id, kind))).all()
+def test_document_filter_decides_on_real_rows_for_every_kind(db, world):
+    company_id = world["company"].id
+    backend, sales = world["backend"].id, world["sales"].id
+
+    def document(title, visibility, department_id=None, status="published", owner=company_id):
+        db.add(KbDocument(company_id=owner, department_id=department_id, title=title, language="en",
+                          visibility=visibility, status=status))
+
+    document("public", "public")
+    document("internal", "internal")
+    document("conf-backend", "confidential", backend)
+    document("conf-sales", "confidential", sales)
+    document("conf-companywide", "confidential")
+    document("review-public", "public", status="review")
+    document("other-company", "public", owner=company_id + 1)
+    db.commit()
+
+    def seen(audience):
+        return {row.title for row in db.query(KbDocument).filter(aud.document_filter(audience)).all()}
+
+    everyone = {"public"}
+    staff = everyone | {"internal"}
+    assert seen(aud.Audience(company_id, "candidate")) == everyone
+    assert seen(aud.Audience(company_id, "employee")) == staff
+    assert seen(aud.Audience(company_id, "manager")) == staff
+    assert seen(aud.Audience(company_id, "manager", frozenset({backend}))) == staff | {"conf-backend"}
+    assert seen(aud.Audience(company_id, "hr")) == staff | {"conf-backend", "conf-sales", "conf-companywide"}

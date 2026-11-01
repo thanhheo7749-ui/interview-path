@@ -1,11 +1,12 @@
 from dataclasses import dataclass, field
 
-from sqlalchemy import and_, or_, select, true
+from sqlalchemy import and_, false, func, not_, or_, select, true
 from sqlalchemy.orm import Session
 
-from app.database.sql_models import CompanyMember, Department, KbDocument, KbNode
+from app.database.sql_models import CompanyMember, Department, KbChunk, KbDocument, KbNode, KbNodeSource
 
 KINDS = ("candidate", "employee", "manager", "hr")
+WITHDRAWN_NODE_STATUSES = ("rejected", "superseded")
 
 
 @dataclass(frozen=True)
@@ -83,6 +84,28 @@ def document_filter(audience: Audience):
         KbDocument.status == "published",
         _layer_filter(audience, KbDocument.visibility, KbDocument.department_id),
     )
+
+
+def chunk_filter(audience: Audience):
+    """A chunk's document must be readable, and so must every node extracted from the chunk.
+
+    A public document can still say something HR classed as confidential or rejected, so the document's layer alone
+    is not enough. The layer test goes through coalesce because it is NULL for a manager and a node with no department,
+    and NOT NULL would let the chunk through. A draft node hides its chunk only when it is above this audience's layer.
+    """
+    withheld = (
+        select(KbNodeSource.id)
+        .join(KbNode, KbNodeSource.node_id == KbNode.id)
+        .where(
+            KbNodeSource.chunk_id == KbChunk.id,
+            or_(
+                KbNode.status.in_(WITHDRAWN_NODE_STATUSES),
+                not_(func.coalesce(_layer_filter(audience, KbNode.visibility, KbNode.department_id), false())),
+            ),
+        )
+        .correlate(KbChunk)
+    )
+    return and_(KbChunk.company_id == audience.company_id, document_filter(audience), ~withheld.exists())
 
 
 def visible_node_ids_query(db: Session, audience: Audience):

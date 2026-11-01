@@ -10,6 +10,7 @@ from app.brain import vectors
 from app.database.sql_models import AssistantQuestion
 
 GROUP_COSINE = 0.80
+NOT_GAP_STATES = ("failed", "conflict")
 
 
 @dataclass(frozen=True)
@@ -30,8 +31,9 @@ def _clusters(db: Session, company_id: int) -> list[GapGroup]:
                  AssistantQuestion.embedding_model)
         .filter(AssistantQuestion.company_id == company_id, AssistantQuestion.answered.is_(False),
                 AssistantQuestion.resolved.is_(False),
-                # A failure is the system's, not the knowledge's. Older rows have no state and still count.
-                or_(AssistantQuestion.state.is_(None), AssistantQuestion.state != "failed"))
+                # A failure is the system's, not the knowledge's, and a conflict waits on HR's decision, not on a
+                # new document. Older rows have no state and still count.
+                or_(AssistantQuestion.state.is_(None), AssistantQuestion.state.notin_(NOT_GAP_STATES)))
         .order_by(AssistantQuestion.id)
         .all()
     )
