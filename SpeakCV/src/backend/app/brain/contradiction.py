@@ -275,10 +275,11 @@ def value_in_quote(kind: str, value: str | None, quote: str) -> bool:
     return bool(raw) and raw in _folded(quote)
 
 
-def _bump_version(db: Session, company_id: int) -> None:
-    company = db.get(Company, company_id)
-    if company is not None:
-        company.kb_version = (company.kb_version or 0) + 1
+def bump_kb_version(db: Session, company_id: int) -> None:
+    """One atomic increment, so a bump from another request during this one is never overwritten. Does not commit."""
+    db.query(Company).filter(Company.id == company_id).update(
+        {Company.kb_version: func.coalesce(Company.kb_version, 0) + 1}, synchronize_session="fetch"
+    )
 
 
 def _quote(db: Session, node: KbNode) -> str:
@@ -354,7 +355,7 @@ def check_new_facts(db: Session, company_id: int, node_ids: list[int], bump_vers
             if result.same_topic and result.same_scope and (not result.same_value or _differ_for_certain(node, other)):
                 db.add(KbConflict(company_id=company_id, node_a_id=other.id, node_b_id=node.id, status="open"))
                 if bump_version:
-                    _bump_version(db, company_id)
+                    bump_kb_version(db, company_id)
                 db.commit()
                 opened += 1
     return opened
@@ -372,7 +373,7 @@ def resolve(db: Session, conflict: KbConflict, action: str, user_id: int) -> KbC
     conflict.resolution = action
     conflict.resolved_by = user_id
     conflict.resolved_at = func.now()
-    _bump_version(db, conflict.company_id)
+    bump_kb_version(db, conflict.company_id)
     db.commit()
     db.refresh(conflict)
     return conflict
@@ -409,6 +410,6 @@ def on_node_rejected(db: Session, node_id: int) -> None:
     for row in rows:
         row.status, row.resolution = "dismissed", "node_rejected"
         row.resolved_at = func.now()
-        _bump_version(db, row.company_id)
+        bump_kb_version(db, row.company_id)
     if rows:
         db.flush()

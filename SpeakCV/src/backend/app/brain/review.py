@@ -30,7 +30,7 @@ class ReviewError(Exception):
 
 # ---------- reading ----------
 
-def _document_node_ids(db: Session, company_id: int, document_id: int) -> set[int]:
+def document_node_ids(db: Session, company_id: int, document_id: int) -> set[int]:
     rows = (
         db.query(KbNodeSource.node_id)
         .join(KbChunk, KbNodeSource.chunk_id == KbChunk.id)
@@ -57,7 +57,7 @@ def draft_nodes(db: Session, company_id: int, document_id: int | None = None) ->
         KbNode.company_id == company_id, KbNode.status == "draft", KbNode.type.notin_(ORG_TYPES)
     )
     if document_id is not None:
-        query = query.filter(KbNode.id.in_(_document_node_ids(db, company_id, document_id) or {-1}))
+        query = query.filter(KbNode.id.in_(document_node_ids(db, company_id, document_id) or {-1}))
     return query.order_by(KbNode.id).all()
 
 
@@ -152,17 +152,19 @@ def settle_edges(db: Session, company_id: int, node_ids: set[int]) -> None:
             edge.status = "published"
 
 
+def has_drafts(db: Session, document: KbDocument) -> bool:
+    pending = document_node_ids(db, document.company_id, document.id)
+    return bool(pending) and db.query(KbNode.id).filter(
+        KbNode.id.in_(list(pending)), KbNode.company_id == document.company_id, KbNode.status == "draft",
+        KbNode.type.notin_(ORG_TYPES),
+    ).first() is not None
+
+
 def finish_document_if_decided(db: Session, document_id: int) -> bool:
     """A reviewed document becomes published once none of its nodes is still a draft (even if all were rejected,
     so its chunks stay available). Returns True when it changed."""
     document = db.get(KbDocument, document_id)
-    if document is None or document.status != "review":
-        return False
-    pending = _document_node_ids(db, document.company_id, document_id)
-    if pending and db.query(KbNode.id).filter(
-        KbNode.id.in_(list(pending)), KbNode.company_id == document.company_id, KbNode.status == "draft",
-        KbNode.type.notin_(ORG_TYPES),
-    ).first():
+    if document is None or document.status != "review" or has_drafts(db, document):
         return False
     document.status = "published"
     return True

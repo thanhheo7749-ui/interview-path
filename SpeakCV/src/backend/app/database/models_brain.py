@@ -1,4 +1,4 @@
-from sqlalchemy import Boolean, Column, Date, DateTime, ForeignKey, Index, Integer, LargeBinary, String, Text
+from sqlalchemy import JSON, Boolean, Column, Date, DateTime, ForeignKey, Index, Integer, LargeBinary, String, Text
 from sqlalchemy.sql import func
 
 from .database import Base
@@ -34,7 +34,7 @@ class KbDocument(Base):
     visibility = Column(String(20), nullable=False)
     effective_date = Column(Date, nullable=True)
     uploaded_by = Column(Integer, ForeignKey("users.id"), nullable=True)
-    status = Column(String(20), nullable=False, default="processing")  # processing | review | published | failed
+    status = Column(String(20), nullable=False, default="processing")  # processing | review | published | failed | withdrawn
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
 
@@ -47,7 +47,9 @@ class KbIngestionJob(Base):
     progress = Column(Integer, nullable=False, default=0)
     error = Column(Text, nullable=True)
     dropped_items = Column(Integer, nullable=False, default=0)
-    failed_chunks = Column(Integer, nullable=False, default=0)
+    failed_chunks = Column(Integer, nullable=False, default=0)  # chunks in failed_chunk_ids, plus 1 for a failed check
+    failed_chunk_ids = Column(JSON, nullable=False, default=list)
+    contradiction_check_failed = Column(Boolean, nullable=False, default=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
 

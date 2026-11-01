@@ -166,6 +166,8 @@ def upgrade() -> None:
     sa.Column('error', sa.Text(), nullable=True),
     sa.Column('dropped_items', sa.Integer(), nullable=False),
     sa.Column('failed_chunks', sa.Integer(), nullable=False),
+    sa.Column('failed_chunk_ids', sa.JSON(), nullable=False),
+    sa.Column('contradiction_check_failed', sa.Boolean(), nullable=False),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('(CURRENT_TIMESTAMP)'), nullable=False),
     sa.ForeignKeyConstraint(['document_id'], ['kb_documents.id'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id')
