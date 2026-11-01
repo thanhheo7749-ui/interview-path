@@ -6,7 +6,6 @@ import httpx
 from google import genai as genai_sdk
 from google.genai import errors as genai_errors
 from google.genai import types as genai_types
-from google.genai._gaos import errors as gaos_errors
 
 from app.ai.schema import to_strict_schema
 from app.ai.types import AIOutputError, AIProviderError, ProviderAudio, ProviderEmbedding, ProviderText, ProviderTranscript, Usage
@@ -39,9 +38,7 @@ class GeminiProvider:
             return call(**kwargs)
         except genai_errors.APIError as exc:
             raise AIProviderError(f"gemini call failed: HTTP {exc.code}") from None
-        except gaos_errors.GenAiError as exc:
-            raise AIProviderError(f"gemini call failed: HTTP {exc.status_code}") from None
-        except (httpx.HTTPError, gaos_errors.NoResponseError) as exc:
+        except httpx.HTTPError as exc:
             raise AIProviderError(f"gemini call failed: {type(exc).__name__}") from None
 
     def _interact(self, **kwargs):
@@ -49,7 +46,7 @@ class GeminiProvider:
         if interaction.status == "failed":
             raise AIProviderError("gemini interaction failed")
         if interaction.status in {"incomplete", "budget_exceeded", "cancelled"}:
-            raise AIOutputError(f"Gemini output was not completed: {interaction.status}")
+            raise AIOutputError(f"Gemini output was not completed: {interaction.status}", usage=_usage(interaction))
         return interaction
 
     def generate_text(self, *, model, system, messages, max_output_tokens) -> ProviderText:
@@ -71,7 +68,7 @@ class GeminiProvider:
             kwargs["response_format"] = response_format
         interaction = self._interact(**kwargs)
         if not interaction.output_text:
-            raise AIOutputError("Gemini returned no text")
+            raise AIOutputError("Gemini returned no text", usage=_usage(interaction))
         return ProviderText(text=interaction.output_text, usage=_usage(interaction))
 
     def embed(self, *, model, texts, kind, dim) -> ProviderEmbedding:

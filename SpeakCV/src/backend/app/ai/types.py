@@ -16,7 +16,11 @@ class AIProviderError(AIError):
 
 
 class AIOutputError(AIError):
-    """The vendor returned unusable output, or refused. HTTP 502."""
+    """The vendor returned unusable output, or refused. HTTP 502. `usage` is what the call still cost, when known."""
+
+    def __init__(self, message: str = "", usage: "Usage | None" = None):
+        super().__init__(message)
+        self.usage = usage
 
 
 @dataclass(frozen=True)

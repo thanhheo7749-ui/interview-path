@@ -1,8 +1,11 @@
 """Environment configuration. Real environment variables always win over .env files."""
+import logging
 import os
 from pathlib import Path
 
 from dotenv import load_dotenv
+
+logger = logging.getLogger(__name__)
 
 MIN_SECRET_LENGTH = 32
 DEFAULT_MAX_UPLOAD_MB = 20
@@ -57,4 +60,16 @@ def csv_list(name: str) -> list[str]:
 
 
 def max_upload_bytes() -> int:
-    return int(os.environ.get("MAX_UPLOAD_MB", DEFAULT_MAX_UPLOAD_MB)) * 1024 * 1024
+    value = os.environ.get("MAX_UPLOAD_MB", str(DEFAULT_MAX_UPLOAD_MB)).strip()
+    if not value.isdecimal() or int(value) < 1:
+        raise ConfigError("MAX_UPLOAD_MB must be a positive integer.")
+    return int(value) * 1024 * 1024
+
+
+def allowed_origins() -> list[str]:
+    origins = csv_list("ALLOWED_ORIGINS")
+    if any("*" in origin for origin in origins):
+        raise ConfigError("ALLOWED_ORIGINS cannot contain *: browsers refuse a wildcard on requests with credentials.")
+    if not origins:
+        logger.warning("ALLOWED_ORIGINS is blank, so browsers on every other origin will be refused.")
+    return origins

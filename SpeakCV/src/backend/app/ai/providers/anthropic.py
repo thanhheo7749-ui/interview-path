@@ -61,13 +61,13 @@ class AnthropicProvider:
 
     @staticmethod
     def _to_text(response) -> ProviderText:
+        usage = Usage(input_tokens=response.usage.input_tokens, output_tokens=response.usage.output_tokens)
         # Refusal and truncation are checked before any content is read.
         if response.stop_reason == "refusal":
-            raise AIOutputError("Anthropic refused the request")
+            raise AIOutputError("Anthropic refused the request", usage=usage)
         if response.stop_reason == "max_tokens":
-            raise AIOutputError("Anthropic output was cut off at max_tokens")
+            raise AIOutputError("Anthropic output was cut off at max_tokens", usage=usage)
         text = "".join(block.text for block in response.content if block.type == "text")
         if not text:
-            raise AIOutputError("Anthropic returned no text")
-        usage = Usage(input_tokens=response.usage.input_tokens, output_tokens=response.usage.output_tokens)
+            raise AIOutputError("Anthropic returned no text", usage=usage)
         return ProviderText(text=text, usage=usage)

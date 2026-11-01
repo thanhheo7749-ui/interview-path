@@ -1,5 +1,8 @@
 # USD per 1M tokens, read from vendor pricing pages. Recheck before relying on these.
-# A model missing from this list logs a NULL estimated cost.
+# Optional: per_audio_second and per_1k_characters, in USD.
+# A model missing from this list logs a NULL estimated cost. So does a call with audio seconds or
+# characters on a model with no such price, so that a partial figure is never presented as complete.
+# Prices still to be looked up: gpt-transcribe, the TTS models, Voyage embeddings.
 as_of: "2026-11-01"
 models:
   claude-opus-5-5: {input_per_1m: 4.0, output_per_1m: 20.0}
@@ -12,4 +15,4 @@ models:
   text-embedding-3-small: {input_per_1m: 0.02, output_per_1m: 0.0}
   text-embedding-3-large: {input_per_1m: 0.13, output_per_1m: 0.0}
   gemini-embedding-2: {input_per_1m: 0.20, output_per_1m: 0.0}
-  fake: {input_per_1m: 0.0, output_per_1m: 0.0}
+  fake: {input_per_1m: 0.0, output_per_1m: 0.0, per_audio_second: 0.0, per_1k_characters: 0.0}

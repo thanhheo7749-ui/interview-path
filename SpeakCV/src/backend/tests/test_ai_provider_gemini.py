@@ -1,4 +1,5 @@
 import base64
+from pathlib import Path
 from types import SimpleNamespace
 
 import httpx
@@ -6,6 +7,8 @@ import pytest
 from google.genai import errors as genai_errors
 from pydantic import BaseModel
 
+from app.ai import gateway
+from app.ai.providers import gemini as gemini_module
 from app.ai.providers.gemini import GeminiProvider
 from app.ai.schema import to_strict_schema
 from app.ai.types import AIOutputError, AIProviderError, Usage
@@ -94,6 +97,29 @@ def test_vendor_errors_become_provider_error_without_key(error):
     with pytest.raises(AIProviderError) as info:
         text_call(stub(GeminiProvider(), error))
     assert KEY not in str(info.value) and info.value.__cause__ is None
+
+
+@pytest.mark.parametrize("response", [_interaction("{", status="incomplete", usage=_usage(30, 2)), _interaction("", usage=_usage(30, 2))])
+def test_output_errors_carry_the_tokens_that_were_billed(response):
+    with pytest.raises(AIOutputError) as info:
+        text_call(stub(GeminiProvider(), response))
+    assert info.value.usage == Usage(input_tokens=30, output_tokens=2)
+
+
+def test_adapter_does_not_import_private_sdk_modules():
+    source = Path(gemini_module.__file__).read_text(encoding="utf-8")
+    assert "_gaos" not in source
+
+
+def test_unknown_sdk_errors_reach_the_gateway_as_provider_errors(monkeypatch):
+    provider = stub(GeminiProvider(), RuntimeError("interaction blew up " + KEY))
+    slot = SimpleNamespace(provider="gemini", model="g")
+    monkeypatch.setattr(gateway, "get_config", lambda: SimpleNamespace(slot=lambda name: slot))
+    monkeypatch.setattr(gateway, "get_provider", lambda name: provider)
+    monkeypatch.setattr(gateway, "log_usage", lambda **kw: None)
+    with pytest.raises(AIProviderError) as info:
+        gateway.generate_text("reasoning", "s", USER, 10, "unit_test")
+    assert KEY not in str(info.value)
 
 
 def test_failed_status_is_provider_error():

@@ -46,15 +46,15 @@ class OpenAIProvider:
             kwargs["response_format"] = response_format
         response = self._run(self._client.chat.completions.create, **kwargs)
         choice = response.choices[0]
-        if choice.message.refusal:
-            raise AIOutputError("OpenAI refused the request")
-        if choice.finish_reason == "length":
-            raise AIOutputError("OpenAI output was cut off at the token limit")
-        if choice.finish_reason == "content_filter":
-            raise AIOutputError("OpenAI output was blocked by the content filter")
-        if not choice.message.content:
-            raise AIOutputError("OpenAI returned no text")
         usage = Usage(input_tokens=response.usage.prompt_tokens, output_tokens=response.usage.completion_tokens)
+        if choice.message.refusal:
+            raise AIOutputError("OpenAI refused the request", usage=usage)
+        if choice.finish_reason == "length":
+            raise AIOutputError("OpenAI output was cut off at the token limit", usage=usage)
+        if choice.finish_reason == "content_filter":
+            raise AIOutputError("OpenAI output was blocked by the content filter", usage=usage)
+        if not choice.message.content:
+            raise AIOutputError("OpenAI returned no text", usage=usage)
         return ProviderText(text=choice.message.content, usage=usage)
 
     def embed(self, *, model, texts, kind, dim) -> ProviderEmbedding:

@@ -83,7 +83,7 @@ def _load_slot(slot: str, is_production: bool) -> SlotConfig:
 def load_config() -> AIConfig:
     is_production = os.environ.get("APP_ENV", "").strip().lower() == "production"
     slots = {slot: _load_slot(slot, is_production) for slot in SLOTS}
-    base_url = os.environ.get("OPENAI_BASE_URL", OFFICIAL_OPENAI_URL).rstrip("/")
+    base_url = (os.environ.get("OPENAI_BASE_URL", "").strip() or OFFICIAL_OPENAI_URL).rstrip("/")
     if is_production and base_url != OFFICIAL_OPENAI_URL:
         logger.warning("OPENAI_BASE_URL is not the official endpoint. Never send real candidate data through a proxy.")
     return AIConfig(slots=slots)
