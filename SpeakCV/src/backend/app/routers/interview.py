@@ -5,11 +5,9 @@
 import os
 import io
 import urllib.parse
-import requests
 import time
 import json
 import re
-import edge_tts
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, Request
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
@@ -18,6 +16,8 @@ from .. import models
 from ..database import sql_models
 from ..database.database import get_db
 from .profile import get_current_user
+from ..ai import gateway
+from ..ai.types import AIError
 from ..ai_service import call_ai_chat, call_ai_chat_with_meta
 from ..core.brain_retrieval import retrieve_subgraph_context
 from ..services.orchestrator import build_interview_result, new_trace_id
@@ -42,8 +42,6 @@ from ..services.interview_report_builder import build_structured_report
 router = APIRouter()
 
 guest_ip_tracker = {}
-
-api_key = os.getenv("GEMINI_API_KEY") or os.getenv("OPENAI_API_KEY")
 
 
 def is_english_voice(voice_id: str | None) -> bool:
@@ -94,62 +92,24 @@ async def transcribe_audio(
     lang: str = Form("vi"),
     currentQuestion: str = Form("")
 ):
-    try:
-        file_location = f"temp_{file.filename}"
-        with open(file_location, "wb+") as file_object:
-            file_object.write(file.file.read())
+    content = await file.read()
 
-        url = "https://api.groq.com/openai/v1/audio/transcriptions"
-        groq_key = os.getenv("GROQ_API_KEY")
-        if not groq_key: return {"text": "Error: GROQ_API_KEY not configured"}
+    result = gateway.transcribe(content, file.content_type or "audio/webm", [lang], feature="legacy_interview_stt")
+    text = result.text.strip()
 
-        headers = { "Authorization": f"Bearer {groq_key}" }
+    bad_phrases = [
+        "cảm ơn", "thank you",
+        "hẹn gặp lại", "bye bye", "tạm biệt"
+    ]
 
-        if lang == "en":
-            dynamic_prompt = (
-                f"Interview context for {position}. Transcribe clear English speech only. "
-                "Keep technical terms exact: Python, FastAPI, backend, frontend, API, Docker, Redis, Kubernetes."
-            )
-        else:
-            dynamic_prompt = f"Chào bạn, tôi đang phỏng vấn cho vị trí {position}. Tôi sẽ chia sẻ về kinh nghiệm làm việc, kỹ năng chuyên môn, quá trình học tập, quản lý dự án, doanh số và định hướng nghề nghiệp của mình."
-
-        with open(file_location, "rb") as audio_file:
-            files = { "file": (file.filename, audio_file, "audio/webm") }
-
-        with open(file_location, "rb") as audio_file:
-            files = { "file": (file.filename, audio_file, "audio/webm") }
-            data = {
-                "model": "whisper-large-v3",
-                "language": lang,
-                "prompt": dynamic_prompt,
-                "temperature": 0.0
-            }
-
-            res = requests.post(url, headers=headers, files=files, data=data, timeout=30)
-
-        if os.path.exists(file_location): os.remove(file_location)
-
-        if res.status_code == 200:
-            text = res.json().get("text", "").strip()
-
-            bad_phrases = [
-                "cảm ơn", "thank you",
-                "hẹn gặp lại", "bye bye", "tạm biệt"
-            ]
-
-            lower_text = text.lower()
-            if any(phrase in lower_text for phrase in bad_phrases) or len(text) < 2:
-                return {"text": ""}
-
-            if lang == "en" and _english_transcript_is_low_quality(text):
-                return {"text": "Please repeat that in English, I could not capture it clearly."}
-
-            return {"text": text}
-        else:
-            return {"text": ""}
-
-    except Exception as e:
+    lower_text = text.lower()
+    if any(phrase in lower_text for phrase in bad_phrases) or len(text) < 2:
         return {"text": ""}
+
+    if lang == "en" and _english_transcript_is_low_quality(text):
+        return {"text": "Please repeat that in English, I could not capture it clearly."}
+
+    return {"text": text}
 
 @router.post("/api/chat")
 async def chat(request: models.ChatRequest, http_req: Request, db: Session = Depends(get_db)):
@@ -185,14 +145,9 @@ async def chat(request: models.ChatRequest, http_req: Request, db: Session = Dep
     safe_user_text = request.user_text.encode('ascii', 'ignore').decode('ascii')
     print(f"[User Msg] User: {safe_user_text} | Voice: {request.voice_id}")
 
-    if not api_key:
-        print("[CRITICAL ERROR] No AI API key found in .env (GEMINI_API_KEY or OPENAI_API_KEY)")
-        raise HTTPException(status_code=500, detail="API Key not configured")
-
     ai_text = ""
 
     prompt_config = db.query(sql_models.SystemConfig).filter_by(setting_key="system_prompt").first()
-    temp_config = db.query(sql_models.SystemConfig).filter_by(setting_key="temperature").first()
 
     requested_lang = (request.lang or "").strip().lower()
     is_english = requested_lang.startswith("en") or is_english_voice(request.voice_id)
@@ -363,7 +318,6 @@ async def chat(request: models.ChatRequest, http_req: Request, db: Session = Dep
     analysis = structured_analysis
 
     # === DYNAMIC PROMPT GENERATION ===
-    temperature = float(temp_config.setting_value) if temp_config else 0.7
 
     # === STEP 1: Get base prompt from frontend/DB ===
     # Default base prompts if not configured
@@ -511,10 +465,8 @@ Bạn nghiêm khắc nhưng công bằng, chuyên nghiệp và trực tiếp. Tr
             print(f"[*] Calling AI (attempt {attempt + 1})...")
             llm_result = call_ai_chat_with_meta(
                 messages=messages,
-                model="gpt-4.1-mini",
-                temperature=temperature,
+                slot="bulk",
                 max_tokens=250,
-                timeout=90,
             )
             ai_text = llm_result["content"]
             usage_meta = {
@@ -528,6 +480,8 @@ Bạn nghiêm khắc nhưng công bằng, chuyên nghiệp và trực tiếp. Tr
                     db.commit()
                 break
             time.sleep(2)
+        except AIError:
+            raise
         except Exception as e:
             print(f"[Warning] AI error (attempt {attempt+1}): {e}")
             time.sleep(2)
@@ -550,11 +504,8 @@ Bạn nghiêm khắc nhưng công bằng, chuyên nghiệp và trực tiếp. Tr
 
     try:
         voice = request.voice_id if not request.voice_id.startswith("openai-") else "en-US-AndrewMultilingualNeural"
-        communicate = edge_tts.Communicate(ai_text, voice)
-        audio_stream = io.BytesIO()
-        async for chunk in communicate.stream():
-            if chunk["type"] == "audio": audio_stream.write(chunk["data"])
-        audio_stream.seek(0)
+        audio = gateway.synthesize(ai_text, requested_lang or "vi", voice, feature="legacy_interview_tts")
+        audio_stream = io.BytesIO(audio.audio)
         return StreamingResponse(
             audio_stream,
             media_type="audio/mpeg",
@@ -565,7 +516,7 @@ Bạn nghiêm khắc nhưng công bằng, chuyên nghiệp và trực tiếp. Tr
                 "X-Interview-Usage": encoded_usage,
             },
         )
-    except Exception as e:
+    except AIError as e:
         print(f"[Error] TTS error: {e}")
         return StreamingResponse(
             io.BytesIO(),
@@ -589,9 +540,12 @@ async def get_hint(request: models.HintRequest):
             system_content = "Gợi ý 3 ý ngắn."
             user_content = f"Câu hỏi: {request.last_question}. JD: {request.jd_text}"
         messages = [{"role": "system", "content": system_content}, {"role": "user", "content": user_content}]
-        result = call_ai_chat(messages=messages, model="gpt-4.1", timeout=30)
+        result = call_ai_chat(messages=messages, slot="reasoning")
         return {"hint": result}
-    except: return {"hint": "Unable to fetch hints."}
+    except AIError:
+        raise
+    except Exception:
+        return {"hint": "Unable to fetch hints."}
 
 @router.post("/api/end-interview")
 async def end_interview(request: models.ReportRequest, current_user: sql_models.User = Depends(get_current_user), db: Session = Depends(get_db)):
@@ -630,11 +584,9 @@ async def end_interview(request: models.ReportRequest, current_user: sql_models.
 
         raw_content = call_ai_chat(
             messages=messages,
-            model="gpt-4.1-mini",
-            temperature=0.2,
+            slot="bulk",
             max_tokens=4000,
             response_format={"type": "json_object"},
-            timeout=90
         )
 
         if raw_content:
@@ -713,6 +665,8 @@ async def end_interview(request: models.ReportRequest, current_user: sql_models.
         else:
             return {"report": {"score": 0, "overall_feedback": "AI Server error.", "details": []}}
 
+    except AIError:
+        raise
     except Exception as e:
         print(f"[Error] Report error: {e}")
         return {"report": {"score": 0, "overall_feedback": "System error.", "details": []}}

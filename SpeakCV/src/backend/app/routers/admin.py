@@ -10,6 +10,7 @@ from io import BytesIO
 import json
 from docx import Document
 
+from ..ai.types import AIError
 from ..ai_service import call_ai_chat
 
 from .. import models
@@ -643,7 +644,7 @@ def _normalize_enriched_item(item: dict):
     }
 
 
-def _enrich_candidates_with_llm(nodes: list[dict], model: str, max_items: int):
+def _enrich_candidates_with_llm(nodes: list[dict], max_items: int):
     target_nodes = nodes[:max_items]
     payload = [{"id": n["id"], "content": n.get("content", ""), "type": n.get("type", "domain_knowledge")} for n in target_nodes]
     system_prompt = (
@@ -657,11 +658,9 @@ def _enrich_candidates_with_llm(nodes: list[dict], model: str, max_items: int):
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_prompt},
         ],
-        model=model,
-        temperature=0.2,
+        slot="bulk",
         max_tokens=1200,
         response_format={"type": "json_object"},
-        timeout=60,
     )
     data = _safe_json_loads(raw)
     items = data.get("items", []) if isinstance(data, dict) else []
@@ -736,8 +735,6 @@ async def ai_brain_start_job(
 
     enrich_cfg = db.query(sql_models.SystemConfig).filter_by(setting_key="ai_brain_ingestion_enrichment_enabled").first()
     enrich_enabled = True if not enrich_cfg else enrich_cfg.setting_value.strip().lower() == "true"
-    enrich_model_cfg = db.query(sql_models.SystemConfig).filter_by(setting_key="ai_brain_ingestion_enrichment_model").first()
-    enrich_model = enrich_model_cfg.setting_value.strip() if enrich_model_cfg and enrich_model_cfg.setting_value else "gpt-4o-mini"
     enrich_max_cfg = db.query(sql_models.SystemConfig).filter_by(setting_key="ai_brain_ingestion_enrichment_max_items").first()
     try:
         enrich_max_items = int(enrich_max_cfg.setting_value) if enrich_max_cfg and enrich_max_cfg.setting_value else 80
@@ -748,8 +745,10 @@ async def ai_brain_start_job(
     enrich_error = None
     if enrich_enabled and nodes:
         try:
-            nodes = _enrich_candidates_with_llm(nodes, enrich_model, max(1, min(enrich_max_items, 200)))
+            nodes = _enrich_candidates_with_llm(nodes, max(1, min(enrich_max_items, 200)))
             enriched = True
+        except AIError:
+            raise
         except Exception as e:
             enrich_error = str(e)
 

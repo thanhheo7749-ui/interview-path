@@ -24,7 +24,6 @@ PyPDF2
 pdfplumber
 python-docx
 openai
-google-generativeai
 google-genai
 voyageai
 edge-tts
