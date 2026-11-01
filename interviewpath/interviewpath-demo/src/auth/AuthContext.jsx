@@ -9,6 +9,8 @@ export function AuthProvider({ children }) {
   const [token, setTokenState] = useState(getToken());
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(Boolean(getToken()));
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     if (!token) return undefined;
@@ -17,9 +19,11 @@ export function AuthProvider({ children }) {
       .then((me) => {
         if (!cancelled) setUser(me);
       })
-      .catch(() => {
-        // A 401 is already redirected by api(); anything else leaves the user signed out.
-        if (!cancelled) setUser(null);
+      .catch((err) => {
+        if (cancelled) return;
+        setUser(null);
+        // A 401 is already redirected by api(). Anything else needs a way out of the loading screen.
+        if (err.status !== 401) setLoadFailed(true);
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -27,7 +31,13 @@ export function AuthProvider({ children }) {
     return () => {
       cancelled = true;
     };
-  }, [token]);
+  }, [token, attempt]);
+
+  const retry = useCallback(() => {
+    setLoadFailed(false);
+    setLoading(true);
+    setAttempt((value) => value + 1);
+  }, []);
 
   const login = useCallback(async (email, password) => {
     const result = await api('/api/login', {
@@ -36,6 +46,7 @@ export function AuthProvider({ children }) {
       skipAuthRedirect: true,
     });
     setToken(result.access_token);
+    setLoadFailed(false);
     setLoading(true);
     setTokenState(result.access_token);
   }, []);
@@ -46,12 +57,23 @@ export function AuthProvider({ children }) {
     setTokenState(null);
     setUser(null);
     setLoading(false);
+    setLoadFailed(false);
     navigate('/login', { replace: true });
   }, [navigate]);
 
+  const changePassword = useCallback(async (currentPassword, newPassword) => {
+    // A 401 here means a wrong current password, which must not end the session.
+    await api('/api/me/password', {
+      method: 'POST',
+      body: { current_password: currentPassword, new_password: newPassword },
+      skipAuthRedirect: true,
+    });
+    setUser((current) => current && { ...current, must_change_password: false });
+  }, []);
+
   const value = useMemo(
-    () => ({ token, user, login, logout, loading }),
-    [token, user, login, logout, loading],
+    () => ({ token, user, login, logout, loading, loadFailed, retry, changePassword }),
+    [token, user, login, logout, loading, loadFailed, retry, changePassword],
   );
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

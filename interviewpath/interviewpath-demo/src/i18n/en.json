@@ -20,8 +20,28 @@
   },
   "nav": {
     "settings": "Company settings",
+    "password": "Change password",
     "company": "Company",
     "signOut": "Sign out"
+  },
+  "auth": {
+    "loadFailed": "We could not load your account. Check your connection and try again.",
+    "retry": "Retry"
+  },
+  "password": {
+    "title": "Change password",
+    "forcedTitle": "Set a new password",
+    "forcedHint": "You signed in with a temporary password. Choose your own to continue.",
+    "current": "Current password",
+    "new": "New password",
+    "repeat": "Repeat new password",
+    "hint": "At least {{count}} characters.",
+    "submit": "Change password",
+    "submitting": "Changing...",
+    "changed": "Your password has been changed.",
+    "mismatch": "The new passwords do not match.",
+    "wrongCurrent": "Current password is incorrect.",
+    "rejected": "Choose a new password of at least 10 characters that differs from the current one."
   },
   "banner": {
     "sample": "Sample data",

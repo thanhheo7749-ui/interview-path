@@ -20,8 +20,28 @@
   },
   "nav": {
     "settings": "Cài đặt công ty",
+    "password": "Đổi mật khẩu",
     "company": "Công ty",
     "signOut": "Đăng xuất"
+  },
+  "auth": {
+    "loadFailed": "Không thể tải tài khoản của bạn. Hãy kiểm tra kết nối rồi thử lại.",
+    "retry": "Thử lại"
+  },
+  "password": {
+    "title": "Đổi mật khẩu",
+    "forcedTitle": "Đặt mật khẩu mới",
+    "forcedHint": "Bạn đã đăng nhập bằng mật khẩu tạm thời. Hãy chọn mật khẩu của riêng bạn để tiếp tục.",
+    "current": "Mật khẩu hiện tại",
+    "new": "Mật khẩu mới",
+    "repeat": "Nhập lại mật khẩu mới",
+    "hint": "Ít nhất {{count}} ký tự.",
+    "submit": "Đổi mật khẩu",
+    "submitting": "Đang đổi...",
+    "changed": "Mật khẩu của bạn đã được đổi.",
+    "mismatch": "Hai mật khẩu mới không khớp.",
+    "wrongCurrent": "Mật khẩu hiện tại không đúng.",
+    "rejected": "Hãy chọn mật khẩu mới có ít nhất 10 ký tự và khác mật khẩu hiện tại."
   },
   "banner": {
     "sample": "Dữ liệu mẫu",

@@ -4,7 +4,7 @@ import re
 import pytest
 from fastapi.testclient import TestClient
 
-from app.database.sql_models import Company, CompanyMember
+from app.database.sql_models import Company, CompanyMember, User
 from app.main import create_app
 from tests.helpers import auth_header, iter_routes, make_user, route_path
 
@@ -58,6 +58,20 @@ def test_member_of_another_company_gets_403_everywhere(two_companies):
     for method, path in company_routes(app):
         response = client.request(method, fill(path, b_id), headers=headers, json={})
         assert response.status_code == 403, f"{method} {path} returned {response.status_code}"
+
+
+def test_member_who_must_change_password_gets_a_distinct_403_everywhere(db, two_companies):
+    a_id, _ = two_companies
+    user = db.query(User).filter_by(email="hr-a@example.test").one()
+    user.must_change_password = True
+    db.commit()
+    app = create_app(legacy_b2c=True)
+    client = TestClient(app)
+    headers = auth_header(user.email)
+    for method, path in company_routes(app):
+        response = client.request(method, fill(path, a_id), headers=headers, json={})
+        assert response.status_code == 403, f"{method} {path} returned {response.status_code}"
+        assert response.json()["detail"] == "password_change_required", f"{method} {path}"
 
 
 def test_anonymous_gets_401_everywhere(two_companies):

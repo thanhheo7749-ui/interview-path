@@ -34,6 +34,8 @@ def test_existing_database_is_stamped_and_keeps_its_data(tmp_path):
     legacy_tables = [t for name, t in Base.metadata.tables.items() if name in BASELINE_TABLES]
     Base.metadata.create_all(engine, tables=legacy_tables)
     with engine.begin() as connection:
+        # A database from before this column was added, as on a live server.
+        connection.execute(text("ALTER TABLE users DROP COLUMN must_change_password"))
         connection.execute(text("INSERT INTO users (email, full_name, hashed_password) VALUES ('keep@example.test', 'K', 'h')"))
 
     with engine.begin() as connection:
@@ -45,6 +47,8 @@ def test_existing_database_is_stamped_and_keeps_its_data(tmp_path):
     assert len(version_rows) == 1
     assert version_rows[0][0] >= BASELINE_REVISION
     assert kept == [("keep@example.test",)]
+    with engine.connect() as connection:
+        assert connection.execute(text("SELECT must_change_password FROM users")).scalar() in (0, False)
 
 
 def test_running_twice_is_safe(tmp_path):

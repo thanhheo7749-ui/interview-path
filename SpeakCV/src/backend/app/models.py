@@ -131,6 +131,7 @@ class Token(BaseModel):
     token_type: str
     user_name: str
     role: str = "user"
+    must_change_password: bool = False
 
 # ── Interview Config & Templates ─────────────
 
@@ -2573,6 +2574,7 @@ class Token(BaseModel):
     token_type: str
     user_name: str
     role: str = "user"
+    must_change_password: bool = False
 
 # ── Interview Config & Templates ─────────────
 

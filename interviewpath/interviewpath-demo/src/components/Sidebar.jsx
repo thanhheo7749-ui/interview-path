@@ -1,11 +1,14 @@
-import { BrainCircuit, LogOut, Settings } from "lucide-react";
+import { BrainCircuit, KeyRound, LogOut, Settings } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { NavLink } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext.jsx";
 import { useCompany } from "../company/CompanyContext.jsx";
 import LanguageSwitch from "./LanguageSwitch.jsx";
 
-const navItems = [{ labelKey: "nav.settings", to: "/settings", icon: Settings }];
+const navItems = [
+  { labelKey: "nav.settings", to: "/settings", icon: Settings },
+  { labelKey: "nav.password", to: "/account/password", icon: KeyRound },
+];
 
 function Sidebar() {
   const { t } = useTranslation();

@@ -11,6 +11,7 @@ services:
     env_file:
       - ./.env
     environment:
+      # MYSQL_ROOT_PASSWORD goes into this URL as is, so it must be URL-safe (no @ : / ? # %).
       DATABASE_URL: mysql+pymysql://root:${MYSQL_ROOT_PASSWORD:?set MYSQL_ROOT_PASSWORD in .env}@db:3306/${MYSQL_DATABASE:?set MYSQL_DATABASE in .env}
       STORAGE_DIR: /data/storage
     volumes:

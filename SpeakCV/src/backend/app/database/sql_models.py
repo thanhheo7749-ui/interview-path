@@ -3,7 +3,7 @@
 # See the LICENSE file in the project root for more information.
 
 from sqlalchemy import CheckConstraint, Column, Integer, String, Text, Float, DateTime, ForeignKey, JSON, Date, Boolean, UniqueConstraint
-from sqlalchemy.sql import func
+from sqlalchemy.sql import false, func
 from .database import Base
 
 # 1. Users table (login credentials only)
@@ -18,6 +18,7 @@ class User(Base):
     credits = Column(Integer, default=50)
     plan = Column(String(20), default="free")
     last_token_reset_date = Column(Date, default=func.current_date())
+    must_change_password = Column(Boolean, default=False, server_default=false(), nullable=False)
 
 # 2. UserProfile table (detailed user info)
 class UserProfile(Base):

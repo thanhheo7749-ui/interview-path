@@ -12,13 +12,17 @@ from .. import models
 from ..database import sql_models
 from ..database.database import get_db
 from ..auth import security
+from ..auth.dependencies import get_authenticated_user
 from ..core.rate_limit import LOGIN_LIMIT, limiter
+from ..schemas.companies import PasswordChange
 
 router = APIRouter()
 
 @router.post("/api/register")
 @limiter.limit(LOGIN_LIMIT)
 def register(request: Request, user: models.UserCreate, db: Session = Depends(get_db)):
+    if len(user.password) < security.MIN_PASSWORD_LENGTH:
+        raise HTTPException(status_code=422, detail=f"Password must be at least {security.MIN_PASSWORD_LENGTH} characters")
     email = user.email.strip().lower()
     db_user = db.query(sql_models.User).filter(func.lower(sql_models.User.email) == email).first()
     if db_user:
@@ -39,10 +43,35 @@ def login(request: Request, user_data: models.UserLogin, db: Session = Depends(g
         raise HTTPException(status_code=401, detail="Invalid email or password")
     
     access_token = security.create_access_token(data={"sub": user.email})
-    return {"access_token": access_token, "token_type": "bearer", "user_name": user.full_name, "role": user.role}
+    return {
+        "access_token": access_token,
+        "token_type": "bearer",
+        "user_name": user.full_name,
+        "role": user.role,
+        "must_change_password": user.must_change_password,
+    }
+
+@router.post("/api/me/password")
+@limiter.limit(LOGIN_LIMIT)
+def change_password(
+    request: Request,
+    body: PasswordChange,
+    user: sql_models.User = Depends(get_authenticated_user),
+    db: Session = Depends(get_db),
+):
+    if not security.verify_password(body.current_password, user.hashed_password):
+        raise HTTPException(status_code=401, detail="Current password is incorrect")
+    # Otherwise a temporary password someone else has seen would pass as the "new" one.
+    if body.new_password == body.current_password:
+        raise HTTPException(status_code=422, detail="The new password must differ from the current one")
+    user.hashed_password = security.get_password_hash(body.new_password)
+    user.must_change_password = False
+    db.commit()
+    return {"message": "Password changed"}
 
 @router.post("/api/auth/google", response_model=models.Token)
-def login_google(google_data: models.GoogleAuthRequest, db: Session = Depends(get_db)):
+@limiter.limit(LOGIN_LIMIT)
+def login_google(request: Request, google_data: models.GoogleAuthRequest, db: Session = Depends(get_db)):
     client_id = os.environ.get("GOOGLE_CLIENT_ID", "").strip()
     if not client_id:
         raise HTTPException(status_code=503, detail="Google login is not configured")
@@ -92,7 +121,16 @@ def login_google(google_data: models.GoogleAuthRequest, db: Session = Depends(ge
             db.refresh(user)
 
         access_token = security.create_access_token(data={"sub": user.email})
-        return {"access_token": access_token, "token_type": "bearer", "user_name": user.full_name, "role": user.role}
+        return {
+            "access_token": access_token,
+            "token_type": "bearer",
+            "user_name": user.full_name,
+            "role": user.role,
+            "must_change_password": user.must_change_password,
+        }
 
+    # Checked first: a bad JSON body from Google is both a RequestException and a ValueError.
+    except requests.RequestException:
+        raise HTTPException(status_code=503, detail="Could not reach Google. Please try again.")
     except ValueError as e:
         raise HTTPException(status_code=401, detail=f"Invalid Google token: {str(e)}")

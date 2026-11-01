@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from app.database.sql_models import User
-from app.routers.cv import router
+from app.routers.cv import legacy_router as router
 from app.routers.profile import get_current_user
 from app.services.interview_context import analyze_interview_context
 

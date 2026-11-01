@@ -9,9 +9,8 @@ CHUNK_SIZE = 1024 * 1024
 CV_TYPES = {
     "application/pdf",
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-    "text/plain",
 }
-DOCUMENT_TYPES = CV_TYPES | {"text/markdown"}
+DOCUMENT_TYPES = CV_TYPES | {"text/plain", "text/markdown"}
 AUDIO_TYPES = {"audio/webm", "audio/ogg", "audio/mpeg", "audio/mp4", "audio/wav", "audio/x-wav"}
 # mimetypes maps some audio containers to video types, so name the ones we accept explicitly.
 EXTENSION_TYPES = {".webm": "audio/webm", ".ogg": "audio/ogg", ".md": "text/markdown", ".mp4": "audio/mp4", ".m4a": "audio/mp4"}

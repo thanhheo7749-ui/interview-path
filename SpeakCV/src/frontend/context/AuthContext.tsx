@@ -14,6 +14,7 @@ import {
 } from "react";
 import { useRouter } from "next/navigation";
 import { LEGACY_B2C } from "@/lib/features";
+import { safeRedirect } from "@/lib/safeRedirect";
 
 interface AuthContextType {
   user: string | null;
@@ -58,13 +59,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     // Dispatch custom event for SubscriptionContext (StorageEvent only fires in other tabs)
     window.dispatchEvent(new Event("auth-changed"));
 
-    const forcedRedirect = sessionStorage.getItem("postLoginRedirect");
+    const forcedRedirect = safeRedirect(sessionStorage.getItem("postLoginRedirect"), "");
+    sessionStorage.removeItem("postLoginRedirect");
     if (forcedRedirect) {
-      sessionStorage.removeItem("postLoginRedirect");
-      if (/^\/(?![/\\])/.test(forcedRedirect)) {
-        router.push(forcedRedirect);
-        return;
-      }
+      router.push(forcedRedirect);
+      return;
     }
 
     if (newRole === "admin") {

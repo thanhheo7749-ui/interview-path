@@ -4,7 +4,7 @@ from pydantic import BaseModel
 
 from app.ai import gateway
 from app.ai.providers import fake
-from app.ai.types import AIOutputError, AIProviderError
+from app.ai.types import AIConfigError, AIOutputError, AIProviderError, Usage
 from app.database.sql_models import AIUsageLog
 
 
@@ -105,6 +105,100 @@ def test_cost_is_estimated_from_pricing():
 
     assert estimate_cost("claude-opus-5-5", Usage(input_tokens=1_000_000, output_tokens=1_000_000)) == pytest.approx(24.0)
     assert estimate_cost("unknown-model", Usage(input_tokens=5)) is None
+
+
+def test_failed_validation_is_logged_as_a_failure_with_its_usage(db):
+    fake.enqueue("unit_test", "not json")
+    fake.enqueue("unit_test", '{"answer": "ok"}')
+    gateway.generate_structured("bulk", "sys", USER, Answer, 100, "unit_test")
+    first, second = db.query(AIUsageLog).order_by(AIUsageLog.id).all()
+    assert (first.success, first.error_type) == (False, "ValidationError")
+    assert first.input_tokens > 0 and first.output_tokens > 0
+    assert (second.success, second.error_type) == (True, None)
+
+
+def test_two_failed_validations_write_two_failure_rows_only(db):
+    fake.enqueue("unit_test", "bad")
+    fake.enqueue("unit_test", "still bad")
+    with pytest.raises(AIOutputError):
+        gateway.generate_structured("bulk", "sys", USER, Answer, 100, "unit_test")
+    rows = db.query(AIUsageLog).all()
+    assert [(r.success, r.error_type) for r in rows] == [(False, "ValidationError")] * 2
+
+
+def test_output_error_usage_is_logged(db, monkeypatch):
+    def refused(self, **kwargs):
+        raise AIOutputError("refused", usage=Usage(input_tokens=40, output_tokens=3))
+
+    monkeypatch.setattr(fake.FakeProvider, "generate_text", refused)
+    with pytest.raises(AIOutputError):
+        gateway.generate_text("reasoning", "sys", USER, 100, "unit_test")
+    row = db.query(AIUsageLog).one()
+    assert (row.success, row.error_type, row.input_tokens, row.output_tokens) == (False, "AIOutputError", 40, 3)
+
+
+def test_output_error_without_usage_logs_zero_tokens(db, monkeypatch):
+    def empty(self, **kwargs):
+        raise AIOutputError("empty")
+
+    monkeypatch.setattr(fake.FakeProvider, "generate_text", empty)
+    with pytest.raises(AIOutputError):
+        gateway.generate_text("reasoning", "sys", USER, 100, "unit_test")
+    assert db.query(AIUsageLog).one().input_tokens == 0
+
+
+@pytest.mark.parametrize("error", [ImportError("no sdk"), KeyError("KEY"), AIConfigError("bad effort")])
+def test_provider_construction_failure_is_a_provider_error_with_a_usage_row(db, monkeypatch, error):
+    def broken(_name):
+        raise error
+
+    monkeypatch.setattr(gateway, "get_provider", broken)
+    with pytest.raises(AIProviderError):
+        gateway.generate_text("reasoning", "sys", USER, 100, "unit_test")
+    row = db.query(AIUsageLog).one()
+    assert (row.success, row.error_type) == (False, type(error).__name__)
+
+
+def _with_prices(monkeypatch, **models):
+    from app.ai import usage
+
+    monkeypatch.setattr(usage, "_prices", lambda: models)
+
+
+def test_cost_covers_audio_and_characters_when_priced(monkeypatch):
+    from app.ai.usage import estimate_cost
+
+    _with_prices(monkeypatch, m={"input_per_1m": 1.0, "output_per_1m": 2.0, "per_audio_second": 0.5, "per_1k_characters": 3.0})
+    usage = Usage(input_tokens=1_000_000, output_tokens=1_000_000, audio_seconds=2.0, characters=2000)
+    assert estimate_cost("m", usage) == pytest.approx(1.0 + 2.0 + 1.0 + 6.0)
+
+
+@pytest.mark.parametrize("usage", [Usage(input_tokens=10, audio_seconds=1.0), Usage(input_tokens=10, characters=5)])
+def test_cost_is_unknown_rather_than_partial(monkeypatch, usage):
+    from app.ai.usage import estimate_cost
+
+    _with_prices(monkeypatch, m={"input_per_1m": 1.0, "output_per_1m": 2.0})
+    assert estimate_cost("m", usage) is None
+
+
+def test_token_only_model_still_gets_a_cost(monkeypatch):
+    from app.ai.usage import estimate_cost
+
+    _with_prices(monkeypatch, m={"input_per_1m": 1.0, "output_per_1m": 2.0})
+    assert estimate_cost("m", Usage(input_tokens=1_000_000)) == pytest.approx(1.0)
+
+
+def test_fake_speech_costs_zero_rather_than_unknown():
+    from app.ai.usage import estimate_cost
+
+    assert estimate_cost("fake", Usage(characters=100, audio_seconds=1.0)) == 0
+
+
+def test_pricing_file_lists_what_still_needs_a_price():
+    from app.ai.usage import PRICING_PATH
+
+    text = PRICING_PATH.read_text(encoding="utf-8")
+    assert all(name in text for name in ("gpt-transcribe", "TTS", "Voyage"))
 
 
 def test_ai_errors_map_to_http_status(app):

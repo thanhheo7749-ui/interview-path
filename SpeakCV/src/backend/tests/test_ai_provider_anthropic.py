@@ -130,6 +130,13 @@ def test_max_tokens_raises():
         text_call(make(_text(stop="max_tokens")))
 
 
+@pytest.mark.parametrize("response", [_text(stop="max_tokens", inp=30, out=2), _text(stop="refusal", inp=30, out=2), _text("", inp=30, out=2)])
+def test_output_errors_carry_the_tokens_that_were_billed(response):
+    with pytest.raises(AIOutputError) as info:
+        text_call(make(response))
+    assert info.value.usage == Usage(input_tokens=30, output_tokens=2)
+
+
 def test_usage_mapping():
     assert text_call(make(_text(inp=21, out=5))).usage == Usage(input_tokens=21, output_tokens=5)
 

@@ -8,18 +8,21 @@ import json
 import pdfplumber
 import docx
 from fastapi import APIRouter, Depends, File, Form, UploadFile, HTTPException
-from fastapi.responses import StreamingResponse
+from fastapi.concurrency import run_in_threadpool
+from fastapi.responses import PlainTextResponse
 
 from .. import models
 from ..core.uploads import CV_TYPES, read_upload
 from ..database import sql_models
 from .profile import get_current_user
-from ..ai.types import AIError
-from ..ai_service import call_ai_chat, call_ai_chat_stream
+from ..ai.types import AIError, AIOutputError
+from ..ai_service import call_ai_chat
 from ..services.interview_context import analyze_interview_context
 from .cv_prompts import CV_JSON_SYSTEM_PROMPT, CV_INDUSTRY_TONES, CV_TAILOR_SYSTEM_PROMPT
 
 router = APIRouter()
+# Paid AI routes for the consumer product. Mounted only when LEGACY_B2C_ENABLED is on.
+legacy_router = APIRouter()
 
 
 # ──────────────────────────────────────────────
@@ -79,7 +82,7 @@ def parse_and_validate_cv(raw_text: str) -> dict:
     return validated.model_dump()
 
 
-@router.post("/api/cv/interview-context", response_model=models.InterviewContextResponse)
+@legacy_router.post("/api/cv/interview-context", response_model=models.InterviewContextResponse)
 async def analyze_interview_context_route(request: models.InterviewContextRequest, current_user: sql_models.User = Depends(get_current_user)):
     return {
         "interview_context": analyze_interview_context(request.cv_text, request.jd_text),
@@ -96,8 +99,8 @@ async def extract_cv_text(file: UploadFile = File(...), current_user: sql_models
 # Routes — CV Generation (HTML)
 # ──────────────────────────────────────────────
 
-@router.post("/api/generate-cv")
-async def generate_cv(request: models.CVGenRequest, current_user: sql_models.User = Depends(get_current_user)): 
+@legacy_router.post("/api/generate-cv")
+def generate_cv(request: models.CVGenRequest, current_user: sql_models.User = Depends(get_current_user)): 
     try:
         print(f"⏳ Generating CV for {request.position} | Style: {request.style_instruction}")
         
@@ -113,14 +116,14 @@ async def generate_cv(request: models.CVGenRequest, current_user: sql_models.Use
         raise
     except Exception as e: 
         print(f"❌ CV GENERATION ERROR: {e}")
-        return {"content": f"<p>System error: {e}</p>"}
+        raise HTTPException(status_code=500, detail="CV generation failed. Please try again.")
 
 
 # ──────────────────────────────────────────────
-# Routes — CV Review (ATS Scoring, Streaming)
+# Routes — CV Review (ATS Scoring)
 # ──────────────────────────────────────────────
 
-@router.post("/api/review-cv")
+@legacy_router.post("/api/review-cv")
 async def review_cv(file: UploadFile = File(...), jd_text: str = Form("Không có JD"), current_user: sql_models.User = Depends(get_current_user)):
     try:
         print(f"⏳ Extracting text from CV: {file.filename}")
@@ -128,7 +131,7 @@ async def review_cv(file: UploadFile = File(...), jd_text: str = Form("Không c�
         cv_text = await extract_text_from_cv(file)
         
         if not cv_text:
-            return {"review": "Cannot extract text from this CV file. Please try another file."}
+            raise HTTPException(status_code=400, detail="Cannot extract text from this CV file. Please try another file.")
         
         system_prompt = "You are an expert ATS system. Evaluate the candidate's CV against the JD. Output a beautifully formatted Markdown report in Vietnamese (DO NOT USE JSON). Include these sections: 🎯 Match Percentage (e.g., 85%), 🔑 Missing Keywords, and 📝 Detailed Feedback (Positive & Areas for Improvement). Use emojis, bold text, and bullet points to make it easy to read."
         
@@ -139,24 +142,22 @@ async def review_cv(file: UploadFile = File(...), jd_text: str = Form("Không c�
             {"role": "user", "content": prompt}
         ]
 
-        print("✅ Starting CV Review stream!")
-        return StreamingResponse(
-            call_ai_chat_stream(messages=messages, slot="reasoning"),
-            media_type="text/event-stream"
-        )
-            
-    except AIError:
+        # The whole call finishes before the response starts, so a failure can still set the status code.
+        review = await run_in_threadpool(call_ai_chat, messages=messages, slot="reasoning")
+        return PlainTextResponse(review)
+
+    except (HTTPException, AIError):
         raise
-    except Exception as e: 
+    except Exception as e:
         print(f"❌ CV READ ERROR: {e}")
-        return StreamingResponse(iter([f"CV read error: {str(e)}"]), media_type="text/event-stream")
+        raise HTTPException(status_code=500, detail="CV review failed. Please try again.")
 
 
 # ──────────────────────────────────────────────
 # Routes — CV Makeover (AI Rewrite → JSON)
 # ──────────────────────────────────────────────
 
-@router.post("/api/cv/upload-makeover")
+@legacy_router.post("/api/cv/upload-makeover")
 async def upload_makeover_cv(file: UploadFile = File(...), industry: str = Form("tech"), current_user: sql_models.User = Depends(get_current_user)):
     try:
         print(f"⏳ CV Makeover — Extracting text from: {file.filename} | Industry: {industry}")
@@ -174,7 +175,8 @@ async def upload_makeover_cv(file: UploadFile = File(...), industry: str = Form(
             {"role": "user", "content": f"Đây là nội dung CV cần phân tích và viết lại:\n\n{cv_text}"}
         ]
 
-        result = call_ai_chat(
+        result = await run_in_threadpool(
+            call_ai_chat,
             messages=messages,
             slot="reasoning",
             response_format={"type": "json_object"},
@@ -185,7 +187,7 @@ async def upload_makeover_cv(file: UploadFile = File(...), industry: str = Form(
         except (json.JSONDecodeError, Exception) as parse_err:
             print(f"⚠️ JSON parse/validation error: {parse_err}")
             print(f"Raw AI response: {result[:500]}")
-            raise HTTPException(status_code=500, detail="AI trả về JSON không hợp lệ. Vui lòng thử lại.")
+            raise AIOutputError("CV makeover output was not valid CV JSON") from None
 
         print("✅ CV makeover completed (JSON mode)!")
         return {"cv_data": cv_data, "extracted_text": cv_text}
@@ -194,15 +196,15 @@ async def upload_makeover_cv(file: UploadFile = File(...), industry: str = Form(
         raise
     except Exception as e:
         print(f"❌ CV MAKEOVER ERROR: {e}")
-        raise HTTPException(status_code=500, detail=f"Chỉnh sửa CV thất bại: {str(e)}")
+        raise HTTPException(status_code=500, detail="Chỉnh sửa CV thất bại. Vui lòng thử lại.")
 
 
 # ──────────────────────────────────────────────
 # Routes — CV Tailor (Optimize CV for JD)
 # ──────────────────────────────────────────────
 
-@router.post("/api/cv/tailor")
-async def tailor_cv(request: models.CVTailorRequest, current_user: sql_models.User = Depends(get_current_user)):
+@legacy_router.post("/api/cv/tailor")
+def tailor_cv(request: models.CVTailorRequest, current_user: sql_models.User = Depends(get_current_user)):
     try:
         jd_text = request.jd_text.strip()
         if not jd_text:
@@ -241,7 +243,7 @@ async def tailor_cv(request: models.CVTailorRequest, current_user: sql_models.Us
         except (json.JSONDecodeError, Exception) as parse_err:
             print(f"⚠️ JSON parse/validation error during tailoring: {parse_err}")
             print(f"Raw AI response: {result[:500]}")
-            raise HTTPException(status_code=500, detail="AI trả về JSON không hợp lệ. Vui lòng thử lại.")
+            raise AIOutputError("CV tailor output was not valid CV JSON") from None
             
         print(f"✅ CV tailor completed! Score: {tailor_summary.get('overall_score', 'N/A')}%")
         return {"cv_data": cv_data, "tailor_summary": tailor_summary}
@@ -250,4 +252,4 @@ async def tailor_cv(request: models.CVTailorRequest, current_user: sql_models.Us
         raise
     except Exception as e:
         print(f"❌ CV TAILOR ERROR: {e}")
-        raise HTTPException(status_code=500, detail=f"Tối ưu CV thất bại: {str(e)}")
+        raise HTTPException(status_code=500, detail="Tối ưu CV thất bại. Vui lòng thử lại.")

@@ -65,6 +65,22 @@ def test_custom_base_url_reaches_client(monkeypatch):
     assert str(OpenAIProvider()._client.base_url).rstrip("/") == "https://proxy.example.com/v1"
 
 
+@pytest.mark.parametrize("value", ["", "   "])
+def test_blank_base_url_means_the_official_endpoint(monkeypatch, value):
+    monkeypatch.setenv("OPENAI_BASE_URL", value)
+    assert str(OpenAIProvider()._client.base_url).rstrip("/") == "https://api.openai.com/v1"
+
+
+@pytest.mark.parametrize("response", [
+    _chat(None, refusal="no", inp=30, out=2), _chat("{", finish="length", inp=30, out=2),
+    _chat("x", finish="content_filter", inp=30, out=2), _chat("", inp=30, out=2),
+])
+def test_output_errors_carry_the_tokens_that_were_billed(response):
+    with pytest.raises(AIOutputError) as info:
+        text_call(stub(OpenAIProvider(), chat=response))
+    assert info.value.usage == Usage(input_tokens=30, output_tokens=2)
+
+
 def test_generate_text_request_shape_and_usage():
     provider = stub(OpenAIProvider(), chat=_chat("hello", inp=21, out=5))
     result = text_call(provider)

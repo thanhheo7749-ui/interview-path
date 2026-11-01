@@ -21,3 +21,20 @@ def test_removed_identifiers_are_gone_from_the_candidate_app():
                     if FORBIDDEN.search(line):
                         offenders.append(f"{path.relative_to(FRONTEND)}:{number}")
     assert offenders == []
+
+
+def test_site_metadata_makes_no_unsupported_claims():
+    if not FRONTEND.exists():
+        pytest.skip("frontend not present")
+    source = (FRONTEND / "app" / "layout.tsx").read_text(encoding="utf-8")
+    metadata = source[source.index("export const metadata"):source.index("icons:")]
+    assert 'title: "SpeakCV: every CV gets a conversation"' in metadata
+    assert not re.search(r"leading|practice|instant|detailed scoring", metadata, re.I)
+
+
+def test_register_form_asks_for_the_length_the_server_requires():
+    if not FRONTEND.exists():
+        pytest.skip("frontend not present")
+    source = (FRONTEND / "app" / "register" / "page.tsx").read_text(encoding="utf-8")
+    assert "minLength={10}" in source
+    assert "minLength={6}" not in source

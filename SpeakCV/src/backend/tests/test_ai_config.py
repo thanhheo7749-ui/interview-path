@@ -67,3 +67,28 @@ def test_embedding_dim_is_required_for_a_real_vendor(monkeypatch):
     monkeypatch.delenv("AI_EMBEDDING_DIM", raising=False)
     with pytest.raises(AIConfigError, match="AI_EMBEDDING_DIM"):
         load_config()
+
+
+def _all_openai_in_production(monkeypatch):
+    _all_fake(monkeypatch)
+    monkeypatch.setenv("APP_ENV", "production")
+    for slot in ("REASONING", "BULK", "EMBEDDING", "STT", "TTS"):
+        monkeypatch.setenv(f"AI_{slot}_PROVIDER", "openai")
+        monkeypatch.setenv(f"AI_{slot}_MODEL", "m")
+    monkeypatch.setenv("AI_EMBEDDING_DIM", "8")
+    monkeypatch.setenv("OPENAI_API_KEY", "made-up")
+
+
+@pytest.mark.parametrize("value", ["", "  ", "https://api.openai.com/v1/"])
+def test_blank_or_official_openai_url_does_not_warn(monkeypatch, caplog, value):
+    _all_openai_in_production(monkeypatch)
+    monkeypatch.setenv("OPENAI_BASE_URL", value)
+    load_config()
+    assert "OPENAI_BASE_URL" not in caplog.text
+
+
+def test_custom_openai_url_warns_in_production(monkeypatch, caplog):
+    _all_openai_in_production(monkeypatch)
+    monkeypatch.setenv("OPENAI_BASE_URL", "https://proxy.example.com/v1")
+    load_config()
+    assert "OPENAI_BASE_URL" in caplog.text

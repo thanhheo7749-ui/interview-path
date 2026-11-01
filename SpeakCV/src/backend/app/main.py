@@ -24,6 +24,7 @@ from .database import sql_models
 from .database.database import SessionLocal
 from .auth.security import get_password_hash
 from .ai.config import load_config
+from .ai.providers import get_provider
 from .ai.types import AIOutputError, AIProviderError
 
 def seed_admin():
@@ -62,13 +63,19 @@ def _include_legacy_routers(app: FastAPI) -> None:
     from .routers import interview, payment, questions, stats, support
 
     app.include_router(profile.legacy_router)
+    app.include_router(cv.legacy_router)
     app.include_router(admin.legacy_brain_router)
     for module in (interview, support, payment, stats, questions):
         app.include_router(module.router)
 
 
 def create_app(legacy_b2c: bool | None = None) -> FastAPI:
-    load_config()  # bad AI configuration must fail startup
+    config = load_config()  # bad AI configuration must fail startup
+    # Build each real provider now, so a bad setting or a missing SDK stops the start, not a later request.
+    for provider in sorted({slot.provider for slot in config.slots.values()} - {"fake"}):
+        get_provider(provider)
+    origins = settings.allowed_origins()
+    settings.max_upload_bytes()
     fake_demo.install()
     app = FastAPI(lifespan=lifespan)
     app.state.limiter = limiter
@@ -84,7 +91,7 @@ def create_app(legacy_b2c: bool | None = None) -> FastAPI:
 
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=settings.csv_list("ALLOWED_ORIGINS"),
+        allow_origins=origins,
         allow_credentials=True,
         allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
         allow_headers=["Authorization", "Content-Type"],

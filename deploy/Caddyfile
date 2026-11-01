@@ -10,5 +10,9 @@
 
 {$API_DOMAIN} {
 	encode zstd gzip
+	# Above MAX_UPLOAD_MB (20) plus multipart overhead. Stops oversized bodies before they reach the backend.
+	request_body {
+		max_size 25MB
+	}
 	reverse_proxy speakcv-backend:8000
 }

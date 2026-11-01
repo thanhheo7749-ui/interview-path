@@ -18,10 +18,19 @@ def _prices() -> dict:
 
 
 def estimate_cost(model: str, usage: Usage) -> float | None:
+    """A figure that left out part of the call would read as complete, so an unpriced part makes the whole None."""
     price = _prices().get(model)
     if price is None:
         return None
-    return (usage.input_tokens * price["input_per_1m"] + usage.output_tokens * price["output_per_1m"]) / 1_000_000
+    parts = (
+        (usage.input_tokens, "input_per_1m", 1_000_000),
+        (usage.output_tokens, "output_per_1m", 1_000_000),
+        (usage.audio_seconds, "per_audio_second", 1),
+        (usage.characters, "per_1k_characters", 1_000),
+    )
+    if any(amount and key not in price for amount, key, _ in parts):
+        return None
+    return sum(amount * price[key] / divisor for amount, key, divisor in parts if amount)
 
 
 def log_usage(*, feature, slot, provider, model, company_id, usage, latency_ms, success, error_type=None) -> None:

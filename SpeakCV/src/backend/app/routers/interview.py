@@ -9,6 +9,7 @@ import time
 import json
 import re
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, Request
+from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
@@ -92,7 +93,7 @@ async def transcribe_audio(
 ):
     content = await read_upload(file, AUDIO_TYPES)
 
-    result = gateway.transcribe(content, file.content_type or "audio/webm", [lang], feature="legacy_interview_stt")
+    result = await run_in_threadpool(gateway.transcribe, content, file.content_type or "audio/webm", [lang], feature="legacy_interview_stt")
     text = result.text.strip()
 
     bad_phrases = [
@@ -110,7 +111,7 @@ async def transcribe_audio(
     return {"text": text}
 
 @router.post("/api/chat")
-async def chat(
+def chat(
     request: models.ChatRequest,
     current_user: sql_models.User = Depends(get_current_user),
     db: Session = Depends(get_db),
@@ -509,7 +510,7 @@ Bạn nghiêm khắc nhưng công bằng, chuyên nghiệp và trực tiếp. Tr
         )
 
 @router.post("/api/hint")
-async def get_hint(request: models.HintRequest, current_user: sql_models.User = Depends(get_current_user)):
+def get_hint(request: models.HintRequest, current_user: sql_models.User = Depends(get_current_user)):
     try:
         is_en = (request.lang or "").strip().lower().startswith("en")
         if is_en:
@@ -527,7 +528,7 @@ async def get_hint(request: models.HintRequest, current_user: sql_models.User = 
         return {"hint": "Unable to fetch hints."}
 
 @router.post("/api/end-interview")
-async def end_interview(request: models.ReportRequest, current_user: sql_models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+def end_interview(request: models.ReportRequest, current_user: sql_models.User = Depends(get_current_user), db: Session = Depends(get_db)):
     try:
         system_prompt = f"""
         Bạn là HR. Đánh giá ứng viên vị trí: {request.jd_text}.

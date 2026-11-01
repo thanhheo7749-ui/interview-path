@@ -22,33 +22,30 @@ const beVietnamPro = Be_Vietnam_Pro({
 });
 
 export const metadata: Metadata = {
-  title: "SpeakCV – AI Interview Practice & Professional CV Builder",
+  title: "SpeakCV: every CV gets a conversation",
   description:
-    "Practice realistic interviews with AI, get instant detailed scoring, and auto-generate professional CVs. The leading AI interview platform.",
+    "Every CV gets a short recorded AI conversation, so HR reviews the evidence and makes the final decision.",
   keywords: [
-    "AI interview",
-    "interview practice",
-    "CV builder",
     "SpeakCV",
     "AI interview",
-    "CV builder",
-    "mock interview",
-    "interview scoring",
+    "CV screening",
+    "candidate screening",
+    "pre-screening interview",
   ],
   authors: [{ name: "SpeakCV Team" }],
   openGraph: {
-    title: "SpeakCV – AI Interview Practice & Professional CV Builder",
+    title: "SpeakCV: every CV gets a conversation",
     description:
-      "Practice realistic interviews with AI, get instant detailed scoring, and auto-generate professional CVs.",
+      "Every CV gets a short recorded AI conversation, so HR reviews the evidence and makes the final decision.",
     type: "website",
     locale: "en_US",
     siteName: "SpeakCV",
   },
   twitter: {
     card: "summary_large_image",
-    title: "SpeakCV – AI Interview Practice & Professional CV Builder",
+    title: "SpeakCV: every CV gets a conversation",
     description:
-      "Practice realistic interviews with AI, get instant detailed scoring, and auto-generate professional CVs.",
+      "Every CV gets a short recorded AI conversation, so HR reviews the evidence and makes the final decision.",
   },
   icons: {
     icon: [

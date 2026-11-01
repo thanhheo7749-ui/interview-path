@@ -1,8 +1,13 @@
-from typing import Literal, Optional
+from typing import Annotated, Literal, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, StringConstraints
+
+from app.auth.security import MIN_PASSWORD_LENGTH
 
 MemberRole = Literal["hr", "manager", "employee"]
+# Whitespace is stripped first, so a name of only spaces fails the minimum length.
+Name = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=255)]
+Locale = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=10)]
 
 
 class CompanyOut(BaseModel):
@@ -16,18 +21,18 @@ class CompanyOut(BaseModel):
 
 
 class CompanyPatch(BaseModel):
-    name: Optional[str] = Field(default=None, min_length=1, max_length=255)
-    default_locale: Optional[str] = Field(default=None, max_length=10)
+    name: Optional[Name] = None
+    default_locale: Optional[Locale] = None
     retention_days: Optional[int] = Field(default=None, ge=1, le=3650)
 
 
 class DepartmentCreate(BaseModel):
-    name: str = Field(min_length=1, max_length=255)
+    name: Name
     parent_id: Optional[int] = None
 
 
 class DepartmentPatch(BaseModel):
-    name: Optional[str] = Field(default=None, min_length=1, max_length=255)
+    name: Optional[Name] = None
     parent_id: Optional[int] = None
 
 
@@ -40,7 +45,7 @@ class DepartmentOut(BaseModel):
 
 class MemberCreate(BaseModel):
     email: str = Field(min_length=3, max_length=255)
-    full_name: Optional[str] = Field(default=None, max_length=255)
+    full_name: Optional[Name] = None
     role: MemberRole
     department_id: Optional[int] = None
 
@@ -79,4 +84,10 @@ class MeOut(BaseModel):
     email: str
     full_name: Optional[str]
     role: str
+    must_change_password: bool
     memberships: list[MembershipOut]
+
+
+class PasswordChange(BaseModel):
+    current_password: str
+    new_password: str = Field(min_length=MIN_PASSWORD_LENGTH)
