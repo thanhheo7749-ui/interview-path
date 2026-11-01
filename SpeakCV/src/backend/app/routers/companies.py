@@ -2,6 +2,7 @@
 import secrets
 
 from fastapi import APIRouter, Depends, HTTPException, Response
+from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -252,7 +253,8 @@ def add_member(
     if body.department_id is not None:
         _get_department(db, company_id, body.department_id)
 
-    user = db.query(User).filter(User.email == email).first()
+    user = db.query(User).filter(func.lower(User.email) == email).first()
+    existing_account = user is not None
     temporary_password = None
     if user is None:
         temporary_password = secrets.token_urlsafe(12)
@@ -280,7 +282,7 @@ def add_member(
     member = CompanyMember(company_id=company_id, user_id=user.id, role=body.role, department_id=body.department_id)
     db.add(member)
     _commit_or_conflict(db, "This person is already a member")
-    return {**_member_out(member, user), "temporary_password": temporary_password}
+    return {**_member_out(member, user), "temporary_password": temporary_password, "existing_account": existing_account}
 
 
 @router.patch(f"{COMPANY}/members/{{member_id}}", response_model=MemberOut)

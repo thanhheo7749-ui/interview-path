@@ -3,6 +3,7 @@
 # See the LICENSE file in the project root for more information.
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 import uuid
 from datetime import datetime
@@ -319,6 +320,24 @@ async def delete_user(
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     
+    # Refuse to orphan a company: block when this user is the only HR member of any of them.
+    sole_hr_companies = []
+    for membership in db.query(sql_models.CompanyMember).filter(
+        sql_models.CompanyMember.user_id == user_id, sql_models.CompanyMember.role == "hr"
+    ).all():
+        hr_count = db.query(func.count(sql_models.CompanyMember.id)).filter(
+            sql_models.CompanyMember.company_id == membership.company_id,
+            sql_models.CompanyMember.role == "hr",
+        ).scalar()
+        if hr_count <= 1:
+            sole_hr_companies.append(db.get(sql_models.Company, membership.company_id).name)
+    if sole_hr_companies:
+        raise HTTPException(
+            status_code=409,
+            detail="Cannot delete: this user is the only HR member of " + ", ".join(sole_hr_companies),
+        )
+    db.query(sql_models.CompanyMember).filter(sql_models.CompanyMember.user_id == user_id).delete()
+
     # Cascade delete all related records before deleting the user
     db.query(sql_models.InterviewHistory).filter(sql_models.InterviewHistory.user_id == user_id).delete()
     db.query(sql_models.TransactionHistory).filter(sql_models.TransactionHistory.user_id == user_id).delete()
