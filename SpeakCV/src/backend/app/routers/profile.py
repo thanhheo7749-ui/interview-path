@@ -8,21 +8,13 @@ from typing import List
 
 from ..database import database, sql_models   
 from .. import models                         
-from ..auth import security                   
+from ..auth.dependencies import get_authenticated_user
 from app.utils import sync_user_tokens
 
 router = APIRouter(prefix="/api", tags=["profile"])
 legacy_router = APIRouter(prefix="/api", tags=["profile"])
 
-def get_current_user(token: str = Depends(security.oauth2_scheme), db: Session = Depends(database.get_db)):
-    email = security.verify_token(token)
-    if not email:
-        raise HTTPException(status_code=401, detail="Invalid token")
-    
-    user = db.query(sql_models.User).filter(sql_models.User.email == email).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-        
+def get_current_user(user: sql_models.User = Depends(get_authenticated_user), db: Session = Depends(database.get_db)):
     sync_user_tokens(user, db)
     return user
 

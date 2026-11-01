@@ -18,7 +18,7 @@ from slowapi.errors import RateLimitExceeded
 
 from .core import settings
 from .core.rate_limit import limiter
-from .routers import profile, auth, cv, admin
+from .routers import profile, auth, cv, admin, companies
 from .database import sql_models
 from .database.database import SessionLocal
 from .auth.security import get_password_hash
@@ -97,6 +97,7 @@ def create_app(legacy_b2c: bool | None = None) -> FastAPI:
     app.include_router(auth.router)
     app.include_router(cv.router)
     app.include_router(admin.router)
+    app.include_router(companies.router)
     enabled = settings.flag("LEGACY_B2C_ENABLED") if legacy_b2c is None else legacy_b2c
     if enabled:
         _include_legacy_routers(app)
