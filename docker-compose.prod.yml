@@ -70,6 +70,10 @@ services:
       - "${SPEAKCV_BACKEND_PORT:-8000}:8000"
     expose:
       - "8000"
+    environment:
+      STORAGE_DIR: /data/storage
+    volumes:
+      - speakcv_storage:/data/storage
     depends_on:
       db:
         condition: service_healthy
@@ -93,3 +97,4 @@ volumes:
   caddy_data:
   caddy_config:
   speakcv_db_data:
+  speakcv_storage:

@@ -39,3 +39,4 @@ SpeakCV/backups/
 .playwright-mcp/
 *.sql
 .venv/
+storage/

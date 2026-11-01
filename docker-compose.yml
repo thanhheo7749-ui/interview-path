@@ -12,6 +12,9 @@ services:
       - ./.env
     environment:
       DATABASE_URL: mysql+pymysql://root:${MYSQL_ROOT_PASSWORD:?set MYSQL_ROOT_PASSWORD in .env}@db:3306/${MYSQL_DATABASE:?set MYSQL_DATABASE in .env}
+      STORAGE_DIR: /data/storage
+    volumes:
+      - speakcv_storage:/data/storage
     depends_on:
       db:
         condition: service_healthy
@@ -66,5 +69,6 @@ services:
     command: ["npm", "run", "dev", "--", "--host", "0.0.0.0", "--port", "5173"]
 
 volumes:
+  speakcv_storage:
   speakcv_db_data:
   interviewpath_node_modules:

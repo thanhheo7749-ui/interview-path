@@ -286,3 +286,5 @@ class CompanyMember(Base):
     department_id = Column(Integer, ForeignKey("departments.id"), nullable=True, index=True)
     role = Column(String(20), nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+from .models_brain import *  # noqa: F401,F403,E402
