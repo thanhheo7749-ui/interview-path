@@ -191,8 +191,11 @@ def test_the_leak_check_catches_a_chunk_filter_that_only_looks_at_the_document(t
     monkeypatch.setattr(aud, "chunk_filter", lambda a: and_(KbChunk.company_id == a.company_id, aud.document_filter(a)))
     report = _evaluate(tmp_path)
 
-    assert report["permission_leak"] > 0
-    leaked = [canary for probe in report["public_document_probes"] for canary in probe["leaked"]]
+    probes = report["public_document_probes"]
+    assert report["permission_leak"] == (sum(1 for r in report["results"] if r["permission_leak"])
+                                         + sum(1 for p in probes if p["leaked"])) > 0
+    assert all(p["leaked"] for p in probes)
+    leaked = [canary for probe in probes for canary in probe["leaked"]]
     assert any("CONFIDENTIAL" in canary for canary in leaked)
     assert any("REJECTED" in canary for canary in leaked)
 
