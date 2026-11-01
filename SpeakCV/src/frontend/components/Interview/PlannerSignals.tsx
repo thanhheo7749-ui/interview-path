@@ -4,7 +4,7 @@
  * See the LICENSE file in the project root for more information.
  */
 
-import { BrainCircuit, ShieldCheck, Activity, Sparkles } from "lucide-react";
+import { BrainCircuit, Activity, Sparkles } from "lucide-react";
 import type { InterviewAnalysis } from "@/hooks/useChat";
 
 interface PlannerSignalsProps {
@@ -117,9 +117,6 @@ export function PlannerSignals({
                 )}
               </div>
             )}
-            <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 rounded-full">
-              <ShieldCheck size={12} /> PII Masked
-            </span>
           </div>
         </div>
 

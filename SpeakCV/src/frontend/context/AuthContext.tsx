@@ -13,6 +13,7 @@ import {
   ReactNode,
 } from "react";
 import { useRouter } from "next/navigation";
+import { LEGACY_B2C } from "@/lib/features";
 
 interface AuthContextType {
   user: string | null;
@@ -60,14 +61,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const forcedRedirect = sessionStorage.getItem("postLoginRedirect");
     if (forcedRedirect) {
       sessionStorage.removeItem("postLoginRedirect");
-      router.push(forcedRedirect);
-      return;
+      if (/^\/(?![/\\])/.test(forcedRedirect)) {
+        router.push(forcedRedirect);
+        return;
+      }
     }
 
     if (newRole === "admin") {
       router.push("/admin");
     } else {
-      router.push("/interview");
+      router.push(LEGACY_B2C ? "/interview" : "/profile");
     }
   };
 

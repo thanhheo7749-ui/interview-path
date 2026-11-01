@@ -11,11 +11,12 @@ import { useAuth } from "@/context/AuthContext";
 import { useSubscription } from "@/context/SubscriptionContext";
 import PricingSection from "@/components/Landing/PricingSection";
 import { CheckoutModal } from "@/components/Modals";
+import { LEGACY_B2C } from "@/lib/features";
+import Link from "next/link";
 import {
   Mic,
   BarChart,
   FileText,
-  Star,
   ChevronRight,
   PlayCircle,
   CheckCircle2,
@@ -80,7 +81,7 @@ function ScrollReveal({
   );
 }
 
-export default function LandingPage() {
+function LegacyLandingPage() {
   const router = useRouter();
   const { user, isLoading } = useAuth();
   const { upgradeToPro } = useSubscription();
@@ -129,13 +130,6 @@ export default function LandingPage() {
               className="hover:text-theme-text transition-colors"
             >
               Tính năng
-            </a>
-            <a
-              href="#testimonials"
-              onClick={handleSmoothScroll}
-              className="hover:text-theme-text transition-colors"
-            >
-              Đánh giá
             </a>
             <a
               href="#pricing"
@@ -442,120 +436,6 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* 4. SOCIAL PROOF / TESTIMONIALS SECTION */}
-      <section
-        id="testimonials"
-        className="py-24 bg-theme-secondary relative overflow-hidden"
-      >
-        <div className="absolute top-1/2 left-0 w-[500px] h-[500px] bg-purple-600/10 blur-[120px] rounded-full pointer-events-none -translate-y-1/2"></div>
-
-        <div className="max-w-7xl mx-auto px-6 relative z-10">
-          <ScrollReveal>
-            <div className="text-center mb-16">
-              <h2 className="text-3xl sm:text-5xl font-black text-theme-text mb-6">
-                Được yêu thích bởi hàng ngàn ứng viên
-              </h2>
-            </div>
-          </ScrollReveal>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {/* Testimonial 1 */}
-            <ScrollReveal delay={0}>
-              <div className="bg-theme-primary border border-theme-border p-8 rounded-3xl relative h-full">
-                <div className="flex gap-1 mb-6">
-                  {[1, 2, 3, 4, 5].map((i) => (
-                    <Star
-                      key={i}
-                      size={18}
-                      className="fill-yellow-500 text-yellow-500"
-                    />
-                  ))}
-                </div>
-                <p className="text-slate-300 mb-8 italic leading-relaxed text-lg">
-                  "Tôi đã vô cùng lo lắng trước buổi phỏng vấn React Native đầu
-                  tiên. Chế độ tính giờ của SpeakCV giúp tôi làm quen với áp
-                  lực. Phản hồi rất chuẩn xác, và tôi đã nhận được công việc!"
-                </p>
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-gradient-to-br from-blue-400 to-indigo-500 rounded-full flex items-center justify-center text-theme-text font-bold text-xl">
-                    M
-                  </div>
-                  <div>
-                    <h4 className="text-theme-text font-bold">Minh Phạm</h4>
-                    <p className="text-theme-muted text-sm">
-                      Lập trình viên Frontend tại VNG
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </ScrollReveal>
-
-            {/* Testimonial 2 */}
-            <ScrollReveal delay={150}>
-              <div className="bg-theme-primary border border-theme-border p-8 rounded-3xl relative h-full">
-                <div className="flex gap-1 mb-6">
-                  {[1, 2, 3, 4, 5].map((i) => (
-                    <Star
-                      key={i}
-                      size={18}
-                      className="fill-yellow-500 text-yellow-500"
-                    />
-                  ))}
-                </div>
-                <p className="text-slate-300 mb-8 italic leading-relaxed text-lg">
-                  "AI đặt những câu hỏi bám sát JD. Ban đầu tôi hơi bất ngờ,
-                  nhưng việc luyện tập giúp buổi phỏng vấn thực tế tại Shopee
-                  trở nên thật dễ dàng."
-                </p>
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-gradient-to-br from-emerald-400 to-teal-500 rounded-full flex items-center justify-center text-theme-text font-bold text-xl">
-                    T
-                  </div>
-                  <div>
-                    <h4 className="text-theme-text font-bold">Trang Nguyễn</h4>
-                    <p className="text-theme-muted text-sm">
-                      Chuyên viên Phân tích Dữ liệu tại Shopee
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </ScrollReveal>
-
-            {/* Testimonial 3 */}
-            <ScrollReveal delay={300}>
-              <div className="bg-theme-primary border border-theme-border p-8 rounded-3xl relative h-full">
-                <div className="flex gap-1 mb-6">
-                  {[1, 2, 3, 4, 5].map((i) => (
-                    <Star
-                      key={i}
-                      size={18}
-                      className="fill-yellow-500 text-yellow-500"
-                    />
-                  ))}
-                </div>
-                <p className="text-slate-300 mb-8 italic leading-relaxed text-lg">
-                  "Điều làm tôi bất ngờ nhất là tính năng tạo CV tự động. Hệ
-                  thống lấy câu trả lời từ các buổi phỏng vấn giả lập và cấu
-                  trúc hoàn hảo theo phương pháp STAR. Tiết kiệm cho tôi hàng
-                  giờ đồng hồ!"
-                </p>
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-gradient-to-br from-rose-400 to-orange-500 rounded-full flex items-center justify-center text-theme-text font-bold text-xl">
-                    D
-                  </div>
-                  <div>
-                    <h4 className="text-theme-text font-bold">Đức Trần</h4>
-                    <p className="text-theme-muted text-sm">
-                      Kỹ sư Backend tại FPT
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </ScrollReveal>
-          </div>
-        </div>
-      </section>
-
       {/* 5. PRICING SECTION */}
       <ScrollReveal>
         <PricingSection onUpgrade={() => setShowCheckout(true)} />
@@ -626,4 +506,55 @@ export default function LandingPage() {
       />
     </div>
   );
+}
+
+function LandingPage() {
+  const { user, isLoading } = useAuth();
+
+  if (isLoading) return <div className="min-h-screen bg-theme-secondary"></div>;
+
+  return (
+    <main className="min-h-screen bg-theme-secondary text-slate-200 font-sans flex flex-col items-center justify-center px-6 text-center">
+      <div className="flex items-center gap-3 mb-8">
+        <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-cyan-400 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/20">
+          <Mic className="text-theme-text" size={28} />
+        </div>
+        <h1 className="text-4xl font-black italic tracking-tight text-theme-text">
+          Speak<span className="text-blue-500">CV</span>
+        </h1>
+      </div>
+      <p className="text-xl sm:text-2xl text-theme-text-secondary max-w-2xl mb-10 leading-relaxed">
+        Every CV gets a conversation. Every decision has evidence.
+      </p>
+      <div className="flex flex-col sm:flex-row items-center gap-4">
+        {user ? (
+          <Link
+            href="/profile"
+            className="px-8 py-3 rounded-full bg-gradient-to-r from-blue-600 to-cyan-500 text-theme-text font-bold hover:opacity-90 transition-all"
+          >
+            Hồ sơ của {user}
+          </Link>
+        ) : (
+          <>
+            <Link
+              href="/login"
+              className="px-8 py-3 rounded-full bg-gradient-to-r from-blue-600 to-cyan-500 text-theme-text font-bold hover:opacity-90 transition-all"
+            >
+              Đăng nhập
+            </Link>
+            <Link
+              href="/register"
+              className="px-8 py-3 rounded-full bg-theme-surface/80 hover:bg-theme-surface text-theme-text font-bold border border-theme-border/50 transition-all"
+            >
+              Đăng ký
+            </Link>
+          </>
+        )}
+      </div>
+    </main>
+  );
+}
+
+export default function Page() {
+  return LEGACY_B2C ? <LegacyLandingPage /> : <LandingPage />;
 }

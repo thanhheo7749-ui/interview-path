@@ -51,7 +51,6 @@ export default function RegisterPage() {
         setError("");
         const data = await loginGoogle(tokenResponse.access_token);
         login(data.access_token, data.user_name, data.role || "user");
-        router.push("/interview");
       } catch (err: any) {
         setError(err.message || "Lỗi đăng nhập qua Google!");
         setLoading(false);

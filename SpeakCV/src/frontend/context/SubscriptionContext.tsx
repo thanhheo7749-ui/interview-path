@@ -13,6 +13,7 @@ import {
   useCallback,
   ReactNode,
 } from "react";
+import { LEGACY_B2C } from "@/lib/features";
 import { getMyProfile, upgradeToPro as upgradeApi } from "@/services/api";
 
 interface SubscriptionContextType {
@@ -28,9 +29,11 @@ const SubscriptionContext = createContext<SubscriptionContextType>(
 
 export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
   const [plan, setPlan] = useState<"free" | "pro">("free");
-  const [tokens, setTokens] = useState(50);
+  const [tokens, setTokens] = useState(LEGACY_B2C ? 50 : 0);
 
   const refreshSubscription = useCallback(async () => {
+    // Legacy B2C billing is off: stay neutral and make no network calls.
+    if (!LEGACY_B2C) return;
     const token = sessionStorage.getItem("token");
     if (!token) {
       // Not logged in — reset to free defaults
@@ -52,6 +55,7 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
 
   // Refresh subscription on mount and when auth changes
   useEffect(() => {
+    if (!LEGACY_B2C) return;
     refreshSubscription();
 
     // Listen for login/logout events
@@ -71,6 +75,7 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
   }, [refreshSubscription]);
 
   const upgradeToPro = async () => {
+    if (!LEGACY_B2C) return;
     try {
       await upgradeApi();
       setPlan("pro");

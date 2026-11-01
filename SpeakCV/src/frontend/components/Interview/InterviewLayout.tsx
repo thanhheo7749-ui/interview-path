@@ -15,19 +15,12 @@ import {
   Sun,
   Moon,
   Briefcase,
-  Sparkles,
-  ShieldCheck,
-  BarChart3,
 } from "lucide-react";
-import toast from "react-hot-toast";
 import { useTheme } from "@/context/ThemeContext";
 
 import { MicroButton } from "@/components/Interview/MicroButton";
 import { ChatBox } from "@/components/Interview/ChatBox";
-import {
-  SetupForm,
-  ENTERPRISE_DEMO_PRESETS,
-} from "@/components/Interview/SetupForm";
+import { SetupForm } from "@/components/Interview/SetupForm";
 import { TimerDisplay } from "@/components/Interview/TimerDisplay";
 import { InlineCameraWidget } from "@/components/Interview/InlineCameraWidget";
 import { PlannerSignals } from "@/components/Interview/PlannerSignals";
@@ -63,7 +56,6 @@ interface InterviewLayoutProps {
   onCloseCamera: () => void;
   audioElement?: HTMLAudioElement | null;
   isPlayingAudio: boolean;
-  onOpenInstantDemoReport?: () => void;
 }
 
 export function InterviewLayout({
@@ -95,7 +87,6 @@ export function InterviewLayout({
   onCloseCamera,
   audioElement,
   isPlayingAudio,
-  onOpenInstantDemoReport,
 }: InterviewLayoutProps) {
   const router = useRouter();
   const { theme, toggleTheme } = useTheme();
@@ -122,19 +113,6 @@ export function InterviewLayout({
       setHint({ show: false, content: "" });
     }
     setSwipeOffset(0);
-  };
-
-  const handleQuickKTechPreset = () => {
-    const kPreset = ENTERPRISE_DEMO_PRESETS[0];
-    setConfig({
-      ...config,
-      position: kPreset.position,
-      company: kPreset.company,
-      mode: kPreset.mode,
-      voice: kPreset.voice,
-      jd: kPreset.jd,
-    });
-    toast.success("Loaded K-Tech Korean Enterprise Demo Context!");
   };
 
   const shouldShowSetup =
@@ -169,22 +147,14 @@ export function InterviewLayout({
           SpeakCV
         </h1>
 
-        {/* Active B2B Context & Quick K-Tech Preset Bar */}
+        {/* Active context bar */}
         <div className="flex flex-wrap items-center justify-center gap-2 mt-1">
-          {config.position ? (
+          {config.position && (
             <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-blue-500/15 border border-blue-500/30 text-blue-300">
               <Briefcase size={12} />
               {config.position}
               {config.company ? ` @ ${config.company}` : ""}
             </span>
-          ) : (
-            <button
-              type="button"
-              onClick={handleQuickKTechPreset}
-              className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-500/30 text-cyan-300 transition-all"
-            >
-              <Sparkles size={12} /> 🇰🇷 Load 1-Click K-Tech Enterprise Context
-            </button>
           )}
 
           <button
@@ -194,20 +164,6 @@ export function InterviewLayout({
           >
             {showContextSetup ? "Close Context Setup" : "🎯 Context & JD Setup"}
           </button>
-
-          {onOpenInstantDemoReport && (
-            <button
-              type="button"
-              onClick={onOpenInstantDemoReport}
-              className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-violet-500/15 hover:bg-violet-500/25 border border-violet-500/35 text-violet-300 transition-all"
-            >
-              <BarChart3 size={12} /> 📊 Instant HR &amp; Coaching Report
-            </button>
-          )}
-
-          <span className="hidden sm:inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
-            <ShieldCheck size={12} /> PII Guard Active
-          </span>
         </div>
 
         {config.interviewType === "timed" && hasStarted && (

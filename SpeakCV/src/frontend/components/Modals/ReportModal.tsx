@@ -22,11 +22,10 @@ import {
   Volume2,
   Gauge,
   Zap,
-  ShieldCheck,
   Building2,
-  Clock,
 } from "lucide-react";
 import { useState } from "react";
+import { LEGACY_B2C } from "@/lib/features";
 
 // === DIMENSION SCORE BAR ===
 function DimensionBar({ dimension, score, weight, reasoning, cited_quotes }: any) {
@@ -248,11 +247,6 @@ export default function ReportModal({
         : report.score >= 5
           ? "Solid Foundation — Probe Technical Depth in Round 2"
           : "Needs Structured STAR Framing & Technical Depth"),
-    estimated_minutes_saved:
-      rawHrRec?.estimated_minutes_saved ||
-      Math.max(30, (questionDetails?.length || 2) * 15 + 5),
-    pii_anonymized: rawHrRec?.pii_anonymized ?? true,
-    evidence_grounded: rawHrRec?.evidence_grounded ?? true,
   };
   const decisionBadgeStyle =
     hrRecommendation.decision === "Strong Hire"
@@ -313,15 +307,10 @@ export default function ReportModal({
                 >
                   <CheckCircle2 size={14} /> HR Decision: {hrRecommendation.decision}
                 </span>
-                {hrRecommendation.pii_anonymized && (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 border border-emerald-500/25 px-3 py-1.5 text-xs font-semibold text-emerald-300">
-                    <ShieldCheck size={14} /> PII Masked &amp; Evidence-Grounded
-                  </span>
-                )}
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="rounded-2xl bg-slate-900/70 border border-slate-800 p-4">
                 <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
                   Readiness Tier
@@ -342,17 +331,6 @@ export default function ReportModal({
                 </p>
                 <p className="mt-1 text-xs text-slate-400">
                   Evaluates Ownership, Integrity &amp; STAR clarity
-                </p>
-              </div>
-              <div className="rounded-2xl bg-slate-900/70 border border-slate-800 p-4">
-                <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1">
-                  <Clock size={12} className="text-amber-400" /> HR Operational ROI
-                </p>
-                <p className="mt-1 text-base font-extrabold text-amber-300">
-                  ~{hrRecommendation.estimated_minutes_saved} mins saved / candidate
-                </p>
-                <p className="mt-1 text-xs text-slate-400">
-                  Replaces manual CV screen + generic 1st-round call
                 </p>
               </div>
             </div>
@@ -658,12 +636,14 @@ export default function ReportModal({
           >
             Continue Interview
           </button>
-          <button
-            onClick={onRetry}
-            className="bg-blue-600 hover:bg-blue-500 px-8 py-3 rounded-xl font-bold flex items-center gap-2 text-white shadow-lg shadow-blue-900/20 transition-all active:scale-95"
-          >
-            <RotateCcw size={18} /> Start New Interview
-          </button>
+          {LEGACY_B2C && (
+            <button
+              onClick={onRetry}
+              className="bg-blue-600 hover:bg-blue-500 px-8 py-3 rounded-xl font-bold flex items-center gap-2 text-white shadow-lg shadow-blue-900/20 transition-all active:scale-95"
+            >
+              <RotateCcw size={18} /> Start New Interview
+            </button>
+          )}
         </div>
       </div>
     </div>

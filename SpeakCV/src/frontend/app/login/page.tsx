@@ -21,14 +21,10 @@ export default function LoginPage() {
   const { login } = useAuth();
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const presetEmail = params.get("email");
-    const presetPassword = params.get("password");
-    const redirect = params.get("redirect");
-    if (presetEmail) setEmail(presetEmail);
-    if (presetPassword) setPassword(presetPassword);
-    if (redirect === "interview") {
-      sessionStorage.setItem("postLoginRedirect", "/interview");
+    const redirect = new URLSearchParams(window.location.search).get("redirect");
+    // Only same-site absolute paths are accepted: "/x" yes, "//host" and "/\\host" no.
+    if (redirect && /^\/(?![/\\])/.test(redirect)) {
+      sessionStorage.setItem("postLoginRedirect", redirect);
     }
   }, []);
 
