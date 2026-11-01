@@ -214,15 +214,6 @@ export const buildInterviewContext = async (cvText: string, jdText: string) => {
     return res.json();
 };
 
-export const parseMasterCV = async (cvText: string) => {
-    const res = await apiRequest(`${API_URL}/cv/parse-master-cv`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ cv_text: cvText }),
-    });
-    return res.json();
-};
-
 export const addExperience = async (data: any) => {
     const res = await fetch(`${API_URL}/experience`, {
         method: "POST",

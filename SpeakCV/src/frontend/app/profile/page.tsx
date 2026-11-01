@@ -13,7 +13,6 @@ import {
   deleteExperience,
   getHistory,
   extractCVText,
-  parseMasterCV,
 } from "@/services/api";
 import { ReportModal } from "@/components/Modals";
 import {
@@ -30,6 +29,7 @@ import {
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
+import { LEGACY_B2C } from "@/lib/features";
 
 export default function ProfilePage() {
   const { user } = useAuth();
@@ -38,7 +38,6 @@ export default function ProfilePage() {
   const [saving, setSaving] = useState(false);
   const [cvInputMode, setCvInputMode] = useState<"upload" | "paste">("upload");
   const [extractingCv, setExtractingCv] = useState(false);
-  const [parsingCv, setParsingCv] = useState(false);
   const [masterCvParseError, setMasterCvParseError] = useState<string | null>(null);
 
   // General data
@@ -128,31 +127,6 @@ export default function ProfilePage() {
     }
   };
 
-  const handleParseMasterCvText = async () => {
-    const rawText = (info.master_cv_text || "").trim();
-    if (!rawText) return;
-
-    setParsingCv(true);
-    setMasterCvParseError(null);
-    try {
-      const parsed = await parseMasterCV(rawText);
-      setInfo((prev: any) => ({
-        ...prev,
-        master_cv_structured: parsed.cv_data || null,
-      }));
-    } catch {
-      setInfo((prev: any) => ({
-        ...prev,
-        master_cv_structured: null,
-      }));
-      setMasterCvParseError(
-        "Không thể chuẩn hóa CV này thành dữ liệu có cấu trúc.",
-      );
-    } finally {
-      setParsingCv(false);
-    }
-  };
-
   const handleMasterCvUpload = async (
     e: React.ChangeEvent<HTMLInputElement>,
   ) => {
@@ -168,35 +142,16 @@ export default function ProfilePage() {
       setInfo((prev: any) => ({
         ...prev,
         master_cv_text: rawText,
+        master_cv_structured: null,
       }));
 
       if (!rawText.trim()) {
-        setInfo((prev: any) => ({
-          ...prev,
-          master_cv_structured: null,
-        }));
-        setMasterCvParseError("Không tìm thấy nội dung CV để chuẩn hóa.");
-        return;
+        setMasterCvParseError("Không tìm thấy nội dung CV.");
       }
-
-      setParsingCv(true);
-      const parsed = await parseMasterCV(rawText);
-      setInfo((prev: any) => ({
-        ...prev,
-        master_cv_text: rawText,
-        master_cv_structured: parsed.cv_data || null,
-      }));
     } catch {
-      setInfo((prev: any) => ({
-        ...prev,
-        master_cv_structured: null,
-      }));
-      setMasterCvParseError(
-        "Không thể chuẩn hóa CV này thành dữ liệu có cấu trúc.",
-      );
+      setMasterCvParseError("Không thể đọc nội dung từ file CV này.");
     } finally {
       setExtractingCv(false);
-      setParsingCv(false);
       e.target.value = "";
     }
   };
@@ -253,7 +208,7 @@ export default function ProfilePage() {
 
           {/* BACK TO HOME BUTTON */}
           <button
-            onClick={() => router.push("/interview")}
+            onClick={() => router.push(LEGACY_B2C ? "/interview" : "/")}
             className="flex items-center gap-2 px-4 py-2 bg-theme-surface hover:bg-theme-surface text-slate-300 hover:text-theme-text rounded-xl transition-all font-medium"
           >
             <ArrowLeft size={18} /> Quay lại Trang chủ
@@ -473,63 +428,18 @@ export default function ProfilePage() {
             placeholder="Dán CV text vào đây hoặc upload file để tự động trích xuất..."
           />
 
-          {cvInputMode === "paste" && (
-            <div className="mt-4 flex justify-end">
-              <button
-                type="button"
-                onClick={handleParseMasterCvText}
-                disabled={parsingCv || !info.master_cv_text?.trim()}
-                className="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-900/40 disabled:text-slate-400 px-4 py-2 rounded-xl font-bold flex items-center gap-2 transition-all"
-              >
-                {parsingCv ? (
-                  <Loader2 className="animate-spin" size={18} />
-                ) : (
-                  <Save size={18} />
-                )}
-                {parsingCv ? "Đang chuẩn hóa CV..." : "Phân tích CV đã dán"}
-              </button>
-            </div>
-          )}
-
           {masterCvParseError && (
             <div className="mt-4 rounded-2xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-300">
               {masterCvParseError}
             </div>
           )}
 
-          {info.master_cv_structured && (
-            <div className="mt-4 rounded-2xl border border-theme-border bg-theme-secondary/50 p-4 space-y-2">
-              <div className="text-sm font-bold text-white">
-                Structured CV Summary
-              </div>
-              <div className="text-sm text-theme-text-secondary">
-                {info.master_cv_structured.personal_info?.name ||
-                  "Unnamed profile"}
-                {info.master_cv_structured.personal_info?.title
-                  ? ` — ${info.master_cv_structured.personal_info.title}`
-                  : ""}
-              </div>
-              <div className="text-sm text-theme-text-secondary">
-                Top skills: {(info.master_cv_structured.skills || [])
-                  .slice(0, 5)
-                  .join(", ") || "None detected"}
-              </div>
-              <div className="text-sm text-theme-text-secondary">
-                Experience items: {(info.master_cv_structured.experience || []).length} · Projects: {(info.master_cv_structured.projects || []).length}
-              </div>
-            </div>
-          )}
-
           <div className="mt-3 text-sm text-theme-text-secondary">
             {extractingCv
               ? "Đang trích xuất nội dung CV..."
-              : parsingCv
-                ? "Đang chuẩn hóa CV thành dữ liệu có cấu trúc..."
-                : info.master_cv_structured
-                  ? "Master CV đã được chuẩn hóa. Nhấn Lưu Hồ Sơ để lưu cả bản raw và structured."
-                  : info.master_cv_text
-                    ? "Đã có raw CV text. Hãy phân tích để tạo structured CV trước khi lưu."
-                    : "Chưa có Master CV nào được lưu."}
+              : info.master_cv_text
+                ? "Đã có CV text. Nhấn Lưu Hồ Sơ để lưu."
+                : "Chưa có Master CV nào được lưu."}
           </div>
         </div>
 
@@ -690,7 +600,7 @@ export default function ProfilePage() {
         hasHistory={selectedReport?.details?.length > 0}
         onRetry={() => {
           setShowReport(false);
-          router.push("/interview");
+          if (LEGACY_B2C) router.push("/interview");
         }}
       />
     </div>

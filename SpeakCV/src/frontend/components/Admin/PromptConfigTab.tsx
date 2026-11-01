@@ -20,6 +20,7 @@ import {
 import { Save, Settings2, Loader2, Cpu, UploadCloud, GitBranchPlus } from "lucide-react";
 import toast from "react-hot-toast";
 import { BrainGraphPanel } from "./BrainGraphPanel";
+import { LEGACY_B2C } from "@/lib/features";
 
 export function PromptConfigTab() {
   const [systemPrompt, setSystemPrompt] = useState("");
@@ -127,6 +128,7 @@ export function PromptConfigTab() {
 
 
   useEffect(() => {
+    if (!LEGACY_B2C) return;
     loadVersions();
     const lastJobId = localStorage.getItem("aiBrainLastJobId");
     if (lastJobId) {
@@ -288,7 +290,8 @@ export function PromptConfigTab() {
           </div>
         </div>
 
-        {/* AI BRAIN INGESTION BLOCK */}
+        {/* AI BRAIN INGESTION BLOCK (legacy B2C only) */}
+        {LEGACY_B2C && (
         <div className="pt-6 border-t border-slate-800/80 space-y-4">
           <h3 className="text-lg font-bold text-slate-200 flex items-center gap-2">
             <GitBranchPlus size={18} className="text-emerald-400" />
@@ -397,6 +400,7 @@ export function PromptConfigTab() {
             Existing versions: {versions.map((v: any) => `${v.version} (${v.status})`).join(" | ") || "None"}
           </div>
         </div>
+        )}
       </div>
     </div>
   );

@@ -238,98 +238,6 @@ export default function InterviewRoom() {
     actions.startTimedInterview();
   };
 
-  const handleOpenInstantDemoReport = () => {
-    if (!reportData) {
-      setReportData({
-        score: 8.6,
-        inferred_position:
-          config.position || "Backend Developer (Python / FastAPI)",
-        overall_feedback:
-          "Candidate demonstrated strong backend architectural reasoning and high ownership aligned with Korean/FDI enterprise engineering standards. After an initial high-level answer on Redis caching, the candidate responded to the AI Question Planner's deep-dive follow-up with concrete metrics (62% p95 latency reduction under 5,000 RPS) and clear STAR structure.",
-        final_scores: {
-          correctness: 5,
-          depth: 4,
-          communication: 5,
-          topic_relevance: 5,
-        },
-        hr_recommendation: {
-          decision: "Strong Hire",
-          readiness_level: "Enterprise Ready",
-          culture_fit_signal: "High Ownership & Structured STAR Communication",
-          estimated_minutes_saved: 35,
-          pii_anonymized: true,
-          evidence_grounded: true,
-        },
-        top_skills_to_improve: [
-          "Quantify trade-offs in initial opening response before follow-up",
-          "Include cache invalidation edge cases in distributed systems",
-          "Elaborate on cross-team API contract versioning",
-        ],
-        strong_topics: [
-          "FastAPI & High-Concurrency APIs",
-          "Redis Write-Through Caching",
-          "K-Culture Ownership & Sprint Delivery",
-        ],
-        weak_topics: ["Multi-Region Cache Invalidation"],
-        dimension_scores: [
-          {
-            dimension: "Technical Depth & Architecture",
-            score: 8.5,
-            weight: 0.4,
-            reasoning:
-              "Clearly explained Redis write-through caching with 60s TTL and circuit breaker fallback under 5,000 RPS load.",
-            cited_quotes: [
-              "I took ownership of designing a Redis write-through cache with a 60s TTL and fallback circuit breaker, reducing p95 latency by 62%.",
-            ],
-          },
-          {
-            dimension: "K-Culture Fit (Ownership & Integrity)",
-            score: 9.0,
-            weight: 0.35,
-            reasoning:
-              "Proactively owned the bottleneck resolution within a 4-person sprint and delivered on schedule.",
-            cited_quotes: [
-              "In our 4-person sprint, our FastAPI endpoint hit 1,200ms latency... I took ownership of designing a Redis write-through cache... delivering on schedule.",
-            ],
-          },
-          {
-            dimension: "Structured STAR Communication",
-            score: 8.4,
-            weight: 0.25,
-            reasoning:
-              "Second turn followed Situation-Task-Action-Result with clear numerical impact.",
-            cited_quotes: [
-              "reducing p95 latency by 62% and delivering on schedule.",
-            ],
-          },
-        ],
-        details: [
-          {
-            question:
-              "Your CV highlights Python and FastAPI, while this role requires high-concurrency Redis caching. How have you used Redis to solve an API performance bottleneck?",
-            candidate_answer:
-              "I used Redis caching in my university backend project to make the API faster, and worked with my teammates to finish before the deadline.",
-            evaluation:
-              "Good topic alignment, but the initial answer lacked concrete metrics, cache strategy details, and specific individual ownership.",
-            ideal_answer:
-              "Specify the baseline latency, the exact caching pattern (e.g., cache-aside or write-through), TTL strategy, and measurable latency reduction.",
-          },
-          {
-            question:
-              "Let's go deeper into that Redis implementation: what specific caching strategy and TTL did you choose, how did you handle failure modes, and what was the measurable latency improvement?",
-            candidate_answer:
-              "In our 4-person sprint, our FastAPI endpoint hit 1,200ms latency under 5,000 RPS. I took ownership of designing a Redis write-through cache with a 60s TTL and fallback circuit breaker, reducing p95 latency by 62% and delivering on schedule.",
-            evaluation:
-              "Excellent STAR response! Demonstrates strong technical depth, fault-tolerance thinking (circuit breaker), and high ownership.",
-            ideal_answer:
-              "Strong production-grade answer; you could briefly mention cache stampede prevention (e.g., mutex locks) for an even stronger senior-level impression.",
-          },
-        ],
-      });
-    }
-    toggleModal("report", true);
-  };
-
   useEffect(() => {
     actions.loadInitialData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -401,7 +309,6 @@ export default function InterviewRoom() {
     analysis,
     masterCvAvailable: hasStructuredMasterCv,
     masterCvStatus,
-    onOpenInstantDemoReport: handleOpenInstantDemoReport,
   } as React.ComponentProps<typeof InterviewLayout> & { analysis: typeof analysis };
 
   return (

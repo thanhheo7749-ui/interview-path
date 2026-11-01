@@ -20,6 +20,7 @@ import {
   HelpCircle,
 } from "lucide-react";
 import { useEffect, useState } from "react";
+import { LEGACY_B2C } from "@/lib/features";
 
 interface AdminSidebarProps {
   activeTab: string;
@@ -44,6 +45,7 @@ export function AdminSidebar({
   const [pendingQCount, setPendingQCount] = useState(0);
 
   useEffect(() => {
+    if (!LEGACY_B2C) return;
     const fetchUnread = async () => {
       try {
         const token = sessionStorage.getItem("token");
@@ -175,47 +177,51 @@ export function AdminSidebar({
             <Briefcase size={20} /> JD Library
           </button>
 
-          <button
-            onClick={() => handleTabClick("support")}
-            className={`w-full flex items-center justify-between px-4 py-3 rounded-xl font-bold transition-all ${
-              activeTab === "support"
-                ? "bg-pink-500/20 border border-pink-500/30 text-pink-400 shadow-lg shadow-pink-900/20"
-                : "text-slate-400 hover:text-white hover:bg-slate-800 border border-transparent"
-            }`}
-          >
-            <div className="flex items-center gap-3">
-              <MessageCircle size={20} /> Live Support
-            </div>
-            {unreadCount > 0 && (
-              <span className="bg-red-500 text-white text-xs px-2 py-0.5 rounded-full shadow-sm shadow-red-500/50 animate-pulse">
-                {unreadCount}
-              </span>
-            )}
-          </button>
+          {LEGACY_B2C && (
+            <>
+              <button
+                onClick={() => handleTabClick("support")}
+                className={`w-full flex items-center justify-between px-4 py-3 rounded-xl font-bold transition-all ${
+                  activeTab === "support"
+                    ? "bg-pink-500/20 border border-pink-500/30 text-pink-400 shadow-lg shadow-pink-900/20"
+                    : "text-slate-400 hover:text-white hover:bg-slate-800 border border-transparent"
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <MessageCircle size={20} /> Live Support
+                </div>
+                {unreadCount > 0 && (
+                  <span className="bg-red-500 text-white text-xs px-2 py-0.5 rounded-full shadow-sm shadow-red-500/50 animate-pulse">
+                    {unreadCount}
+                  </span>
+                )}
+              </button>
+
+              <button
+                onClick={() => handleTabClick("questions")}
+                className={`w-full flex items-center justify-between px-4 py-3 rounded-xl font-bold transition-all ${
+                  activeTab === "questions"
+                    ? "bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 shadow-lg shadow-emerald-900/20"
+                    : "text-slate-400 hover:text-white hover:bg-slate-800 border border-transparent"
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <HelpCircle size={20} /> Questions
+                </div>
+                {pendingQCount > 0 && (
+                  <span className="bg-orange-500 text-white text-xs px-2 py-0.5 rounded-full shadow-sm shadow-orange-500/50 animate-pulse">
+                    {pendingQCount}
+                  </span>
+                )}
+              </button>
+            </>
+          )}
 
           <button
-            onClick={() => handleTabClick("questions")}
-            className={`w-full flex items-center justify-between px-4 py-3 rounded-xl font-bold transition-all ${
-              activeTab === "questions"
-                ? "bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 shadow-lg shadow-emerald-900/20"
-                : "text-slate-400 hover:text-white hover:bg-slate-800 border border-transparent"
-            }`}
-          >
-            <div className="flex items-center gap-3">
-              <HelpCircle size={20} /> Questions
-            </div>
-            {pendingQCount > 0 && (
-              <span className="bg-orange-500 text-white text-xs px-2 py-0.5 rounded-full shadow-sm shadow-orange-500/50 animate-pulse">
-                {pendingQCount}
-              </span>
-            )}
-          </button>
-
-          <button
-            onClick={() => router.push("/interview")}
+            onClick={() => router.push(LEGACY_B2C ? "/interview" : "/")}
             className="w-full flex items-center justify-center gap-2 px-4 py-3 text-slate-400 hover:text-white hover:bg-slate-800 border border-slate-700 rounded-xl font-bold transition-colors mt-50"
           >
-            <ArrowLeft size={18} /> Back to Interview Page
+            <ArrowLeft size={18} /> {LEGACY_B2C ? "Back to Interview Page" : "Back to Home"}
           </button>
         </div>
       </div>

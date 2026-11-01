@@ -20,6 +20,7 @@ import { PromptConfigTab } from "@/components/Admin/PromptConfigTab";
 import { TransactionsTab } from "@/components/Admin/TransactionsTab";
 import { SupportTab } from "@/components/Admin/SupportTab";
 import { QuestionsTab } from "@/components/Admin/QuestionsTab";
+import { LEGACY_B2C } from "@/lib/features";
 
 export default function AdminPage() {
   const router = useRouter();
@@ -38,8 +39,7 @@ export default function AdminPage() {
       "transactions",
       "config",
       "templates",
-      "support",
-      "questions",
+      ...(LEGACY_B2C ? ["support", "questions"] : []),
     ]);
 
     const syncTabFromUrl = () => {
@@ -78,7 +78,7 @@ export default function AdminPage() {
         <ShieldAlert size={80} className="text-red-500 animate-bounce" />
         <h1 className="text-2xl font-bold text-red-400">{error}</h1>
         <button
-          onClick={() => router.push("/interview")}
+          onClick={() => router.push(LEGACY_B2C ? "/interview" : "/")}
           className="px-8 py-3 bg-slate-800 hover:bg-slate-700 rounded-xl font-bold transition-colors"
         >
           <ArrowLeft size={18} className="inline mr-2" /> Back
