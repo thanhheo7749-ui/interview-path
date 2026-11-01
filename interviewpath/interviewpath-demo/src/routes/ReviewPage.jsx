@@ -1,0 +1,190 @@
+import { useCallback, useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import { useCompany } from '../company/CompanyContext.jsx';
+import {
+  EmptyState, ErrorAlert, WarningList, cardClass, inputClass, primaryButton, secondaryButton,
+} from '../components/KbFeedback.jsx';
+import { decideReview, getReviewQueue, notifyKbChanged } from '../lib/kb.js';
+
+const VISIBILITIES = ['public', 'internal', 'confidential'];
+
+function groupByDocument(nodes) {
+  const groups = new Map();
+  for (const node of nodes) {
+    const name = node.sources?.[0]?.document_title ?? '';
+    if (!groups.has(name)) groups.set(name, []);
+    groups.get(name).push(node);
+  }
+  return [...groups.entries()].map(([name, items]) => ({ name, items }));
+}
+
+function ReviewPage() {
+  const { t } = useTranslation();
+  const { membership } = useCompany();
+  const companyId = membership?.company_id ?? null;
+  const [queue, setQueue] = useState(null);
+  const [edits, setEdits] = useState({});
+  const [error, setError] = useState('');
+  const [warnings, setWarnings] = useState([]);
+  const [busy, setBusy] = useState(false);
+
+  const load = useCallback(async () => {
+    const data = await getReviewQueue(companyId);
+    setQueue(data);
+    setEdits({});
+  }, [companyId]);
+
+  useEffect(() => {
+    if (companyId == null) return undefined;
+    let cancelled = false;
+    getReviewQueue(companyId)
+      .then((data) => {
+        if (!cancelled) setQueue(data);
+      })
+      .catch((err) => {
+        if (!cancelled) setError(err.message);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [companyId]);
+
+  const valueOf = (node, field) => edits[node.id]?.[field] ?? node[field];
+  const edit = (node, field, value) => setEdits((current) => ({ ...current, [node.id]: { ...current[node.id], [field]: value } }));
+
+  const decide = async (items) => {
+    setError('');
+    setBusy(true);
+    try {
+      const result = await decideReview(companyId, items);
+      setWarnings(result?.warnings ?? []);
+      await load();
+      notifyKbChanged();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const accept = (node) => ({
+    action: 'accept',
+    node_id: node.id,
+    title: valueOf(node, 'title'),
+    body: valueOf(node, 'body'),
+    visibility: valueOf(node, 'visibility'),
+  });
+
+  const nodes = queue?.nodes ?? [];
+  const proposals = queue?.merge_proposals ?? [];
+
+  return (
+    <div className="space-y-6 p-8">
+      <h1 className="text-2xl font-extrabold tracking-tight">{t('review.title')}</h1>
+      <ErrorAlert message={error} />
+      <WarningList warnings={warnings} onDismiss={() => setWarnings([])} />
+
+      {queue && nodes.length === 0 && <EmptyState>{t('review.empty')}</EmptyState>}
+
+      {groupByDocument(nodes).map((group) => (
+        <section key={group.name} className={`${cardClass} space-y-4`}>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h2 className="text-lg font-extrabold tracking-tight">{group.name || t('review.unknownDocument')}</h2>
+            <button type="button" disabled={busy} onClick={() => decide(group.items.map(accept))} className={primaryButton}>
+              {t('review.acceptAll')}
+            </button>
+          </div>
+
+          {group.items.map((node) => {
+            const proposal = proposals.find((p) => p.node_id === node.id);
+            return (
+              <article key={node.id} className="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
+                <p className="text-xs font-bold uppercase tracking-[0.12em] text-slate-400">
+                  {t(`review.types.${node.type}`, { defaultValue: node.type })}
+                </p>
+                <div className="grid gap-3 md:grid-cols-2">
+                  <label className="text-sm font-semibold text-slate-700">
+                    <span className="block">{t('review.itemTitle')}</span>
+                    <input
+                      value={valueOf(node, 'title')}
+                      onChange={(e) => edit(node, 'title', e.target.value)}
+                      className={`${inputClass} mt-1 w-full`}
+                    />
+                  </label>
+                  <label className="text-sm font-semibold text-slate-700">
+                    <span className="block">{t('review.layer')}</span>
+                    <select
+                      value={valueOf(node, 'visibility')}
+                      onChange={(e) => edit(node, 'visibility', e.target.value)}
+                      className={`${inputClass} mt-1 w-full`}
+                    >
+                      {VISIBILITIES.map((v) => (
+                        <option key={v} value={v}>
+                          {t(`layers.${v}`)}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+                <label className="block text-sm font-semibold text-slate-700">
+                  <span className="block">{t('review.body')}</span>
+                  <textarea
+                    rows={3}
+                    value={valueOf(node, 'body')}
+                    onChange={(e) => edit(node, 'body', e.target.value)}
+                    className={`${inputClass} mt-1 w-full`}
+                  />
+                </label>
+                {node.fact_kind && node.fact_value && (
+                  <p className="text-sm text-slate-600">
+                    {t('review.fact')}: <strong>{node.fact_value} {node.fact_unit}</strong>
+                    {node.scope_text ? ` (${node.scope_text})` : ''}
+                  </p>
+                )}
+                {node.sources?.map((source) => (
+                  <blockquote key={`${source.document_title}-${source.page}-${source.quote}`} className="border-l-4 border-blue-300 pl-3 text-sm text-slate-700">
+                    <p>{source.quote}</p>
+                    <footer className="mt-1 text-xs text-slate-500">
+                      {source.document_title}
+                      {source.page != null ? `, ${t('review.page', { page: source.page })}` : ''}
+                    </footer>
+                  </blockquote>
+                ))}
+                {proposal && (
+                  <div className="flex flex-wrap items-center gap-3 rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-900">
+                    <p>
+                      {t('review.mergeHint', { title: proposal.into_title, percent: Math.round(proposal.cosine * 100) })}
+                    </p>
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() => decide([{ action: 'merge', node_id: node.id, into_node_id: proposal.into_node_id }])}
+                      className={secondaryButton}
+                    >
+                      {t('review.merge')}
+                    </button>
+                  </div>
+                )}
+                <div className="flex gap-3">
+                  <button type="button" disabled={busy} onClick={() => decide([accept(node)])} className={primaryButton}>
+                    {t('review.accept')}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => decide([{ action: 'reject', node_id: node.id }])}
+                    className={secondaryButton}
+                  >
+                    {t('review.reject')}
+                  </button>
+                </div>
+              </article>
+            );
+          })}
+        </section>
+      ))}
+    </div>
+  );
+}
+
+export default ReviewPage;

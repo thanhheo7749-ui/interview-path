@@ -1,0 +1,46 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { expect } from '@playwright/test';
+
+export const API_URL = `http://localhost:${process.env.E2E_API_PORT || '8099'}`;
+export const HR_EMAIL = 'hr@e2e.test';
+export const NEW_PASSWORD = 'e2e-hr-own-password';
+export const CORS = { 'access-control-allow-origin': '*' };
+
+// Each spec file that changes knowledge or passwords uses its own company, so spec order does not matter.
+export const LOGIN_USER = { email: HR_EMAIL, passwordFile: 'portal_e2e_password' };
+export const BRAIN_USER = { email: 'brain-hr@e2e.test', passwordFile: 'portal_e2e_brain_password' };
+
+export const temporaryPassword = (user = LOGIN_USER) => readFileSync(join(process.env.E2E_TMP, user.passwordFile), 'utf8');
+
+// The first login test changes the password in the browser. This keeps later tests independent of that one.
+export async function ensurePasswordChanged(request, user = LOGIN_USER) {
+  const login = (password) => request.post(`${API_URL}/api/login`, { data: { email: user.email, password } });
+  if ((await login(NEW_PASSWORD)).ok()) return;
+  const first = await login(temporaryPassword(user));
+  // Another worker may have changed the password between the two logins.
+  if (!first.ok()) {
+    expect((await login(NEW_PASSWORD)).ok()).toBe(true);
+    return;
+  }
+  const { access_token: token } = await first.json();
+  const changed = await request.post(`${API_URL}/api/me/password`, {
+    headers: { Authorization: `Bearer ${token}` },
+    data: { current_password: temporaryPassword(user), new_password: NEW_PASSWORD },
+  });
+  expect(changed.ok()).toBe(true);
+}
+
+export async function fillLogin(page, password, user = LOGIN_USER) {
+  await page.getByLabel('Email').fill(user.email);
+  await page.getByLabel('Password').fill(password);
+  await page.getByRole('button', { name: 'Sign in' }).click();
+}
+
+export async function signIn(page, user = LOGIN_USER) {
+  await ensurePasswordChanged(page.request, user);
+  await page.goto('/');
+  await expect(page).toHaveURL(/\/login$/);
+  await fillLogin(page, NEW_PASSWORD, user);
+  await expect(page.getByRole('heading', { name: 'Company settings' })).toBeVisible();
+}

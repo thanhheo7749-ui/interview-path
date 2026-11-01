@@ -83,5 +83,103 @@
       "manager": "Manager",
       "employee": "Employee"
     }
+  },
+  "navKb": {
+    "documents": "Documents",
+    "review": "Review",
+    "conflicts": "Conflicts",
+    "gaps": "Knowledge gaps"
+  },
+  "layers": {
+    "public": "Public",
+    "internal": "Internal",
+    "confidential": "Confidential"
+  },
+  "kb": {
+    "warningsTitle": "Completed with warnings"
+  },
+  "demoAi": {
+    "notice": "Demo AI: answers are simulated"
+  },
+  "documents": {
+    "title": "Documents",
+    "uploadTitle": "Upload a document",
+    "file": "File",
+    "docTitle": "Title",
+    "visibility": "Visibility",
+    "department": "Department (optional)",
+    "noDepartment": "Whole company",
+    "effectiveDate": "Effective date (optional)",
+    "upload": "Upload",
+    "uploading": "Uploading...",
+    "formats": "PDF, DOCX, TXT or Markdown. Extracted items wait in Review until HR accepts them.",
+    "empty": "No documents yet. Upload a policy, handbook or job description above to start building the company knowledge.",
+    "colTitle": "Title",
+    "colLayer": "Visibility",
+    "colDepartment": "Department",
+    "colStatus": "Status",
+    "progress": "Progress",
+    "retry": "Retry",
+    "partial": "Partly processed: {{dropped}} items dropped and {{failed}} sections failed. Review what was extracted before relying on it.",
+    "status": {
+      "processing": "Processing",
+      "review": "Ready for review",
+      "published": "Published",
+      "failed": "Failed"
+    },
+    "job": {
+      "queued": "Queued",
+      "running": "Processing",
+      "review": "Ready for review",
+      "failed": "Failed",
+      "done": "Done"
+    }
+  },
+  "review": {
+    "title": "Review",
+    "empty": "Nothing to review. Upload a document and its extracted items will appear here.",
+    "unknownDocument": "Unknown document",
+    "acceptAll": "Accept all",
+    "accept": "Accept",
+    "reject": "Reject",
+    "merge": "Merge",
+    "mergeHint": "Looks like the existing item \"{{title}}\" ({{percent}}% similar).",
+    "itemTitle": "Title",
+    "body": "Body",
+    "layer": "Layer",
+    "fact": "Fact",
+    "page": "page {{page}}",
+    "types": {
+      "policy": "Policy",
+      "process": "Process",
+      "role": "Role",
+      "skill": "Skill",
+      "value": "Value",
+      "benefit": "Benefit",
+      "tool": "Tool",
+      "term": "Term"
+    }
+  },
+  "conflicts": {
+    "title": "Conflicts",
+    "intro": "Two documents disagree. Keep one value, or mark them as covering different scopes.",
+    "empty": "No open conflicts. New ones appear here when an uploaded document disagrees with existing knowledge.",
+    "source": "Source {{label}}",
+    "value": "Value",
+    "unit": "Unit",
+    "scope": "Scope",
+    "layer": "Layer",
+    "keepA": "Keep A",
+    "keepB": "Keep B",
+    "differentScope": "Different scope"
+  },
+  "gaps": {
+    "title": "Knowledge gaps",
+    "intro": "Questions the Copilot could not answer, grouped by topic.",
+    "heading": "Documents to write",
+    "empty": "No unanswered questions. When someone asks something the knowledge does not cover, it is listed here so you can write the missing document.",
+    "count_one": "Asked {{count}} time",
+    "count_other": "Asked {{count}} times",
+    "resolve": "Mark resolved"
   }
 }

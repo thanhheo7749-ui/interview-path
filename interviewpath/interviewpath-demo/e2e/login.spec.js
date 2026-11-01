@@ -1,39 +1,5 @@
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
 import { expect, test } from '@playwright/test';
-
-const API_URL = `http://localhost:${process.env.E2E_API_PORT || '8099'}`;
-const HR_EMAIL = 'hr@e2e.test';
-const NEW_PASSWORD = 'e2e-hr-own-password';
-const CORS = { 'access-control-allow-origin': '*' };
-
-const temporaryPassword = () => readFileSync(join(process.env.E2E_TMP, 'portal_e2e_password'), 'utf8');
-
-// The first test changes the password in the browser. This keeps later tests independent of that one.
-async function ensurePasswordChanged(request) {
-  const login = (password) => request.post(`${API_URL}/api/login`, { data: { email: HR_EMAIL, password } });
-  if ((await login(NEW_PASSWORD)).ok()) return;
-  const { access_token: token } = await (await login(temporaryPassword())).json();
-  const changed = await request.post(`${API_URL}/api/me/password`, {
-    headers: { Authorization: `Bearer ${token}` },
-    data: { current_password: temporaryPassword(), new_password: NEW_PASSWORD },
-  });
-  expect(changed.ok()).toBe(true);
-}
-
-async function fillLogin(page, password) {
-  await page.getByLabel('Email').fill(HR_EMAIL);
-  await page.getByLabel('Password').fill(password);
-  await page.getByRole('button', { name: 'Sign in' }).click();
-}
-
-async function signIn(page) {
-  await ensurePasswordChanged(page.request);
-  await page.goto('/');
-  await expect(page).toHaveURL(/\/login$/);
-  await fillLogin(page, NEW_PASSWORD);
-  await expect(page.getByRole('heading', { name: 'Company settings' })).toBeVisible();
-}
+import { CORS, HR_EMAIL, NEW_PASSWORD, ensurePasswordChanged, fillLogin, signIn, temporaryPassword } from './helpers.js';
 
 test('first sign-in with a temporary password forces a change before anything else', async ({ page }) => {
   await page.goto('/login');
