@@ -48,6 +48,9 @@ def ask_the_company(
     user: User = Depends(get_authenticated_user),
     db: Session = Depends(get_db),
 ):
+    # Open to any logged-in user, so require_member's check does not cover this route.
+    if user.must_change_password:
+        raise HTTPException(status_code=403, detail="password_change_required")
     company_id = db.query(Company.id).filter(Company.slug == slug).scalar()
     if company_id is None:
         raise HTTPException(status_code=404, detail="Company not found")
