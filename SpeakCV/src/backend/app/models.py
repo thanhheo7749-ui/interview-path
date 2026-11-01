@@ -82,9 +82,6 @@ class CVTailorRequest(BaseModel):
     master_cv_json: dict
     jd_text: str
 
-class CVParseMasterCVRequest(BaseModel):
-    raw_text: str
-
 class InterviewContextRequest(BaseModel):
     cv_text: str
     jd_text: str
@@ -2526,9 +2523,6 @@ class CVRewriteRequest(BaseModel):
 class CVTailorRequest(BaseModel):
     master_cv_json: dict
     jd_text: str
-
-class CVParseMasterCVRequest(BaseModel):
-    raw_text: str
 
 class InterviewContextRequest(BaseModel):
     cv_text: str

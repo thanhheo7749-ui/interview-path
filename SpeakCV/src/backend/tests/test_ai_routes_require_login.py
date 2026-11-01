@@ -2,7 +2,7 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from app.routers import cv, interview, jobs
+from app.routers import cv, interview
 
 PROTECTED = [
     (interview.router, "post", "/api/transcribe"),
@@ -15,7 +15,6 @@ PROTECTED = [
     (cv.router, "post", "/api/cv/upload-makeover"),
     (cv.router, "post", "/api/cv/tailor"),
     (cv.router, "post", "/api/cv/extract-text"),
-    (jobs.router, "post", "/api/jobs/match"),
 ]
 
 

@@ -11,7 +11,6 @@ LEGACY_PATHS = [
     ("post", "/api/upgrade-pro"),
     ("get", "/api/my-stats"),
     ("get", "/api/questions"),
-    ("post", "/api/jobs/match"),
     ("get", "/api/admin/ai-brain/versions"),
     ("post", "/api/admin/ai-brain/ingestion/jobs"),
 ]

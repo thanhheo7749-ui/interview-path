@@ -133,9 +133,6 @@ def _build_hr_recommendation(
             "decision": "Pending Interview",
             "readiness_level": "Awaiting Candidate Responses",
             "culture_fit_signal": "No turn signals recorded yet",
-            "estimated_minutes_saved": 30,
-            "pii_anonymized": True,
-            "evidence_grounded": True,
         }
 
     avg_score = mean(valid_scores)
@@ -156,9 +153,6 @@ def _build_hr_recommendation(
         "decision": decision,
         "readiness_level": readiness_level,
         "culture_fit_signal": culture_fit_signal,
-        "estimated_minutes_saved": max(30, answered_count * 15 + 5),
-        "pii_anonymized": True,
-        "evidence_grounded": True,
     }
 
 

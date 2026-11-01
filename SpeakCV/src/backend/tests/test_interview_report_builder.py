@@ -390,6 +390,5 @@ def test_build_structured_report_includes_b2b_hr_recommendation_and_time_saved()
     hr_rec = report["hr_recommendation"]
     assert hr_rec["decision"] == "Strong Hire"
     assert hr_rec["readiness_level"] == "Enterprise Ready"
-    assert hr_rec["estimated_minutes_saved"] >= 30
-    assert hr_rec["pii_anonymized"] is True
-    assert hr_rec["evidence_grounded"] is True
+    for removed in ("estimated_minutes_saved", "pii_anonymized", "evidence_grounded"):
+        assert removed not in hr_rec

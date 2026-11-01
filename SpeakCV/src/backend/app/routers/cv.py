@@ -79,16 +79,6 @@ def parse_and_validate_cv(raw_text: str) -> dict:
     return validated.model_dump()
 
 
-@router.post("/api/cv/parse-master-cv")
-async def parse_master_cv_route(request: models.CVParseMasterCVRequest):
-    try:
-        cv_data = parse_and_validate_cv(request.raw_text)
-        return {"cv_data": cv_data}
-    except (json.JSONDecodeError, Exception) as parse_err:
-        print(f"⚠️ JSON parse/validation error: {parse_err}")
-        raise HTTPException(status_code=400, detail="CV JSON không hợp lệ. Vui lòng thử lại.")
-
-
 @router.post("/api/cv/interview-context", response_model=models.InterviewContextResponse)
 async def analyze_interview_context_route(request: models.InterviewContextRequest, current_user: sql_models.User = Depends(get_current_user)):
     return {
