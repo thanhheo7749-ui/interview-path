@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.auth.dependencies import get_authenticated_user, require_member
 from app.database.database import get_db
-from app.database.sql_models import Application, AuditLog, Company, CompanyMember, Consent, User
+from app.database.sql_models import Application, AuditLog, Company, CompanyMember, Consent, Job, User
 from app.hiring import audit, consents, fairness, retention
 
 router = APIRouter(prefix="/api/companies/{company_id}/trust", dependencies=[Depends(require_member("hr"))])
@@ -77,6 +77,16 @@ class WithdrawnConsent(BaseModel):
     withdrawn_at: datetime
 
 
+class MyConsent(BaseModel):
+    id: int
+    purpose: str
+    version: str
+    language: str | None
+    granted_at: datetime
+    withdrawn_at: datetime | None
+    job_title: str | None
+
+
 def _offset(page: int) -> int:
     return (page - 1) * PAGE_SIZE
 
@@ -137,12 +147,31 @@ def fairness_check(
         raise HTTPException(status_code=404, detail="Application not found")
     try:
         result = fairness.check(db, application, actor_user_id=user.id)
+    except fairness.ApplicationDeleted as exc:
+        raise HTTPException(status_code=404, detail="Application not found") from exc
     except fairness.FairnessUnavailable as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     return FairnessOut(
         identical_blind_text=result.identical_blind_text, identical_result=result.identical_result,
         original_blind_text=result.original_blind_text, swapped_blind_text=result.swapped_blind_text,
     )
+
+
+@me_router.get("/api/me/consents", response_model=list[MyConsent])
+def my_consents(user: User = Depends(get_authenticated_user), db: Session = Depends(get_db)):
+    rows = (
+        db.query(Consent, Job.title)
+        .outerjoin(Application, Application.id == Consent.application_id)
+        .outerjoin(Job, Job.id == Application.job_id)
+        .filter(Consent.user_id == user.id)
+        .order_by(Consent.id.desc())
+        .all()
+    )
+    return [
+        MyConsent(id=consent.id, purpose=consent.purpose, version=consent.text_version, language=consent.language,
+                  granted_at=consent.granted_at, withdrawn_at=consent.withdrawn_at, job_title=title)
+        for consent, title in rows
+    ]
 
 
 @me_router.post("/api/me/consents/{consent_id}/withdraw", response_model=WithdrawnConsent)

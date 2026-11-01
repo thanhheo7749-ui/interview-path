@@ -10,10 +10,12 @@ TRANSITIONS = {
     "declined_recording": {"ready_for_hr"},
     "session_in_progress": {"session_completed", "ready_for_hr"},
     "session_completed": {"analyzing"},
-    "analyzing": {"ready_for_hr"},
+    "analyzing": {"ready_for_hr", "session_completed"},  # back to waiting only when a crash stopped the analysis
     "ready_for_hr": {"invited"},
     "withdrawn": set(),
 }
+# `analysis_status` when there was nothing to analyse: the candidate said nothing.
+NOT_TAKEN = "not_taken"
 
 
 class InvalidTransition(ValueError):

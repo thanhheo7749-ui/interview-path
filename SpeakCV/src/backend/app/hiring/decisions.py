@@ -46,12 +46,18 @@ def _notify(db, application, decision: str) -> None:
     title = db.get(Job, application.job_id).title
     subject, body = NOTIFICATIONS[language][decision]
     notify.enqueue(db, application.company_id, application.candidate_user_id, "decision", language,
-                   subject.format(title=title), body.format(title=title))
+                   subject.format(title=title), body.format(title=title), application_id=application.id)
+
+
+def _check_not_anonymized(application) -> None:
+    if application.anonymized_at is not None:
+        raise DecisionError(409, "This application's personal data has been deleted")
 
 
 def decide(db, application, decision, actor_user_id, reason=None) -> None:
     if decision not in DECISIONS:
         raise DecisionError(422, "Decision must be approved or rejected")
+    _check_not_anonymized(application)
     if application.stage != "ready_for_hr":
         raise DecisionError(409, "This application is not ready for a decision")
     if application.hr_decision != "pending":
@@ -70,6 +76,7 @@ def correct_cv_status(db, application, cv_status, actor_user_id, reason) -> None
         raise DecisionError(422, "CV status must be meets or not_met")
     if not (reason or "").strip():
         raise DecisionError(422, "A reason is required")
+    _check_not_anonymized(application)
     if application.cv_status is None:
         raise DecisionError(409, "This application has no CV label yet")
     previous = application.cv_status
@@ -95,6 +102,7 @@ def reveal(db, application, actor_user_id) -> dict:
 
 def grant_restart(db, application, actor_user_id) -> None:
     """One restart per application. The old session and its audio stay as they are."""
+    _check_not_anonymized(application)
     if application.stage != "ready_for_hr" or application.hr_decision != "pending":
         raise DecisionError(409, "A restart can only be granted while the application awaits review")
     sessions = (
@@ -119,6 +127,7 @@ def grant_restart(db, application, actor_user_id) -> None:
 
 def fast_track(db, application, actor_user_id) -> None:
     """Skip the interview. No AI runs, and the application reaches HR with no interview evidence."""
+    _check_not_anonymized(application)
     try:
         if application.stage != "invited":
             raise InvalidTransition("not invited")

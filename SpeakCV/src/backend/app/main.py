@@ -24,7 +24,7 @@ from .routers import board as board_router
 from .routers import screening as screening_router
 from .routers import trust
 from .brain import fake_demo, ingestion
-from .hiring import cv_processing
+from .hiring import analysis, cv_processing
 from .hiring import retention
 from .hiring import fake_demo as hiring_fake_demo
 from .database import sql_models
@@ -64,6 +64,7 @@ async def lifespan(app: FastAPI):
     seed_admin()
     ingestion.fail_interrupted_jobs()
     cv_processing.fail_interrupted()
+    analysis.recover_interrupted()
     retention_task = retention.start_daily_task(app)
     yield
     if retention_task is not None:

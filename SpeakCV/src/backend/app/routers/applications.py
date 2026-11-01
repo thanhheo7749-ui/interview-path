@@ -124,13 +124,14 @@ def _ensure_fits(data: bytes, suffix: str) -> None:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
-def _apply(db: Session, user: User, slug: str, data: bytes, suffix: str, src: str | None, consent_version: str) -> ApplicationOut:
+def _apply(db: Session, user: User, slug: str, data: bytes, suffix: str, src: str | None, consent_version: str,
+           consent_language: str | None = None) -> ApplicationOut:
     job = db.query(Job).filter(Job.slug == slug, Job.status != "draft").first()
     if job is None:
         raise HTTPException(status_code=404, detail="Job not found")
     _ensure_fits(data, suffix)
     try:
-        application = applications.create_application(db, user, job, data, suffix, src, consent_version)
+        application = applications.create_application(db, user, job, data, suffix, src, consent_version, consent_language)
     except applications.JobNotOpen as exc:
         raise HTTPException(status_code=409, detail="This job is closed") from exc
     except applications.AlreadyApplied as exc:
@@ -150,6 +151,7 @@ async def apply_to_job(
     background_tasks: BackgroundTasks,
     consent_version: str = Form(..., max_length=30),
     src: str | None = Form(None, max_length=64),
+    consent_language: str | None = Form(None, max_length=10),
     file: UploadFile = File(...),
     user: User = Depends(get_authenticated_user),
     db: Session = Depends(get_db),
@@ -160,7 +162,7 @@ async def apply_to_job(
         })
     suffix = _suffix(file)
     data = await read_upload(file, CV_UPLOAD_TYPES)
-    created = await run_in_threadpool(_apply, db, user, slug, data, suffix, src, consent_version)
+    created = await run_in_threadpool(_apply, db, user, slug, data, suffix, src, consent_version, consent_language)
     background_tasks.add_task(cv_processing.run, created.id)
     return created
 

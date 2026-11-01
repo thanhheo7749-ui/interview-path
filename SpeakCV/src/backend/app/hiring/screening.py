@@ -9,7 +9,7 @@ from sqlalchemy.exc import IntegrityError
 from app.ai import gateway
 from app.ai.config import get_config
 from app.brain.text import normalise_for_match, quote_in
-from app.database.sql_models import CvClaim, Job, RequirementResult, ScreeningCache
+from app.database.sql_models import Application, CvClaim, Job, RequirementResult, ScreeningCache
 from app.hiring import audit, jobs
 from app.hiring.identity import cv_section
 
@@ -44,6 +44,10 @@ _DIRECTIVE = re.compile(
     )),
     re.IGNORECASE,
 )
+
+
+class ApplicationDeleted(Exception):
+    """The application was deleted during the AI call, so its result is discarded."""
 
 
 class RequirementAssessment(BaseModel):
@@ -138,12 +142,14 @@ def assess(db, application) -> ScreeningResult:
 
     Commits: the transaction ends before the AI call and again around the cache write, so the caller must have
     nothing pending that it may yet discard. Rows for the application are added and flushed; the caller commits.
+    Raises ApplicationDeleted if the application was deleted during the AI call: a cache row holds quotes from the CV.
     """
     db.commit()
     blind_text = application.cv_text_blind
     if not blind_text:
         raise ValueError("Application has no blind text to assess")
     blind_hash = application.cv_blind_hash
+    application_id = application.id
     company_id = application.company_id
     job_version = db.get(Job, application.job_id).version
     requirements = tuple(
@@ -167,6 +173,13 @@ def assess(db, application) -> ScreeningResult:
         )
         provider = response.provider
         payload = _verified(response.value, requirements, blind_text)
+        locked = (
+            db.query(Application).filter(Application.id == application_id)
+            .populate_existing().with_for_update().first()
+        )
+        if locked is None or locked.anonymized_at is not None:
+            db.rollback()
+            raise ApplicationDeleted
         db.add(ScreeningCache(**key, result=payload))
         try:
             db.commit()

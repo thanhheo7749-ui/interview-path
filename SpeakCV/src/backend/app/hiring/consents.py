@@ -49,11 +49,11 @@ def current_text(purpose: str, language: str, retention_days: int = DEFAULT_RETE
     return ConsentText(version=VERSION, text=template.format(retention_days=retention_days))
 
 
-def record(db, user_id, company_id, application_id, purpose, text_version) -> Consent:
+def record(db, user_id, company_id, application_id, purpose, text_version, language=None) -> Consent:
     if purpose not in PURPOSES:
         raise ValueError(f"Unknown consent purpose: {purpose}")
     consent = Consent(user_id=user_id, company_id=company_id, application_id=application_id,
-                      purpose=purpose, text_version=text_version)
+                      purpose=purpose, text_version=text_version, language=language)
     db.add(consent)
     db.flush()
     return consent

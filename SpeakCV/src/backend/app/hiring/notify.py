@@ -9,9 +9,9 @@ from app.database.sql_models import Notification, User
 logger = logging.getLogger(__name__)
 
 
-def enqueue(db, company_id, user_id, kind, language, subject, body) -> Notification:
-    """Add a pending notification. The caller commits."""
-    row = Notification(company_id=company_id, user_id=user_id, kind=kind, language=language,
+def enqueue(db, company_id, user_id, kind, language, subject, body, application_id=None) -> Notification:
+    """Add a pending notification. The caller commits. Deleting an application deletes what points at it."""
+    row = Notification(company_id=company_id, user_id=user_id, application_id=application_id, kind=kind, language=language,
                        subject=subject, body=body, status="pending")
     db.add(row)
     db.flush()
