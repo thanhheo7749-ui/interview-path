@@ -6,21 +6,32 @@ from app.ai.config import get_config
 from app.ai.providers import fake
 
 _fixture: list[dict] = []
+_fixture_edges: list[dict] = []
 _REF = re.compile(r"\[([nc]\d+)\]\s*(.*)")
 _DOCUMENT = re.compile(r"<document>\n(.*)\n</document>", re.DOTALL)
 
 
-def load_extraction_fixture(items: list[dict]) -> None:
-    """Items carry the extraction fields. An item is emitted when its quote appears in the chunk."""
+def load_extraction_fixture(items: list[dict], edges: list[dict] | None = None) -> None:
+    """Items carry the extraction fields. An item is emitted when its quote appears in the chunk.
+
+    Edges are emitted the same way. The pipeline drops and counts an edge whose ends do not resolve."""
     _fixture.clear()
     _fixture.extend(items)
+    _fixture_edges.clear()
+    _fixture_edges.extend(edges or [])
 
 
 def _extract(_system, messages, _schema) -> str:
     match = _DOCUMENT.search(messages[-1]["content"])
     chunk = match.group(1) if match else ""
     if _fixture:
-        return json.dumps({"nodes": [i for i in _fixture if i["quote"] in chunk], "edges": []}, ensure_ascii=False)
+        return json.dumps(
+            {
+                "nodes": [i for i in _fixture if i["quote"] in chunk],
+                "edges": [e for e in _fixture_edges if e["quote"] in chunk],
+            },
+            ensure_ascii=False,
+        )
     first_line = next((line.strip(" #") for line in chunk.splitlines() if line.strip(" #")), "")
     if not first_line:
         return json.dumps({"nodes": [], "edges": []})

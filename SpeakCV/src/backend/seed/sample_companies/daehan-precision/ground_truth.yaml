@@ -1,0 +1,271 @@
+# Authored ground truth for the fictional "Daehan Precision Vina (Sample)". Not real company data.
+canaries: [CANARY-DAEHAN-PRECISION-SALARY-7741]
+
+contradictions:
+  - topic: annual leave days
+    a: {file: handbook.ko.md, quote: "연 15일을 부여한다", value: "15"}
+    b: {file: leave-policy.vi.md, quote: "được hưởng 12 ngày nghỉ phép năm có lương", value: "12"}
+  - topic: probation period
+    a: {file: handbook.ko.md, quote: "신규 입사자의 수습기간은 2개월이다", value: "2"}
+    b: {file: handbook.vi.md, quote: "Thời gian thử việc của nhân viên mới là 3 tháng", value: "3"}
+  - topic: Tet bonus months for full-time employees
+    a: {file: bonus-policy.ko.md, quote: "기본급의 2개월분을 지급한다", value: "2"}
+    b: {file: handbook.vi.md, quote: "bằng 1 tháng lương cơ bản cho nhân viên chính thức", value: "1"}
+  - topic: incident report deadline
+    a: {file: handbook.ko.md, quote: "24시간 이내에 부서장에게 서면으로 보고한다", value: "24"}
+    b: {file: team-playbook.vi.md, quote: "trong vòng 48 giờ kể từ lúc phát hiện", value: "48"}
+
+gaps:
+  - "Do we get parental leave beyond the legal minimum?"
+  - "Can I work remotely from another country for a few weeks?"
+  - "How is overtime on weekends paid?"
+  - "Is there a training or certification budget?"
+  - "How does a transfer to the Korean headquarters work?"
+  - "May employees take a side job or freelance work?"
+
+extraction:
+  # handbook.ko.md
+  - {ref: Annual leave days for full-time employees, type: policy, title: Annual leave days for full-time employees,
+     body: "정규직 연차휴가는 연 15일이다. Annual leave days for full-time employees: 15.",
+     quote: "연 15일을 부여한다", fact_kind: number, fact_value: "15", fact_unit: days,
+     scope_text: full-time employees after one year of service, effective_date: ""}
+  - {ref: Probation period length for new full-time employees, type: policy, title: Probation period length for new full-time employees,
+     body: "수습 2개월. Probation period length for new full-time employees: 2 months.",
+     quote: "신규 입사자의 수습기간은 2개월이다", fact_kind: number, fact_value: "2", fact_unit: months,
+     scope_text: new employees, effective_date: ""}
+  - {ref: Incident report deadline for quality and security incidents, type: policy, title: Incident report deadline for quality and security incidents,
+     body: "사고는 24시간 이내에 서면으로 보고한다. Incident report deadline for quality and security incidents: 24 hours.",
+     quote: "24시간 이내에 부서장에게 서면으로 보고한다", fact_kind: number, fact_value: "24", fact_unit: hours,
+     scope_text: quality and security incidents reported to the department head, effective_date: ""}
+  - {ref: 정규 근무시간, type: policy, title: 정규 근무시간,
+     body: "월요일부터 금요일까지 08:00부터 17:00까지 근무하며 점심시간은 12시부터 13시까지이다.",
+     quote: "정규 근무시간은 월요일부터 금요일까지 08:00부터 17:00까지이다",
+     fact_kind: none, fact_value: "", fact_unit: "", scope_text: "", effective_date: ""}
+  - {ref: 직속 상사를 통한 보고, type: process, title: 직속 상사를 통한 보고,
+     body: "모든 업무는 직속 상사를 통해 보고하며 상급자를 건너뛰지 않는다.",
+     quote: "모든 업무는 직속 상사를 통해 보고하며",
+     fact_kind: none, fact_value: "", fact_unit: "", scope_text: "", effective_date: ""}
+  - {ref: 일일 업무보고, type: process, title: 일일 업무보고,
+     body: "매일 17시 전까지 팀장에게 일일 업무보고를 제출한다.",
+     quote: "일일 업무보고는 매일 17시 전까지 팀장에게 제출한다",
+     fact_kind: none, fact_value: "", fact_unit: "", scope_text: "", effective_date: ""}
+  - {ref: 주간 보고서, type: process, title: 주간 보고서,
+     body: "매주 금요일 정오까지 부서장에게 주간 보고서를 올린다.",
+     quote: "주간 보고서는 매주 금요일 정오까지 부서장에게 올린다",
+     fact_kind: none, fact_value: "", fact_unit: "", scope_text: "", effective_date: ""}
+  - {ref: 품의서 결재, type: process, title: 품의서 결재,
+     body: "중요한 결정은 품의서를 작성하여 결재선을 따라 승인받는다.",
+     quote: "품의서를 작성하여 결재선을 따라 승인받는다",
+     fact_kind: none, fact_value: "", fact_unit: "", scope_text: "", effective_date: ""}
+  - {ref: 휴가원 결재, type: process, title: 휴가원 결재,
+     body: "연차는 3일 전까지 휴가원을 작성하여 직속 상사의 결재를 받는다.",
+     quote: "3일 전까지 휴가원을 작성하여 직속 상사의 결재를 받는다",
+     fact_kind: none, fact_value: "", fact_unit: "", scope_text: "", effective_date: ""}
+  - {ref: 연 1회 안전 교육, type: policy, title: 연 1회 안전 교육,
+     body: "모든 직원은 사내 안전 교육을 연 1회 이수한다.",
+     quote: "사내 안전 교육은 모든 직원이 연 1회 이수해야 한다",
+     fact_kind: none, fact_value: "", fact_unit: "", scope_text: "", effective_date: ""}
+  # handbook.vi.md
+  - {ref: Probation period length for new full-time employees, type: fact, title: Probation period length for new full-time employees,
+     body: "Thử việc 3 tháng. Probation period length for new full-time employees: 3 months.",
+     quote: "Thời gian thử việc của nhân viên mới là 3 tháng", fact_kind: number, fact_value: "3", fact_unit: months,
+     scope_text: new employees, effective_date: ""}
+  - {ref: Tet bonus months for full-time employees, type: fact, title: Tet bonus months for full-time employees,
+     body: "Thưởng Tết bằng 1 tháng lương cơ bản. Tet bonus months for full-time employees: 1.",
+     quote: "bằng 1 tháng lương cơ bản cho nhân viên chính thức", fact_kind: number, fact_value: "1", fact_unit: months,
+     scope_text: full-time employees at Tet, effective_date: ""}
+  - {ref: Báo cáo tuần cho trưởng bộ phận, type: process, title: Báo cáo tuần cho trưởng bộ phận,
+     body: "Báo cáo tuần gửi trưởng bộ phận trước 12:00 thứ Sáu.",
+     quote: "Báo cáo tuần gửi trưởng bộ phận trước 12:00 thứ Sáu",
+     fact_kind: none, fact_value: "", fact_unit: "", scope_text: "", effective_date: ""}
+  - {ref: Đồng phục và giày bảo hộ, type: policy, title: Đồng phục và giày bảo hộ,
+     body: "Nhân viên khu sản xuất mặc đồng phục và giày bảo hộ khi vào nhà xưởng.",
+     quote: "Nhân viên khu sản xuất phải mặc đồng phục và giày bảo hộ khi vào nhà xưởng",
+     fact_kind: none, fact_value: "", fact_unit: "", scope_text: "", effective_date: ""}
+  # values.en.md
+  - {ref: Follow the process, type: value, title: Follow the process,
+     body: "We follow the written procedure even when a shortcut looks safe.",
+     quote: "We follow the written procedure even when a shortcut looks safe.",
+     fact_kind: none, fact_value: "", fact_unit: "", scope_text: "", effective_date: ""}
+  - {ref: Raises a change request instead of bending a procedure, type: behavior, title: Raises a change request instead of bending a procedure,
+     body: "If a procedure is wrong, we raise a change request and wait for approval.",
+     quote: "We raise a change request and wait for approval",
+     fact_kind: none, fact_value: "", fact_unit: "", scope_text: "", effective_date: ""}
+  - {ref: Document every decision, type: value, title: Document every decision,
+     body: "Every decision leaves a record in the approval system, with a name and a date.",
+     quote: "Every decision leaves a record in the approval system",
+     fact_kind: none, fact_value: "", fact_unit: "", scope_text: "", effective_date: ""}
+  - {ref: Writes meeting minutes the same day, type: behavior, title: Writes meeting minutes the same day,
+     body: "We write meeting minutes the same day and send them to everyone who attended.",
+     quote: "We write meeting minutes the same day",
+     fact_kind: none, fact_value: "", fact_unit: "", scope_text: "", effective_date: ""}
+  - {ref: Escalate through the reporting line, type: value, title: Escalate through the reporting line,
+     body: "We report problems to our direct manager within the same shift.",
+     quote: "We report problems to our direct manager within the same shift.",
+     fact_kind: none, fact_value: "", fact_unit: "", scope_text: "", effective_date: ""}
+  - {ref: Does not go around the manager, type: behavior, title: Does not go around the manager,
+     body: "We do not go around a manager to a senior leader, and we do not hide bad news.",
+     quote: "We do not go around a manager to a senior leader",
+     fact_kind: none, fact_value: "", fact_unit: "", scope_text: "", effective_date: ""}
+  - {ref: Quality before speed, type: value, title: Quality before speed,
+     body: "We stop the line when a measurement is out of tolerance.",
+     quote: "We stop the line when a measurement is out of tolerance.",
+     fact_kind: none, fact_value: "", fact_unit: "", scope_text: "", effective_date: ""}
+  - {ref: Accepts a late verified result over an open doubt, type: behavior, title: Accepts a late verified result over an open doubt,
+     body: "We would rather deliver one day late with a verified result than on time with an open doubt.",
+     quote: "We would rather deliver one day late with a verified result",
+     fact_kind: none, fact_value: "", fact_unit: "", scope_text: "", effective_date: ""}
+  - {ref: Respect for seniors and teammates, type: value, title: Respect for seniors and teammates,
+     body: "Senior engineers explain the reasons behind a rule when a junior asks.",
+     quote: "Senior engineers explain the reasons behind a rule when a junior asks.",
+     fact_kind: none, fact_value: "", fact_unit: "", scope_text: "", effective_date: ""}
+  # values.vi.md
+  - {ref: Gửi đề xuất thay đổi quy trình, type: behavior, title: Gửi đề xuất thay đổi quy trình,
+     body: "Khi thấy quy trình chưa hợp lý, gửi đề xuất thay đổi và chờ phê duyệt, không tự ý điều chỉnh.",
+     quote: "chúng tôi gửi đề xuất thay đổi và chờ phê duyệt",
+     fact_kind: none, fact_value: "", fact_unit: "", scope_text: "", effective_date: ""}
+  # team-playbook.vi.md
+  - {ref: Incident report deadline for quality and security incidents, type: fact, title: Incident report deadline for quality and security incidents,
+     body: "Báo cáo sự cố nộp trong 48 giờ. Incident report deadline for quality and security incidents: 48 hours.",
+     quote: "trong vòng 48 giờ kể từ lúc phát hiện", fact_kind: number, fact_value: "48", fact_unit: hours,
+     scope_text: quality and security incidents reported to the department head, effective_date: ""}
+  - {ref: Họp đứng 09:00 hằng ngày, type: process, title: Họp đứng 09:00 hằng ngày,
+     body: "Họp đứng tối đa 15 phút, trưởng nhóm ghi biên bản vào hệ thống phê duyệt.",
+     quote: "Cuộc họp đứng diễn ra lúc 09:00 mỗi ngày làm việc",
+     fact_kind: none, fact_value: "", fact_unit: "", scope_text: "", effective_date: ""}
+  - {ref: Số người duyệt pull request, type: policy, title: Số người duyệt pull request,
+     body: "Pull request cần 2 người duyệt, trong đó có trưởng nhóm, trước khi merge.",
+     quote: "cần 2 người duyệt trước khi merge", fact_kind: number, fact_value: "2", fact_unit: reviewers,
+     scope_text: Backend team pull requests, effective_date: ""}
+  - {ref: Phát hành vào thứ Ba và thứ Năm, type: process, title: Phát hành vào thứ Ba và thứ Năm,
+     body: "Chỉ phát hành vào thứ Ba và thứ Năm sau 18:00, cần phiếu yêu cầu thay đổi được ký duyệt.",
+     quote: "Chỉ phát hành vào khung giờ thứ Ba và thứ Năm sau 18:00",
+     fact_kind: none, fact_value: "", fact_unit: "", scope_text: "", effective_date: ""}
+  - {ref: Báo sự cố cho trưởng nhóm qua điện thoại, type: process, title: Báo sự cố cho trưởng nhóm qua điện thoại,
+     body: "Người phát hiện sự cố báo ngay cho trưởng nhóm bằng điện thoại rồi lập báo cáo.",
+     quote: "báo ngay cho trưởng nhóm bằng điện thoại",
+     fact_kind: none, fact_value: "", fact_unit: "", scope_text: "", effective_date: ""}
+  - {ref: Phân tích nguyên nhân gốc do trưởng bộ phận chủ trì, type: process, title: Phân tích nguyên nhân gốc do trưởng bộ phận chủ trì,
+     body: "Trưởng bộ phận chủ trì phân tích nguyên nhân gốc và ký duyệt biện pháp phòng ngừa.",
+     quote: "Trưởng bộ phận chủ trì buổi phân tích nguyên nhân gốc",
+     fact_kind: none, fact_value: "", fact_unit: "", scope_text: "", effective_date: ""}
+  - {ref: Không sửa dữ liệu sản xuất khi chưa được duyệt, type: policy, title: Không sửa dữ liệu sản xuất khi chưa được duyệt,
+     body: "Không ai được tự ý sửa dữ liệu sản xuất trực tiếp trên môi trường thật khi chưa có chữ ký duyệt.",
+     quote: "Không ai được tự ý sửa dữ liệu sản xuất trực tiếp",
+     fact_kind: none, fact_value: "", fact_unit: "", scope_text: "", effective_date: ""}
+  # jd-backend.en.md
+  - {ref: Backend Developer, type: role, title: Backend Developer,
+     body: "Builds and maintains the services behind the production management system, reporting to the Backend team lead.",
+     quote: "The Backend Developer builds and maintains the services behind our production management system",
+     fact_kind: none, fact_value: "", fact_unit: "", scope_text: "", effective_date: ""}
+  - {ref: Java, type: skill, title: Java,
+     body: "Java development experience of at least 3 years.",
+     quote: "Java development experience of at least 3 years",
+     fact_kind: none, fact_value: "", fact_unit: "", scope_text: "", effective_date: ""}
+  - {ref: Spring Boot, type: skill, title: Spring Boot,
+     body: "Building REST services with Spring Boot.",
+     quote: "Spring Boot experience building REST services",
+     fact_kind: none, fact_value: "", fact_unit: "", scope_text: "", effective_date: ""}
+  - {ref: Oracle and SQL tuning, type: skill, title: Oracle and SQL tuning,
+     body: "Oracle database and SQL tuning experience.",
+     quote: "Oracle database and SQL tuning experience",
+     fact_kind: none, fact_value: "", fact_unit: "", scope_text: "", effective_date: ""}
+  - {ref: Design documents before coding, type: requirement, title: Design documents before coding,
+     body: "A habit of writing design documents before coding.",
+     quote: "Habit of writing design documents before coding",
+     fact_kind: none, fact_value: "", fact_unit: "", scope_text: "", effective_date: ""}
+  - {ref: Follows change control, type: requirement, title: Follows change control,
+     body: "Can follow change-control procedures and approval workflows.",
+     quote: "Ability to follow change-control procedures and approval workflows",
+     fact_kind: none, fact_value: "", fact_unit: "", scope_text: "", effective_date: ""}
+  - {ref: Written communication, type: requirement, title: Written communication,
+     body: "Clear written communication in English, with Korean or Vietnamese.",
+     quote: "Clear written communication in English, with Korean or Vietnamese",
+     fact_kind: none, fact_value: "", fact_unit: "", scope_text: "", effective_date: ""}
+  - {ref: ISO 9001 familiarity, type: skill, title: ISO 9001 familiarity,
+     body: "Familiarity with ISO 9001 quality management.",
+     quote: "Familiarity with ISO 9001 quality management",
+     fact_kind: none, fact_value: "", fact_unit: "", scope_text: "", effective_date: ""}
+  - {ref: Manufacturing execution systems, type: skill, title: Manufacturing execution systems,
+     body: "Experience with manufacturing execution systems.",
+     quote: "Experience with manufacturing execution systems",
+     fact_kind: none, fact_value: "", fact_unit: "", scope_text: "", effective_date: ""}
+  - {ref: Korean language, type: skill, title: Korean language,
+     body: "Korean language ability for working with headquarters.",
+     quote: "Korean language ability for working with headquarters",
+     fact_kind: none, fact_value: "", fact_unit: "", scope_text: "", effective_date: ""}
+  - {ref: Writes a daily report for the team lead, type: behavior, title: Writes a daily report for the team lead,
+     body: "A short daily report for the team lead and a weekly summary for the department head.",
+     quote: "You write a short daily report for your team lead",
+     fact_kind: none, fact_value: "", fact_unit: "", scope_text: "", effective_date: ""}
+  - {ref: Reports a breakdown to the manager first, type: behavior, title: Reports a breakdown to the manager first,
+     body: "When something breaks, report it to the manager first and write the incident report within the deadline.",
+     quote: "you report it to your manager first",
+     fact_kind: none, fact_value: "", fact_unit: "", scope_text: "", effective_date: ""}
+  # leave-policy.vi.md
+  - {ref: Annual leave days for full-time employees, type: fact, title: Annual leave days for full-time employees,
+     body: "Phép năm 12 ngày. Annual leave days for full-time employees: 12.",
+     quote: "được hưởng 12 ngày nghỉ phép năm có lương", fact_kind: number, fact_value: "12", fact_unit: days,
+     scope_text: full-time employees after one year of service, effective_date: ""}
+  - {ref: Chuyển ngày phép sang quý I, type: policy, title: Chuyển ngày phép sang quý I,
+     body: "Ngày phép năm chưa dùng được chuyển sang quý I của năm sau, không quy đổi thành tiền.",
+     quote: "có thể chuyển sang quý I của năm sau",
+     fact_kind: none, fact_value: "", fact_unit: "", scope_text: "", effective_date: ""}
+  - {ref: Giấy xác nhận khi nghỉ ốm, type: policy, title: Giấy xác nhận khi nghỉ ốm,
+     body: "Nghỉ ốm từ 2 ngày liên tiếp cần giấy xác nhận của cơ sở y tế.",
+     quote: "Nghỉ ốm cần giấy xác nhận của cơ sở y tế nếu nghỉ từ 2 ngày liên tiếp",
+     fact_kind: none, fact_value: "", fact_unit: "", scope_text: "", effective_date: ""}
+  - {ref: Nghỉ cưới có lương, type: policy, title: Nghỉ cưới có lương,
+     body: "Nhân viên được nghỉ 3 ngày hưởng lương khi bản thân kết hôn.",
+     quote: "Nhân viên được nghỉ 3 ngày hưởng lương khi bản thân kết hôn",
+     fact_kind: none, fact_value: "", fact_unit: "", scope_text: "", effective_date: ""}
+  # bonus-policy.ko.md
+  - {ref: Tet bonus months for full-time employees, type: policy, title: Tet bonus months for full-time employees,
+     body: "설날 상여는 기본급의 2개월분이다. Tet bonus months for full-time employees: 2.",
+     quote: "기본급의 2개월분을 지급한다", fact_kind: number, fact_value: "2", fact_unit: months,
+     scope_text: full-time employees at Tet, effective_date: ""}
+  - {ref: 성과 상여 연 1회, type: policy, title: 성과 상여 연 1회,
+     body: "성과 상여는 연 1회 12월 급여와 함께 지급하며 등급은 S, A, B, C이다.",
+     quote: "성과 상여는 연 1회, 12월 급여와 함께 지급한다",
+     fact_kind: none, fact_value: "", fact_unit: "", scope_text: "", effective_date: ""}
+  - {ref: 2단계 평가 절차, type: process, title: 2단계 평가 절차,
+     body: "팀장의 1차 평가와 부서장의 2차 평가를 거쳐 인사팀이 확정한다.",
+     quote: "팀장의 1차 평가와 부서장의 2차 평가를 거쳐 인사팀이 확정한다",
+     fact_kind: none, fact_value: "", fact_unit: "", scope_text: "", effective_date: ""}
+  # manager-notes.ko.md
+  - {ref: Backend salary band, type: private_note, title: Backend salary band,
+     body: "백엔드 개발자 연봉 밴드 7,200만 원에서 9,600만 원. CANARY-DAEHAN-PRECISION-SALARY-7741",
+     quote: "백엔드 개발자 급여 밴드는 연봉 기준 7,200만 원에서 9,600만 원이다",
+     fact_kind: none, fact_value: "", fact_unit: "", scope_text: "", effective_date: ""}
+  - {ref: Dealbreaker bypassing the approval line, type: private_note, title: Dealbreaker bypassing the approval line,
+     body: "절차와 결재선을 무시하고 운영 서버를 수정한 경력이 확인되면 불합격 처리한다.",
+     quote: "절차와 결재선을 무시하고 혼자 판단하여 운영 서버를 수정한 경력이 확인되면 불합격 처리한다",
+     fact_kind: none, fact_value: "", fact_unit: "", scope_text: "", effective_date: ""}
+  - {ref: Dealbreaker working without documentation, type: private_note, title: Dealbreaker working without documentation,
+     body: "문서화 없이 구두로만 일하는 습관이 드러나면 채용하지 않는다.",
+     quote: "문서화 없이 구두로만 일하는 습관이 면접에서 드러나면 채용하지 않는다",
+     fact_kind: none, fact_value: "", fact_unit: "", scope_text: "", effective_date: ""}
+
+edges:
+  # values to behaviours
+  - {source_ref: Follow the process, target_ref: Raises a change request instead of bending a procedure, relation: shown_by, quote: "We raise a change request and wait for approval"}
+  - {source_ref: Document every decision, target_ref: Writes meeting minutes the same day, relation: shown_by, quote: "We write meeting minutes the same day"}
+  - {source_ref: Escalate through the reporting line, target_ref: Does not go around the manager, relation: shown_by, quote: "We do not go around a manager to a senior leader"}
+  - {source_ref: Quality before speed, target_ref: Accepts a late verified result over an open doubt, relation: shown_by, quote: "We would rather deliver one day late with a verified result"}
+  - {source_ref: Follow the process, target_ref: Gửi đề xuất thay đổi quy trình, relation: shown_by, quote: "chúng tôi gửi đề xuất thay đổi và chờ phê duyệt"}
+  # role requirements
+  - {source_ref: Backend Developer, target_ref: Java, relation: requires, must_have: true, quote: "Java development experience of at least 3 years"}
+  - {source_ref: Backend Developer, target_ref: Spring Boot, relation: requires, must_have: true, quote: "Spring Boot experience building REST services"}
+  - {source_ref: Backend Developer, target_ref: Oracle and SQL tuning, relation: requires, must_have: true, quote: "Oracle database and SQL tuning experience"}
+  - {source_ref: Backend Developer, target_ref: Design documents before coding, relation: requires, must_have: true, quote: "Habit of writing design documents before coding"}
+  - {source_ref: Backend Developer, target_ref: Follows change control, relation: requires, must_have: true, quote: "Ability to follow change-control procedures and approval workflows"}
+  - {source_ref: Backend Developer, target_ref: Written communication, relation: requires, must_have: true, quote: "Clear written communication in English, with Korean or Vietnamese"}
+  - {source_ref: Backend Developer, target_ref: ISO 9001 familiarity, relation: requires, must_have: false, quote: "Familiarity with ISO 9001 quality management"}
+  - {source_ref: Backend Developer, target_ref: Manufacturing execution systems, relation: requires, must_have: false, quote: "Experience with manufacturing execution systems"}
+  - {source_ref: Backend Developer, target_ref: Korean language, relation: requires, must_have: false, quote: "Korean language ability for working with headquarters"}
+  - {source_ref: Backend Developer, target_ref: Writes a daily report for the team lead, relation: expects, quote: "You write a short daily report for your team lead"}
+  - {source_ref: Backend Developer, target_ref: Reports a breakdown to the manager first, relation: expects, quote: "you report it to your manager first"}
+  # private notes
+  - {source_ref: Backend Developer, target_ref: Backend salary band, relation: has_note, quote: "백엔드 개발자 급여 밴드는 연봉 기준 7,200만 원에서 9,600만 원이다"}
+  - {source_ref: Backend Developer, target_ref: Dealbreaker bypassing the approval line, relation: has_note, quote: "절차와 결재선을 무시하고 혼자 판단하여 운영 서버를 수정한 경력이 확인되면 불합격 처리한다"}
+  - {source_ref: Backend Developer, target_ref: Dealbreaker working without documentation, relation: has_note, quote: "문서화 없이 구두로만 일하는 습관이 면접에서 드러나면 채용하지 않는다"}

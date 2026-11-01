@@ -1,0 +1,20 @@
+slug: sori-labs
+name: Sori Labs (Sample)
+default_locale: en
+departments:
+  - name: Product Engineering
+  - name: People
+users:
+  - {email: hr@sori-labs.sample, name: Sample HR, role: hr, department: People}
+  - {email: manager@sori-labs.sample, name: Sample Manager, role: manager, department: Product Engineering}
+  - {email: employee@sori-labs.sample, name: Sample Employee, role: employee, department: Product Engineering}
+documents:
+  - {file: handbook.ko.md, title: 사내 핸드북, language: ko, visibility: internal}
+  - {file: handbook.vi.md, title: Sổ tay nhân viên, language: vi, visibility: internal}
+  - {file: values.en.md, title: How we work, language: en, visibility: public}
+  - {file: values.ko.md, title: 일하는 방식, language: ko, visibility: public}
+  - {file: team-playbook.vi.md, title: Cách nhóm Backend làm việc, language: vi, visibility: internal, department: Product Engineering}
+  - {file: jd-backend.en.md, title: Backend Developer JD, language: en, visibility: public, department: Product Engineering}
+  - {file: leave-policy.vi.md, title: Quy định nghỉ phép, language: vi, visibility: internal}
+  - {file: bonus-policy.ko.md, title: 보너스 정책, language: ko, visibility: internal}
+  - {file: manager-notes.ko.md, title: 채용 관리자 메모, language: ko, visibility: confidential, department: Product Engineering}

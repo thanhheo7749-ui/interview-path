@@ -1,0 +1,24 @@
+slug: daehan-precision
+name: Daehan Precision Vina (Sample)
+default_locale: ko
+departments:
+  - name: Engineering
+  - name: Backend
+    parent: Engineering
+  - name: Manufacturing IT
+    parent: Engineering
+  - name: HR
+users:
+  - {email: hr@daehan-precision.sample, name: Sample HR, role: hr, department: HR}
+  - {email: manager@daehan-precision.sample, name: Sample Manager, role: manager, department: Backend}
+  - {email: employee@daehan-precision.sample, name: Sample Employee, role: employee, department: Backend}
+documents:
+  - {file: handbook.ko.md, title: 사내 핸드북, language: ko, visibility: internal}
+  - {file: handbook.vi.md, title: Sổ tay nhân viên, language: vi, visibility: internal}
+  - {file: values.en.md, title: Company values, language: en, visibility: public}
+  - {file: values.vi.md, title: Giá trị cốt lõi, language: vi, visibility: public}
+  - {file: team-playbook.vi.md, title: Cẩm nang nhóm Backend, language: vi, visibility: internal, department: Backend}
+  - {file: jd-backend.en.md, title: Backend Developer JD, language: en, visibility: public, department: Backend}
+  - {file: leave-policy.vi.md, title: Quy định nghỉ phép, language: vi, visibility: internal}
+  - {file: bonus-policy.ko.md, title: 상여 규정, language: ko, visibility: internal}
+  - {file: manager-notes.ko.md, title: 채용 관리자 메모, language: ko, visibility: confidential, department: Backend}
