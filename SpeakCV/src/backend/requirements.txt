@@ -6,6 +6,7 @@ pydantic
 
 # 2. DATABASE & ORM
 sqlalchemy
+alembic
 pymysql
 
 # 3. Authentication & Security

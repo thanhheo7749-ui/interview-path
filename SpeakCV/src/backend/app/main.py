@@ -14,7 +14,6 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
-from sqlalchemy import inspect, text
 
 from .core import settings
 from .core.rate_limit import limiter
@@ -22,24 +21,6 @@ from .routers import profile, auth, cv, admin, interview, support, payment, jobs
 from .database import sql_models
 from .database.database import engine, SessionLocal
 from .auth.security import get_password_hash
-
-sql_models.Base.metadata.create_all(bind=engine)
-
-def ensure_profile_master_cv_column():
-    inspector = inspect(engine)
-    columns = {column["name"] for column in inspector.get_columns("user_profiles")}
-
-    with engine.begin() as connection:
-        if "master_cv_text" not in columns:
-            connection.execute(text("ALTER TABLE user_profiles ADD COLUMN master_cv_text TEXT NULL"))
-            print("[MIGRATE] Added user_profiles.master_cv_text column")
-        if "master_cv_structured" not in columns:
-            connection.execute(text("ALTER TABLE user_profiles ADD COLUMN master_cv_structured JSON NULL"))
-            print("[MIGRATE] Added user_profiles.master_cv_structured column")
-
-        if "master_cv_text" not in columns or "master_cv_structured" not in columns:
-            return
-
 
 def seed_admin():
     """Create the admin account if configured and absent. Never modifies an existing user."""
@@ -68,7 +49,6 @@ def seed_admin():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    ensure_profile_master_cv_column()
     seed_admin()
     yield
 
