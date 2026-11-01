@@ -11,6 +11,23 @@ _VI_RANGE = re.compile("[À-ỹ]")
 K1 = 1.5
 B = 0.75
 
+# Tokens that say nothing about a question's topic, so they do not count towards keyword coverage. Ranking keeps them.
+_STOP_EN = """
+a about all also am an and any are as at be been but by can could did do does for from get got had has have how i if
+in into is it its me my no not of on or our shall should so that the their them then there these they this to us was
+we were what when where which who whom why will with would you your
+""".split()
+# Syllables, because tokenise splits Vietnamese on spaces.
+_STOP_VI = """
+ai anh bao các cho chị có của cũng đã đang để đó được em gì hay hãy khi không là làm lại mà mấy mình một này nào nhiêu
+những nếu phải rằng rồi sao sẽ tôi thì thế theo trong và về với vậy
+""".split()
+# Syllable pairs, because tokenise splits Hangul that way, plus particles that stand alone.
+_STOP_KO = """
+가 과 는 도 를 에 와 은 을 의 이 입니 니다 니까 습니 합니 됩니 있습 없습 나요 까요 인가 는지 무엇 어떻 떻게 얼마
+""".split()
+_STOP_WORDS = frozenset(_STOP_EN + _STOP_VI + _STOP_KO)
+
 
 def normalise_for_match(text: str) -> str:
     return " ".join(unicodedata.normalize("NFKC", text or "").split())
@@ -40,6 +57,18 @@ def tokenise(text: str) -> list[str]:
             else:
                 tokens.append(run)
     return tokens
+
+
+def content_tokens(tokens: list[str]) -> list[str]:
+    return [token for token in tokens if token not in _STOP_WORDS]
+
+
+def keyword_coverage(query_tokens: list[str], document_tokens: list[str]) -> float:
+    """The fraction of the query's distinct non-stop tokens found in the document. 0.0 when it has none."""
+    wanted = set(content_tokens(query_tokens))
+    if not wanted:
+        return 0.0
+    return len(wanted & set(document_tokens)) / len(wanted)
 
 
 def guess_language(text: str) -> str:

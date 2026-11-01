@@ -164,8 +164,8 @@ def leave(db, world):
     handbook = world.document("Internal Handbook", "internal")
     policy = world.document("Leave Policy", "internal")
     guide = world.document("Portal Guide", "internal")
-    a = world.node("Entitlement in the handbook", "Handbook entitlement figure.", "internal", document=handbook, chunk_text=TWELVE)
-    b = world.node("Entitlement in the policy", "Policy entitlement figure.", "internal", document=policy, chunk_text=FIFTEEN)
+    a = world.node("Annual leave in the handbook", "Figure from the handbook.", "internal", document=handbook, chunk_text=TWELVE)
+    b = world.node("Annual leave in the policy", "Figure from the policy.", "internal", document=policy, chunk_text=FIFTEEN)
     portal = world.node("Portal note", "Requests go through the portal.", "internal", document=guide, chunk_text=PORTAL)
     conflict = world.open_conflict(a, b)
     chunk_of = {node.id: db.query(KbNodeSource.chunk_id).filter_by(node_id=node.id).scalar() for node in (a, b, portal)}

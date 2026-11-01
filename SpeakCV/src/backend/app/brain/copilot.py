@@ -70,8 +70,18 @@ def _thresholds() -> dict:
 
 
 def threshold_for(model: str) -> float:
-    thresholds = _thresholds()
+    """The minimum cosine for an item to count as relevant under this embedding model."""
+    thresholds = _thresholds()["min_cosine"]
     return thresholds.get(model, thresholds["default"])
+
+
+def min_keyword_coverage() -> float:
+    return _thresholds()["min_keyword_coverage"]
+
+
+def _is_relevant(cosine: float, coverage: float, model: str) -> bool:
+    """Judged on raw signals. The hybrid score only ranks: its keyword half is scaled so the best match is always 1.0."""
+    return cosine >= threshold_for(model) or coverage >= min_keyword_coverage()
 
 
 def _as_data(text: str) -> str:
@@ -131,13 +141,15 @@ def ask(db: Session, audience: Audience, question: str, user_id: int | None) -> 
         bundle = retriever.search(db, audience, question, query_vector=vector)
         best_score = bundle.best_score
 
-        if not bundle.items or bundle.best_score < threshold_for(embedded.model):
+        if not any(_is_relevant(item.cosine, item.keyword_coverage, embedded.model) for item in bundle.items):
             return finish("not_found", NOT_FOUND[language], [], False)
 
         # A conflict whose other side is hidden from this audience does not exist as far as they can tell.
         # Refs include chunks: a chunk states the value of the node extracted from it, so it counts as that node.
         conflicts = retriever.visible_conflicts(db, audience, bundle.conflicted_refs)
-        top_conflicts = [item.ref for item in bundle.items[:TOP_ITEMS] if item.ref in conflicts]
+        # A conflict on another topic is no reason to say two sources differ, though its values stay withheld below.
+        top_conflicts = [item.ref for item in bundle.items[:TOP_ITEMS] if item.ref in conflicts
+                         and _is_relevant(item.conflict_cosine, item.conflict_keyword_coverage, embedded.model)]
         if top_conflicts:
             citations = dict.fromkeys(citation for ref in top_conflicts for citation in conflicts[ref])
             return finish("conflict", CONFLICT[language], list(citations), False)

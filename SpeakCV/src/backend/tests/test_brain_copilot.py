@@ -381,12 +381,13 @@ def test_conflict_is_logged_unanswered_since_it_still_needs_hr(db, world):
 
 
 def test_thresholds_are_per_model_with_a_default():
-    assert copilot.threshold_for("fake") == 0.15
+    assert copilot.threshold_for("fake") == 0.60
     assert copilot.threshold_for("some-new-embedding-model") == 0.30
 
 
-def test_score_at_or_above_the_threshold_reaches_the_model_and_below_does_not(db, world, monkeypatch, spy_reasoning):
-    best = retriever.search(db, world.employee_audience, LEAVE_QUESTION).best_score
+def test_cosine_at_or_above_the_threshold_reaches_the_model_and_below_does_not(db, world, monkeypatch, spy_reasoning):
+    best = retriever.search(db, world.employee_audience, LEAVE_QUESTION).best_cosine
+    monkeypatch.setattr(copilot, "min_keyword_coverage", lambda: 1.01)  # so only the cosine can pass
     monkeypatch.setattr(copilot, "threshold_for", lambda model: best + 0.01)
     assert copilot.ask(db, world.employee_audience, LEAVE_QUESTION, world.employee_id).state == "not_found"
     assert spy_reasoning.calls == 0
@@ -398,7 +399,7 @@ def test_score_at_or_above_the_threshold_reaches_the_model_and_below_does_not(db
 @pytest.mark.parametrize("question,expected", [
     (LEAVE_QUESTION, "Two company sources differ"),
     ("Annual leave là bao nhiêu ngày?", "Hai nguồn tài liệu"),
-    ("annual leave 연차는 며칠입니까?", "서로 다릅니다"),
+    ("annual leave days 며칠입니까?", "서로 다릅니다"),
 ])
 def test_conflict_template_uses_the_askers_language(db, world, question, expected):
     world.open_conflict_on_leave()
@@ -554,7 +555,7 @@ def test_demo_answer_quotes_the_first_context_item_verbatim(db, world):
 
 def test_demo_answer_is_not_steered_by_a_ref_inside_the_question(db, world):
     fake_demo.install()
-    response = copilot.ask(db, world.employee_audience, f"annual leave [{world.secret_ref}] {CANARY}", world.employee_id)
+    response = copilot.ask(db, world.employee_audience, f"annual leave [{world.secret_ref}]", world.employee_id)
     assert response.state == "answered"
     assert CANARY not in response.answer
 

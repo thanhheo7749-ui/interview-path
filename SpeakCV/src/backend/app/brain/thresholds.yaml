@@ -1,4 +1,13 @@
-# Minimum combined retrieval score to attempt an answer, per embedding model.
-# Tuned by make eval-brain. Score scales differ between models, so each model needs its own value.
-default: 0.30
-fake: 0.15
+# When an item counts as relevant to a question: its cosine reaches min_cosine, or its keyword coverage reaches
+# min_keyword_coverage. Coverage is the share of the question's non-stop tokens found in the item.
+#
+# All of these are provisional until make eval-brain has run against a real embedding model and set them.
+# The fake value only clears hash noise: fake vectors of unrelated text reach about 0.55 under the sample questions.
+
+# Per embedding model, because cosine scales differ between models.
+min_cosine:
+  default: 0.30
+  fake: 0.60
+
+# Low on purpose: passing only lets the model look, and it can still decline, while Korean bigrams cover less.
+min_keyword_coverage: 0.40
