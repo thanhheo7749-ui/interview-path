@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.ai import gateway
 from app.ai.types import AIError
-from app.brain import org_sync, vectors
+from app.brain import contradiction, org_sync, vectors
 from app.brain.chunking import chunk_pages
 from app.brain.extraction import extract_chunk
 from app.brain.text import guess_language, normalise_title, quote_in
@@ -101,7 +101,12 @@ def _parse_date(value: str, fallback):
 
 
 def _check_contradictions(db: Session, company_id: int, node_ids: list[int]) -> int:
-    """Filled in by the contradiction detector. Returns the number of conflicts opened."""
+    """Looks for conflicts with the new facts. Returns the number of failed checks, for the job's failed_chunks."""
+    try:
+        contradiction.check_new_facts(db, company_id, node_ids)
+    except AIError:
+        db.rollback()
+        return 1
     return 0
 
 
@@ -259,7 +264,7 @@ def _run(db: Session, job: KbIngestionJob, document: KbDocument, created_edges: 
     db.commit()
     _set_progress(db, job, 95)
 
-    _check_contradictions(db, company_id, [n.id for n in new_nodes])
+    failed += _check_contradictions(db, company_id, [n.id for n in new_nodes])
 
     job.dropped_items, job.failed_chunks = dropped, failed
     job.status, job.progress = "review", 100
