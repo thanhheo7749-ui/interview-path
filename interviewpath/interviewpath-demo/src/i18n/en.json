@@ -257,5 +257,101 @@
       "provider": "The AI service did not respond. Please try again later.",
       "generic": "Copilot could not answer this question. Please try again."
     }
+  },
+  "trust": {
+    "nav": "Trust Center",
+    "title": "Trust Center",
+    "intro": "Consents, the audit log, data retention and the fairness check for your company.",
+    "legalNote": "Consent wording and retention periods are proposals and have not had legal review.",
+    "previous": "Previous",
+    "next": "Next",
+    "pageOf": "Page {{page}} of {{pages}}",
+    "tabs": {
+      "consents": "Consents",
+      "audit": "Audit log",
+      "retention": "Retention",
+      "fairness": "Fairness check"
+    },
+    "purposes": {
+      "cv_processing": "CV processing",
+      "recording_screening": "Recorded screening interview"
+    },
+    "consents": {
+      "intro": "Each candidate consent is listed under the candidate's alias. Names and email addresses are not shown.",
+      "empty": "No consents recorded yet.",
+      "alias": "Alias",
+      "purpose": "Purpose",
+      "version": "Text version",
+      "granted": "Granted",
+      "status": "Status",
+      "noAlias": "(not linked)",
+      "active": "Active",
+      "withdrawn": "Withdrawn {{date}}"
+    },
+    "audit": {
+      "intro": "Every decision, reveal and AI step is recorded here. Candidates appear only as application numbers.",
+      "filter": "Action",
+      "allActions": "All actions",
+      "empty": "No audit entries match.",
+      "when": "When",
+      "action": "Action",
+      "actor": "By",
+      "target": "Target",
+      "ai": "AI step",
+      "details": "Details",
+      "staff": "Staff member #{{id}}",
+      "system": "System"
+    },
+    "actions": {
+      "cv_assessed": "CV assessed",
+      "voice_session_started": "Interview started",
+      "voice_session_completed": "Interview completed",
+      "voice_session_expired": "Interview expired",
+      "recording_declined": "Recording declined",
+      "fast_tracked": "Fast-tracked",
+      "hr_decision": "HR decision",
+      "cv_status_corrected": "CV label corrected",
+      "identity_revealed": "Identity revealed",
+      "audio_played": "Audio played",
+      "restart_granted": "Restart granted",
+      "analysis_retried": "Analysis retried",
+      "fairness_check": "Fairness check",
+      "consent_withdrawn": "Consent withdrawn",
+      "application_withdrawn": "Application withdrawn",
+      "application_anonymized": "Application anonymized",
+      "reminder_queued": "Reminder queued"
+    },
+    "retention": {
+      "period": "Retention period",
+      "days_one": "{{count}} day",
+      "days_other": "{{count}} days",
+      "periodHint": "Undecided applications are removed after {{undecided}} days.",
+      "awaiting": "Awaiting deletion",
+      "awaitingHint": "Applications that still hold personal data.",
+      "dueNow": "Due now",
+      "dueNowHint": "Past their retention period; the next scheduled run deletes them.",
+      "anonymized": "Already anonymized",
+      "anonymizedHint": "Personal data deleted; the status record remains.",
+      "deletedLabel": "Deleted:",
+      "deleted": "the CV file and text, interview recordings and transcripts, assessment results, consents and notifications for the application, and the link between audit entries and the candidate.",
+      "keptLabel": "Kept:",
+      "kept": "the application's alias, stage and decision, and the audit log, so hiring statistics and accountability remain."
+    },
+    "fairness": {
+      "intro": "Swaps the name and gender in an application's CV, masks it again, and compares the blind text. Nothing is rescored and nothing about the application changes.",
+      "noApplications": "No applications to check yet.",
+      "application": "Application",
+      "choose": "Choose an application",
+      "run": "Run check",
+      "running": "Checking...",
+      "unavailable": "This application cannot be checked: {{reason}}.",
+      "resultSame": "After swapping name and gender, the blind text is identical and the stored screening result is the same.",
+      "resultTextSameOnly": "After swapping name and gender, the blind text is identical, but the stored screening results could not be confirmed as the same.",
+      "resultTextDiffers": "After swapping name and gender, the blind text differs, although the stored screening results are the same. Compare the two texts below.",
+      "resultDiffers": "After swapping name and gender, the blind text differs and the stored screening results are not the same. Compare the two texts below.",
+      "original": "Blind text (original)",
+      "swapped": "Blind text (name and gender swapped)",
+      "limit": "School names and experience content remain, so this reduces bias but does not eliminate it."
+    }
   }
 }
