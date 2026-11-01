@@ -8,17 +8,10 @@ services:
       - "host.docker.internal:host-gateway"
     ports:
       - "${SPEAKCV_BACKEND_PORT:-8001}:8000"
+    env_file:
+      - ./.env
     environment:
-      DATABASE_URL: mysql+pymysql://root:${MYSQL_ROOT_PASSWORD:-thanhhoang@123}@db:3306/${MYSQL_DATABASE:-speakcv}
-      GEMINI_API_KEY: ${GEMINI_API_KEY}
-      OPENAI_API_KEY: ${OPENAI_API_KEY}
-      OPENAI_BASE_URL: ${OPENAI_BASE_URL}
-      OPENAI_MODEL_GPT4O_MINI: ${OPENAI_MODEL_GPT4O_MINI}
-      OPENAI_MODEL_GPT4O: ${OPENAI_MODEL_GPT4O}
-      GROQ_API_KEY: ${GROQ_API_KEY}
-      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@gmail.com}
-      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin123}
-      ADMIN_NAME: ${ADMIN_NAME:-Admin}
+      DATABASE_URL: mysql+pymysql://root:${MYSQL_ROOT_PASSWORD:?set MYSQL_ROOT_PASSWORD in .env}@db:3306/${MYSQL_DATABASE:?set MYSQL_DATABASE in .env}
     depends_on:
       db:
         condition: service_healthy
@@ -45,8 +38,8 @@ services:
     container_name: speakcv_db
     restart: unless-stopped
     environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-thanhhoang@123}
-      MYSQL_DATABASE: ${MYSQL_DATABASE:-speakcv}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?set MYSQL_ROOT_PASSWORD in .env}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:?set MYSQL_DATABASE in .env}
     ports:
       - "3307:3306"
     healthcheck:
@@ -64,6 +57,8 @@ services:
     restart: unless-stopped
     ports:
       - "${INTERVIEWPATH_PORT:-5173}:5173"
+    environment:
+      VITE_API_URL: "${VITE_API_URL:-http://localhost:8001}"
     volumes:
       - ./interviewpath/interviewpath-demo:/app
       - interviewpath_node_modules:/app/node_modules

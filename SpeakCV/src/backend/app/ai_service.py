@@ -9,15 +9,8 @@ import json
 import time
 import requests
 import google.generativeai as genai
-from dotenv import load_dotenv
-from pathlib import Path
 
-# Load root project .env first, then local .env overrides
-_resolved = Path(__file__).resolve()
-_root_candidate = _resolved.parents[2] / ".env"
-if _root_candidate.exists():
-    load_dotenv(_root_candidate)
-load_dotenv(override=True)  # local src/backend/.env overrides
+from .core import settings  # noqa: F401  (loads .env files before os.getenv reads)
 
 def _valid_api_key(value: str | None) -> str | None:
     if not value:

@@ -109,7 +109,7 @@ enable_proxy="$(first_real "$(base_value ENABLE_PROXY)")"
 mysql_database="$(first_real "$(base_value MYSQL_DATABASE)" "speakcv")"
 mysql_root_password="$(first_real "$(base_value MYSQL_ROOT_PASSWORD)" "$existing_db_password")"
 secret_key="$(first_real "$(base_value SECRET_KEY)")"
-admin_email="$(first_real "$(source_value ADMIN_EMAIL)" "$(base_value ADMIN_EMAIL)" "admin@gmail.com")"
+admin_email="$(first_real "$(source_value ADMIN_EMAIL)" "$(base_value ADMIN_EMAIL)")"
 admin_password="$(first_real "$(source_value ADMIN_PASSWORD)" "$(base_value ADMIN_PASSWORD)")"
 admin_name="$(first_real "$(source_value ADMIN_NAME)" "$(base_value ADMIN_NAME)" "Admin")"
 access_token_minutes="$(first_real "$(base_value ACCESS_TOKEN_EXPIRE_MINUTES)" "3000")"
@@ -131,20 +131,26 @@ if is_placeholder "$secret_key"; then
   secret_key="$(random_hex)"
 fi
 
-if is_placeholder "$admin_password"; then
-  admin_password="$(random_hex)"
-fi
-
 encoded_mysql_password="$(url_encode "$mysql_root_password")"
 database_url="mysql+pymysql://root:${encoded_mysql_password}@db:3306/${mysql_database}"
 
 google_client_id="$(first_real "$(source_value NEXT_PUBLIC_GOOGLE_CLIENT_ID)" "$(base_value NEXT_PUBLIC_GOOGLE_CLIENT_ID)")"
-gemini_api_key="$(first_real "$(source_value GEMINI_API_KEY)" "$(base_value GEMINI_API_KEY)")"
+ai_reasoning_provider="$(first_real "$(source_value AI_REASONING_PROVIDER)" "$(base_value AI_REASONING_PROVIDER)")"
+ai_reasoning_model="$(first_real "$(source_value AI_REASONING_MODEL)" "$(base_value AI_REASONING_MODEL)")"
+ai_bulk_provider="$(first_real "$(source_value AI_BULK_PROVIDER)" "$(base_value AI_BULK_PROVIDER)")"
+ai_bulk_model="$(first_real "$(source_value AI_BULK_MODEL)" "$(base_value AI_BULK_MODEL)")"
+ai_embedding_provider="$(first_real "$(source_value AI_EMBEDDING_PROVIDER)" "$(base_value AI_EMBEDDING_PROVIDER)")"
+ai_embedding_model="$(first_real "$(source_value AI_EMBEDDING_MODEL)" "$(base_value AI_EMBEDDING_MODEL)")"
+ai_embedding_dim="$(first_real "$(source_value AI_EMBEDDING_DIM)" "$(base_value AI_EMBEDDING_DIM)")"
+ai_stt_provider="$(first_real "$(source_value AI_STT_PROVIDER)" "$(base_value AI_STT_PROVIDER)")"
+ai_stt_model="$(first_real "$(source_value AI_STT_MODEL)" "$(base_value AI_STT_MODEL)")"
+ai_tts_provider="$(first_real "$(source_value AI_TTS_PROVIDER)" "$(base_value AI_TTS_PROVIDER)")"
+ai_tts_model="$(first_real "$(source_value AI_TTS_MODEL)" "$(base_value AI_TTS_MODEL)")"
+anthropic_api_key="$(first_real "$(source_value ANTHROPIC_API_KEY)" "$(base_value ANTHROPIC_API_KEY)")"
 openai_api_key="$(first_real "$(source_value OPENAI_API_KEY)" "$(base_value OPENAI_API_KEY)")"
-openai_base_url="$(first_real "$(source_value OPENAI_BASE_URL)" "$(base_value OPENAI_BASE_URL)" "https://api.openai.com/v1")"
-groq_api_key="$(first_real "$(source_value GROQ_API_KEY)" "$(base_value GROQ_API_KEY)")"
-openai_model_mini="$(first_real "$(source_value OPENAI_MODEL_GPT4O_MINI)" "$(base_value OPENAI_MODEL_GPT4O_MINI)" "gpt-4.1-mini")"
-openai_model_full="$(first_real "$(source_value OPENAI_MODEL_GPT4O)" "$(base_value OPENAI_MODEL_GPT4O)" "gpt-4.1")"
+openai_base_url="$(first_real "$(source_value OPENAI_BASE_URL)" "$(base_value OPENAI_BASE_URL)")"
+gemini_api_key="$(first_real "$(source_value GEMINI_API_KEY)" "$(base_value GEMINI_API_KEY)")"
+voyage_api_key="$(first_real "$(source_value VOYAGE_API_KEY)" "$(base_value VOYAGE_API_KEY)")"
 
 primary_domain="$(first_real "$(base_value PRIMARY_DOMAIN)")"
 speakcv_domain="$(first_real "$(base_value SPEAKCV_DOMAIN)")"
@@ -174,14 +180,22 @@ API_DOMAIN=${api_domain}
 # Public URLs. scripts/vps-deploy.sh resolves these from PUBLIC_HOST on the VPS.
 VITE_SPEAKCV_URL=http://localhost:3000
 NEXT_PUBLIC_API_URL=http://localhost:8000
+VITE_API_URL=http://localhost:8000
 NEXT_PUBLIC_GOOGLE_CLIENT_ID=${google_client_id}
-CORS_ORIGINS=http://localhost:3000,http://localhost:5173,http://127.0.0.1:3000,http://127.0.0.1:5173
+GOOGLE_CLIENT_ID=${google_client_id}
+ALLOWED_ORIGINS=http://localhost:3000,http://localhost:5173,http://127.0.0.1:3000,http://127.0.0.1:5173
 VNPAY_RETURN_URL=http://localhost:3000/upgrade/success
 
 # Database
 MYSQL_DATABASE=${mysql_database}
 MYSQL_ROOT_PASSWORD=${mysql_root_password}
 DATABASE_URL=${database_url}
+
+# Runtime
+APP_ENV=production
+LEGACY_B2C_ENABLED=false
+NEXT_PUBLIC_LEGACY_B2C_ENABLED=false
+MAX_UPLOAD_MB=20
 
 # Auth/admin
 SECRET_KEY=${secret_key}
@@ -191,25 +205,23 @@ ADMIN_EMAIL=${admin_email}
 ADMIN_PASSWORD=${admin_password}
 ADMIN_NAME=${admin_name}
 
-# AI providers
-GEMINI_API_KEY=${gemini_api_key}
+# AI slots and providers
+AI_REASONING_PROVIDER=${ai_reasoning_provider}
+AI_REASONING_MODEL=${ai_reasoning_model}
+AI_BULK_PROVIDER=${ai_bulk_provider}
+AI_BULK_MODEL=${ai_bulk_model}
+AI_EMBEDDING_PROVIDER=${ai_embedding_provider}
+AI_EMBEDDING_MODEL=${ai_embedding_model}
+AI_EMBEDDING_DIM=${ai_embedding_dim}
+AI_STT_PROVIDER=${ai_stt_provider}
+AI_STT_MODEL=${ai_stt_model}
+AI_TTS_PROVIDER=${ai_tts_provider}
+AI_TTS_MODEL=${ai_tts_model}
+ANTHROPIC_API_KEY=${anthropic_api_key}
 OPENAI_API_KEY=${openai_api_key}
 OPENAI_BASE_URL=${openai_base_url}
-OPENAI_MODEL_GPT4O_MINI=${openai_model_mini}
-OPENAI_MODEL_GPT4O=${openai_model_full}
-GROQ_API_KEY=${groq_api_key}
-
-# AI runtime tuning
-AI_MAX_HISTORY_MESSAGES=$(first_real "$(source_value AI_MAX_HISTORY_MESSAGES)" "$(base_value AI_MAX_HISTORY_MESSAGES)" "16")
-AI_TOKEN_CHAR_BUDGET=$(first_real "$(source_value AI_TOKEN_CHAR_BUDGET)" "$(base_value AI_TOKEN_CHAR_BUDGET)" "18000")
-AI_DEFAULT_MAX_OUTPUT_TOKENS=$(first_real "$(source_value AI_DEFAULT_MAX_OUTPUT_TOKENS)" "$(base_value AI_DEFAULT_MAX_OUTPUT_TOKENS)" "500")
-AI_ENABLE_CACHE=$(first_real "$(source_value AI_ENABLE_CACHE)" "$(base_value AI_ENABLE_CACHE)" "1")
-AI_CACHE_TTL_SECONDS=$(first_real "$(source_value AI_CACHE_TTL_SECONDS)" "$(base_value AI_CACHE_TTL_SECONDS)" "300")
-AI_ROUTER_CHAR_THRESHOLD=$(first_real "$(source_value AI_ROUTER_CHAR_THRESHOLD)" "$(base_value AI_ROUTER_CHAR_THRESHOLD)" "850")
-AI_ENABLE_BRAIN_RETRIEVAL=$(first_real "$(source_value AI_ENABLE_BRAIN_RETRIEVAL)" "$(base_value AI_ENABLE_BRAIN_RETRIEVAL)" "1")
-AI_BRAIN_RETRIEVAL_DEBUG=$(first_real "$(source_value AI_BRAIN_RETRIEVAL_DEBUG)" "$(base_value AI_BRAIN_RETRIEVAL_DEBUG)" "0")
-AI_BRAIN_CONTEXT_MAX_CHARS=$(first_real "$(source_value AI_BRAIN_CONTEXT_MAX_CHARS)" "$(base_value AI_BRAIN_CONTEXT_MAX_CHARS)" "3200")
-AI_USAGE_LOG_FILE=$(first_real "$(source_value AI_USAGE_LOG_FILE)" "$(base_value AI_USAGE_LOG_FILE)" "/tmp/speakcv-backend.log")
+GEMINI_API_KEY=${gemini_api_key}
+VOYAGE_API_KEY=${voyage_api_key}
 
 # VNPAY optional settings
 VNPAY_TMN_CODE=$(first_real "$(source_value VNPAY_TMN_CODE)" "$(base_value VNPAY_TMN_CODE)")

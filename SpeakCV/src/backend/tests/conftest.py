@@ -22,3 +22,41 @@ os.environ.update(
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
 if str(BACKEND_ROOT) not in sys.path:
     sys.path.insert(0, str(BACKEND_ROOT))
+
+
+import pytest  # noqa: E402
+from fastapi.testclient import TestClient  # noqa: E402
+
+
+@pytest.fixture(autouse=True)
+def _fresh_tables():
+    from app.database import sql_models  # noqa: F401
+    from app.database.database import Base, engine
+
+    Base.metadata.drop_all(bind=engine)
+    Base.metadata.create_all(bind=engine)
+    yield
+
+
+@pytest.fixture
+def db():
+    from app.database.database import SessionLocal
+
+    session = SessionLocal()
+    try:
+        yield session
+    finally:
+        session.close()
+
+
+@pytest.fixture
+def app():
+    from app.main import create_app
+
+    return create_app()
+
+
+@pytest.fixture
+def client(app):
+    with TestClient(app) as test_client:
+        yield test_client

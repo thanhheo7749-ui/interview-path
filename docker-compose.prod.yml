@@ -29,6 +29,7 @@ services:
       dockerfile: Dockerfile.prod
       args:
         VITE_SPEAKCV_URL: ${VITE_SPEAKCV_URL}
+        VITE_API_URL: ${VITE_API_URL}
     container_name: interviewpath_demo
     restart: unless-stopped
     ports:

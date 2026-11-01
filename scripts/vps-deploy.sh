@@ -106,7 +106,7 @@ detect_public_host() {
 write_resolved_env() {
   local enable_proxy public_host demo_port frontend_port backend_port
   local primary_domain speakcv_domain api_domain
-  local vite_speakcv_url next_public_api_url cors_origins vnpay_return_url
+  local vite_speakcv_url next_public_api_url allowed_origins vnpay_return_url
 
   enable_proxy="$(read_env ENABLE_PROXY)"
   demo_port="$(read_env INTERVIEWPATH_PORT)"
@@ -129,13 +129,13 @@ write_resolved_env() {
     public_host="$primary_domain"
     vite_speakcv_url="https://${speakcv_domain}"
     next_public_api_url="https://${api_domain}"
-    cors_origins="https://${primary_domain},https://${speakcv_domain}"
+    allowed_origins="https://${primary_domain},https://${speakcv_domain}"
     vnpay_return_url="https://${speakcv_domain}/upgrade/success"
   else
     public_host="$(detect_public_host)"
     vite_speakcv_url="http://${public_host}:${frontend_port}"
     next_public_api_url="http://${public_host}:${backend_port}"
-    cors_origins="http://${public_host}:${frontend_port},http://${public_host}:${demo_port}"
+    allowed_origins="http://${public_host}:${frontend_port},http://${public_host}:${demo_port}"
     vnpay_return_url="http://${public_host}:${frontend_port}/upgrade/success"
   fi
 
@@ -160,7 +160,8 @@ write_resolved_env() {
   set_key SPEAKCV_BACKEND_PORT "$backend_port"
   set_key VITE_SPEAKCV_URL "$vite_speakcv_url"
   set_key NEXT_PUBLIC_API_URL "$next_public_api_url"
-  set_key CORS_ORIGINS "$cors_origins"
+  set_key VITE_API_URL "$next_public_api_url"
+  set_key ALLOWED_ORIGINS "$allowed_origins"
   set_key VNPAY_RETURN_URL "$vnpay_return_url"
 }
 
@@ -169,18 +170,19 @@ required_keys=(
   MYSQL_ROOT_PASSWORD
   DATABASE_URL
   SECRET_KEY
-  ADMIN_EMAIL
-  ADMIN_PASSWORD
 )
 
 for key in "${required_keys[@]}"; do
   require_value "$key"
 done
 
-if is_placeholder "$(read_env OPENAI_API_KEY)" && is_placeholder "$(read_env GEMINI_API_KEY)"; then
-  echo "Missing AI provider key: set OPENAI_API_KEY or GEMINI_API_KEY in $ENV_FILE" >&2
-  exit 1
-fi
+for slot in REASONING BULK EMBEDDING STT TTS; do
+  require_value "AI_${slot}_PROVIDER"
+  if [[ "$(read_env "AI_${slot}_PROVIDER")" == "fake" ]]; then
+    echo "AI_${slot}_PROVIDER is fake; production refuses the fake provider." >&2
+    exit 1
+  fi
+done
 
 write_resolved_env
 

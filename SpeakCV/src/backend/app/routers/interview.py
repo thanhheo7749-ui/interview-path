@@ -13,7 +13,6 @@ import edge_tts
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, Request
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
-from dotenv import load_dotenv
 
 from .. import models
 from ..database import sql_models
@@ -39,8 +38,6 @@ from core.nunchi_analyzer import analyze_candidate_response
 from ..services.turn_evaluator import build_turn_analysis, resolve_turn_target_topic
 from ..services.question_planner import plan_next_question
 from ..services.interview_report_builder import build_structured_report
-
-load_dotenv() 
 
 router = APIRouter()
 

@@ -28,3 +28,4 @@ edge-tts
 
 # 6. Knowledge Graph & Analysis
 networkx
+slowapi

@@ -6,11 +6,9 @@ import os
 import json
 import requests
 from fastapi import APIRouter, File, UploadFile, HTTPException
-from dotenv import load_dotenv
 from .cv import extract_text_from_cv
 from ..ai_service import call_ai_chat
 
-load_dotenv()
 router = APIRouter()
 
 MOCK_JOBS = [
