@@ -1,0 +1,67 @@
+{
+  "common": {
+    "loading": "Loading...",
+    "save": "Save",
+    "cancel": "Cancel",
+    "dismiss": "Dismiss",
+    "remove": "Remove",
+    "rename": "Rename",
+    "none": "None",
+    "genericError": "Something went wrong. Please try again."
+  },
+  "login": {
+    "title": "Sign in to InterviewPath",
+    "subtitle": "HR portal",
+    "email": "Email",
+    "password": "Password",
+    "submit": "Sign in",
+    "submitting": "Signing in...",
+    "failed": "Incorrect email or password."
+  },
+  "nav": {
+    "settings": "Company settings",
+    "company": "Company",
+    "signOut": "Sign out"
+  },
+  "banner": {
+    "sample": "Sample data",
+    "sampleHint": "This company contains sample data for demonstration only."
+  },
+  "settings": {
+    "title": "Company settings",
+    "noCompany": "This account is not a member of any company.",
+    "companyName": "Company name",
+    "readOnlyNote": "Only HR members can change company settings."
+  },
+  "departments": {
+    "title": "Departments",
+    "empty": "No departments yet.",
+    "newName": "New department name",
+    "parent": "Parent department",
+    "noParent": "No parent (top level)",
+    "add": "Add department",
+    "delete": "Delete department",
+    "confirmDelete": "Delete this department?"
+  },
+  "members": {
+    "title": "Members",
+    "email": "Member email",
+    "name": "Member name (optional)",
+    "role": "Member role",
+    "department": "Department",
+    "noDepartment": "No department",
+    "add": "Add member",
+    "colEmail": "Email",
+    "colName": "Name",
+    "colRole": "Role",
+    "colDepartment": "Department",
+    "temporaryPassword": "Temporary password, shown once",
+    "existingAccount": "This email already had an account. Confirm with this person that the account is theirs before relying on this membership.",
+    "confirmRemove": "Remove this member?",
+    "roles": {
+      "hr": "HR",
+      "manager": "Manager",
+      "employee": "Employee"
+    }
+  }
+}
