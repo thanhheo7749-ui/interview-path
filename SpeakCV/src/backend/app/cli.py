@@ -26,6 +26,12 @@ def build_parser() -> argparse.ArgumentParser:
 
     reembed_parser = commands.add_parser("reembed", help="Regenerate knowledge base vectors with the current embedding slot")
     reembed_parser.add_argument("--company", help="Company slug. Defaults to every company.")
+
+    seed_parser = commands.add_parser(
+        "seed-samples", help="Create the two fictional sample companies and run their documents through the pipeline"
+    )
+    seed_parser.add_argument("--auto-approve", action="store_true", help="Publish everything. Sample companies only.")
+    seed_parser.add_argument("--only", help="Seed one sample company by slug.")
     return parser
 
 
@@ -108,6 +114,17 @@ def reembed(args) -> int:
         db.close()
 
 
+def seed_samples(args) -> int:
+    from app.brain import seed
+
+    try:
+        seed.seed_samples(auto_approve=args.auto_approve, only=args.only)
+    except (seed.SeedError, PermissionError) as exc:
+        print(str(exc), file=sys.stderr)
+        return 1
+    return 0
+
+
 def main(argv=None) -> int:
     args = build_parser().parse_args(argv)
     if args.command == "migrate":
@@ -116,6 +133,8 @@ def main(argv=None) -> int:
         return create_company(args)
     elif args.command == "reembed":
         return reembed(args)
+    elif args.command == "seed-samples":
+        return seed_samples(args)
     return 0
 
 

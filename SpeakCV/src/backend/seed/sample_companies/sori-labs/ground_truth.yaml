@@ -1,0 +1,239 @@
+# Authored ground truth for the fictional "Sori Labs (Sample)". Not real company data.
+# Omitted extraction fields default to: ref = title, body = "", fact_kind = none, other fact fields and effective_date empty.
+canaries: [CANARY-SORI-LABS-SALARY-7741]
+
+contradictions:
+  - topic: annual leave days
+    a: {file: handbook.ko.md, quote: "연 20일을 부여한다", value: "20"}
+    b: {file: leave-policy.vi.md, quote: "được hưởng 15 ngày nghỉ phép năm có lương mỗi năm", value: "15"}
+  - topic: remote work days per week
+    a: {file: handbook.ko.md, quote: "원격근무는 주 3일까지 자유롭게 선택할 수 있다", value: "3"}
+    b: {file: team-playbook.vi.md, quote: "Nhóm Backend làm việc từ xa 2 ngày mỗi tuần", value: "2"}
+  - topic: bonus payouts per year
+    a: {file: bonus-policy.ko.md, quote: "정기 보너스는 연 2회, 6월과 12월에 지급한다", value: "2"}
+    b: {file: handbook.vi.md, quote: "Công ty xét thưởng một lần mỗi năm vào tháng 12", value: "1"}
+  - topic: first review time for a pull request
+    a: {file: values.en.md, quote: "within 4 working hours during core hours", value: "4"}
+    b: {file: team-playbook.vi.md, quote: "được review lần đầu trong vòng 1 ngày làm việc", value: "1"}
+
+gaps:
+  - "Do we get parental leave beyond the legal minimum?"
+  - "Are there stock options, and how do they vest?"
+  - "Is there a conference or learning budget?"
+  - "Does the company sponsor work visas for relocation?"
+  - "Can I work from another country for a month?"
+  - "Is there a stipend for a home-office setup?"
+
+extraction:
+  # handbook.ko.md
+  - {title: Annual leave days for full-time employees, type: policy,
+     body: "연차 20일. Annual leave days for full-time employees: 20.",
+     quote: "연 20일을 부여한다", fact_kind: number, fact_value: "20", fact_unit: days,
+     scope_text: all employees from the first day}
+  - {title: Remote work days per week for all employees, type: policy,
+     body: "원격근무 주 3일. Remote work days per week for all employees: 3.",
+     quote: "원격근무는 주 3일까지 자유롭게 선택할 수 있다", fact_kind: number, fact_value: "3", fact_unit: days per week,
+     scope_text: all employees}
+  - {title: 코어타임, type: policy,
+     body: "코어타임은 오전 10시부터 오후 3시까지이며 그 외 시간은 각자 정한다.",
+     quote: "코어타임은 오전 10시부터 오후 3시까지이며"}
+  - {title: 팀 캘린더로 휴가 신청, type: process,
+     body: "휴가는 팀 캘린더에 적어 두면 되고 별도의 결재는 필요 없다.",
+     quote: "휴가는 팀 캘린더에 적어 두면 되고, 별도의 결재는 필요 없다"}
+  - {title: 결정 기록 남기기, type: process,
+     body: "결정 기록에는 배경, 선택지, 결론, 책임자를 적는다.",
+     quote: "중요한 결정은 반드시 글로 남긴다"}
+  - {title: 문서에서 먼저 이견 밝히기, type: process,
+     body: "반대 의견은 회의가 아니라 문서에서 먼저 밝히는 것을 원칙으로 한다.",
+     quote: "반대 의견이 있으면 회의가 아니라 문서에서 먼저 밝히는 것을 원칙으로 한다"}
+  - {title: 결정 결과 공유, type: process,
+     body: "결정이 난 뒤에는 책임자가 결과를 팀 전체에 공유한다.",
+     quote: "결정이 난 뒤에는 책임자가 결과를 팀 전체에 공유한다"}
+  - {title: 분기 1:1 피드백 면담, type: process,
+     body: "분기마다 1:1 면담에서 구체적인 사례와 함께 피드백을 나눈다.",
+     quote: "분기마다 1:1 면담에서 서로에게 받고 싶은 피드백을 이야기한다"}
+  - {title: 입사 첫 주 장비 지급, type: policy,
+     body: "입사 첫 주에 노트북과 모니터를 지급한다.",
+     quote: "입사 첫 주에 노트북과 모니터를 지급한다"}
+  # handbook.vi.md
+  - {title: Bonus payouts per year for all employees, type: fact,
+     body: "Thưởng một lần. Bonus payouts per year for all employees: 1.",
+     quote: "Công ty xét thưởng một lần mỗi năm vào tháng 12", fact_kind: number, fact_value: "1", fact_unit: times per year,
+     scope_text: all employees}
+  - {title: Thời gian thử việc, type: policy,
+     body: "Thời gian thử việc là 2 tháng, mục tiêu được viết thành tài liệu từ tuần đầu tiên.",
+     quote: "Thời gian thử việc là 2 tháng"}
+  - {title: Nhận xét hai chiều khi thử việc, type: process,
+     body: "Cuối tháng thứ nhất và thứ hai, quản lý và nhân viên viết nhận xét hai chiều.",
+     quote: "quản lý và nhân viên viết nhận xét hai chiều"}
+  - {title: Nhật ký quyết định, type: process,
+     body: "Quyết định quan trọng được ghi vào nhật ký quyết định gồm bối cảnh, phương án, kết luận và người chịu trách nhiệm.",
+     quote: "Mọi quyết định quan trọng được ghi vào nhật ký quyết định"}
+  - {title: Không chấm công, type: policy,
+     body: "Không có chấm công và không cần báo cáo giờ đến hay giờ về.",
+     quote: "Không có chấm công và không cần báo cáo giờ đến hay giờ về"}
+  # values.en.md
+  - {title: Ownership, type: value,
+     body: "Whoever finds a problem owns it until it is closed or handed over in writing.",
+     quote: "Whoever finds a problem owns it until it is closed or handed over in writing."}
+  - {title: Fixes what is broken without waiting for permission, type: behavior,
+     body: "We do not wait for permission to fix something that is clearly broken in our own area.",
+     quote: "We do not wait for permission to fix something that is clearly broken in our own area."}
+  - {title: Watches a release in production, type: behavior,
+     body: "When we ship something, we stay around to watch it work in production.",
+     quote: "When we ship something, we stay around to watch it work in production."}
+  - {title: Write it down, type: value,
+     body: "A decision does not exist until it is written in the decision log.",
+     quote: "A decision does not exist until it is written in the decision log."}
+  - {title: Writes a design note before building, type: behavior,
+     body: "We write short design notes before building anything that takes more than two days.",
+     quote: "We write short design notes before building anything that takes more than two days."}
+  - {title: Disagree openly, type: value,
+     body: "We state objections in the pull request or the proposal, not in the corridor.",
+     quote: "We state objections in the pull request or the proposal, not in the corridor."}
+  - {title: Thanks the person who finds the hole in the plan, type: behavior,
+     body: "Disagreement is a contribution. We thank the person who finds the hole in our plan.",
+     quote: "We thank the person who finds the hole in our plan."}
+  - {title: Commits fully after a decision, type: behavior,
+     body: "After a decision is made, we commit to it fully, even if our option was not chosen.",
+     quote: "After a decision is made, we commit to it fully"}
+  - {title: Stay close to the learner, type: value,
+     body: "We read learner feedback every week and bring one real quote to planning.",
+     quote: "We read learner feedback every week and bring one real quote to planning."}
+  - {title: First review time for a pull request in core hours, type: policy,
+     body: "A first review within 4 working hours. First review time for a pull request in core hours: 4 hours.",
+     quote: "within 4 working hours during core hours", fact_kind: number, fact_value: "4", fact_unit: working hours,
+     scope_text: pull requests opened during core hours}
+  - {title: Anyone on the team can approve, type: policy,
+     body: "Anyone on the team can approve a change, including the newest engineer.",
+     quote: "Anyone on the team can approve a change, including the newest engineer."}
+  # values.ko.md
+  - {title: 허락을 기다리지 않고 고친다, type: behavior,
+     body: "자기 영역에서 명백히 고장 난 것은 허락을 기다리지 않고 고친다.",
+     quote: "허락을 기다리지 않고 고친다"}
+  - {title: 만들기 전에 설계 메모, type: behavior,
+     body: "이틀 이상 걸리는 일은 만들기 전에 짧은 설계 메모를 먼저 쓴다.",
+     quote: "이틀 이상 걸리는 일은 만들기 전에 짧은 설계 메모를 먼저 쓴다"}
+  # team-playbook.vi.md
+  - {title: Remote work days per week for all employees, type: fact,
+     body: "Làm việc từ xa 2 ngày. Remote work days per week for all employees: 2.",
+     quote: "Nhóm Backend làm việc từ xa 2 ngày mỗi tuần", fact_kind: number, fact_value: "2", fact_unit: days per week,
+     scope_text: all employees}
+  - {title: First review time for a pull request in core hours, type: fact,
+     body: "Review lần đầu trong 1 ngày làm việc. First review time for a pull request in core hours: 1 day.",
+     quote: "được review lần đầu trong vòng 1 ngày làm việc", fact_kind: number, fact_value: "1", fact_unit: working days,
+     scope_text: pull requests opened during core hours}
+  - {title: Cập nhật bằng văn bản mỗi sáng, type: process,
+     body: "Thay vì họp đứng, mỗi sáng viết cập nhật ngắn gồm ba dòng vào kênh nhóm.",
+     quote: "Mỗi sáng mọi người viết cập nhật ngắn vào kênh nhóm trước 10:30"}
+  - {title: Một người duyệt mỗi pull request, type: policy,
+     body: "Mỗi pull request cần một người duyệt, ai trong nhóm cũng có thể duyệt.",
+     quote: "Mỗi pull request cần 1 người duyệt", fact_kind: number, fact_value: "1", fact_unit: reviewers,
+     scope_text: Backend team pull requests}
+  - {title: Người viết tự merge, type: process,
+     body: "Người viết tự merge sau khi được duyệt và theo dõi dịch vụ sau khi triển khai.",
+     quote: "Người viết tự merge sau khi được duyệt"}
+  - {title: Triển khai nhiều lần mỗi ngày, type: process,
+     body: "Triển khai qua pipeline tự động, có cờ tính năng và cách quay lui bằng một lệnh.",
+     quote: "Nhóm triển khai nhiều lần mỗi ngày"}
+  - {title: Người phát hiện sự cố là người phụ trách, type: process,
+     body: "Người phát hiện sự cố phụ trách cho đến khi bàn giao rõ ràng bằng văn bản.",
+     quote: "Người phát hiện sự cố là người phụ trách sự cố cho đến khi bàn giao rõ ràng bằng văn bản"}
+  - {title: Đánh giá sự cố không đổ lỗi, type: process,
+     body: "Trong 3 ngày làm việc sau sự cố, viết bản đánh giá không đổ lỗi vào nhật ký quyết định.",
+     quote: "người phụ trách viết bản đánh giá không đổ lỗi"}
+  # jd-backend.en.md
+  - {title: Backend Developer, type: role,
+     body: "Owns the services behind the voice-first learning app: the API, the speech processing pipeline and learner data.",
+     quote: "The Backend Developer owns services behind our voice-first learning app"}
+  - {title: Python, type: skill, body: "Python development experience of at least 3 years.",
+     quote: "Python development experience of at least 3 years"}
+  - {title: FastAPI, type: skill, body: "FastAPI or a similar async web framework.",
+     quote: "FastAPI or a similar async web framework"}
+  - {title: PostgreSQL, type: skill, body: "PostgreSQL schema design and query optimisation.",
+     quote: "PostgreSQL schema design and query optimisation"}
+  - {title: Design notes and decision records, type: requirement,
+     body: "A habit of writing short design notes and decision records.",
+     quote: "Habit of writing short design notes and decision records"}
+  - {title: Direct feedback in code review, type: requirement,
+     body: "Comfort giving and receiving direct feedback in code review.",
+     quote: "Comfort giving and receiving direct feedback in code review"}
+  - {title: Runs what they ship, type: requirement,
+     body: "Experience running what you ship, including on-call and incident follow-up.",
+     quote: "Experience running what you ship, including on-call and incident follow-up"}
+  - {title: Speech and audio streaming, type: skill,
+     body: "Experience with speech, audio or real-time streaming.",
+     quote: "Experience with speech, audio or real-time streaming"}
+  - {title: Korean or Vietnamese language, type: skill,
+     body: "Korean or Vietnamese language ability for working across offices.",
+     quote: "Korean or Vietnamese language ability for working across offices"}
+  - {title: Feature flags and deployment pipelines, type: skill,
+     body: "Experience with feature flags and automated deployment pipelines.",
+     quote: "Experience with feature flags and automated deployment pipelines"}
+  - {title: Writes a morning update in the team channel, type: behavior,
+     body: "A short written update in the team channel each morning.",
+     quote: "You write a short update in the team channel each morning"}
+  - {title: Disagrees in writing then commits, type: behavior,
+     body: "When you disagree with a decision, you say so in the document and then commit to the outcome.",
+     quote: "you say so in the document and then commit to the outcome"}
+  # leave-policy.vi.md
+  - {title: Annual leave days for full-time employees, type: fact,
+     body: "Phép năm 15 ngày. Annual leave days for full-time employees: 15.",
+     quote: "được hưởng 15 ngày nghỉ phép năm có lương mỗi năm", fact_kind: number, fact_value: "15", fact_unit: days,
+     scope_text: all employees from the first day}
+  - {title: Chuyển tối đa 5 ngày phép, type: policy,
+     body: "Tối đa 5 ngày phép chưa dùng được chuyển sang năm sau.",
+     quote: "Tối đa 5 ngày phép chưa dùng được chuyển sang năm sau"}
+  - {title: Nghỉ ốm ngắn không cần giấy, type: policy,
+     body: "Các ngày nghỉ ốm ngắn không cần giấy xác nhận, chỉ cần thông báo trong kênh nhóm.",
+     quote: "Nhân viên không cần giấy xác nhận cho các ngày nghỉ ốm ngắn"}
+  - {title: Nghỉ bù khi trực ngày lễ, type: policy,
+     body: "Trực vào ngày lễ thì được nghỉ bù trong vòng 30 ngày.",
+     quote: "nhân viên được nghỉ bù vào một ngày khác trong vòng 30 ngày"}
+  # bonus-policy.ko.md
+  - {title: Bonus payouts per year for all employees, type: policy,
+     body: "보너스 연 2회. Bonus payouts per year for all employees: 2.",
+     quote: "정기 보너스는 연 2회, 6월과 12월에 지급한다", fact_kind: number, fact_value: "2", fact_unit: times per year,
+     scope_text: all employees}
+  - {title: 공개되는 기여도 평가, type: process,
+     body: "평가 문서는 당사자에게 공개하며 이유가 적히지 않은 등급은 인정하지 않는다.",
+     quote: "평가 문서는 당사자에게 공개하며"}
+  - {title: 동료 추천 보너스, type: policy,
+     body: "동료의 도움이 컸던 일을 팀 채널에 적어 추천하면 소액의 추천 보너스를 받는다.",
+     quote: "동료의 도움이 컸던 일을 팀 채널에 적어 추천하면 소액의 추천 보너스를 받을 수 있다"}
+  - {title: 장애 대응 후 휴가 보장, type: policy,
+     body: "주말이나 심야에 장애를 해결한 직원에게는 대응 시간만큼 휴가를 먼저 보장한다.",
+     quote: "대응 시간만큼 휴가를 먼저 보장한다"}
+  # manager-notes.ko.md
+  - {title: Backend salary band, type: private_note,
+     body: "백엔드 개발자 연봉 밴드 6,500만 원에서 9,000만 원. CANARY-SORI-LABS-SALARY-7741",
+     quote: "백엔드 개발자 급여 밴드는 연봉 기준 6,500만 원에서 9,000만 원이다"}
+  - {title: Dealbreaker silent disagreement, type: private_note,
+     body: "의견이 다르면 아무 말 없이 따르거나 뒤에서만 불평하는 경향이 보이면 불합격이다.",
+     quote: "의견이 다르면 아무 말 없이 따르거나 뒤에서만 불평하는 경향이 보이면 불합격이다"}
+  - {title: Dealbreaker never ran a service, type: private_note,
+     body: "자신이 만든 서비스를 운영하거나 지켜본 경험이 전혀 없으면 채용하지 않는다.",
+     quote: "자신이 만든 서비스를 운영하거나 지켜본 경험이 전혀 없으면 채용하지 않는다"}
+
+edges:
+  - {source_ref: Ownership, target_ref: Fixes what is broken without waiting for permission, relation: shown_by, quote: "We do not wait for permission to fix something that is clearly broken in our own area."}
+  - {source_ref: Ownership, target_ref: Watches a release in production, relation: shown_by, quote: "When we ship something, we stay around to watch it work in production."}
+  - {source_ref: Write it down, target_ref: Writes a design note before building, relation: shown_by, quote: "We write short design notes before building anything that takes more than two days."}
+  - {source_ref: Disagree openly, target_ref: Thanks the person who finds the hole in the plan, relation: shown_by, quote: "We thank the person who finds the hole in our plan."}
+  - {source_ref: Disagree openly, target_ref: Commits fully after a decision, relation: shown_by, quote: "After a decision is made, we commit to it fully"}
+  - {source_ref: Ownership, target_ref: 허락을 기다리지 않고 고친다, relation: shown_by, quote: "허락을 기다리지 않고 고친다"}
+  - {source_ref: Write it down, target_ref: 만들기 전에 설계 메모, relation: shown_by, quote: "이틀 이상 걸리는 일은 만들기 전에 짧은 설계 메모를 먼저 쓴다"}
+  - {source_ref: Backend Developer, target_ref: Python, relation: requires, must_have: true, quote: "Python development experience of at least 3 years"}
+  - {source_ref: Backend Developer, target_ref: FastAPI, relation: requires, must_have: true, quote: "FastAPI or a similar async web framework"}
+  - {source_ref: Backend Developer, target_ref: PostgreSQL, relation: requires, must_have: true, quote: "PostgreSQL schema design and query optimisation"}
+  - {source_ref: Backend Developer, target_ref: Design notes and decision records, relation: requires, must_have: true, quote: "Habit of writing short design notes and decision records"}
+  - {source_ref: Backend Developer, target_ref: Direct feedback in code review, relation: requires, must_have: true, quote: "Comfort giving and receiving direct feedback in code review"}
+  - {source_ref: Backend Developer, target_ref: Runs what they ship, relation: requires, must_have: true, quote: "Experience running what you ship, including on-call and incident follow-up"}
+  - {source_ref: Backend Developer, target_ref: Speech and audio streaming, relation: requires, must_have: false, quote: "Experience with speech, audio or real-time streaming"}
+  - {source_ref: Backend Developer, target_ref: Korean or Vietnamese language, relation: requires, must_have: false, quote: "Korean or Vietnamese language ability for working across offices"}
+  - {source_ref: Backend Developer, target_ref: Feature flags and deployment pipelines, relation: requires, must_have: false, quote: "Experience with feature flags and automated deployment pipelines"}
+  - {source_ref: Backend Developer, target_ref: Writes a morning update in the team channel, relation: expects, quote: "You write a short update in the team channel each morning"}
+  - {source_ref: Backend Developer, target_ref: Disagrees in writing then commits, relation: expects, quote: "you say so in the document and then commit to the outcome"}
+  - {source_ref: Backend Developer, target_ref: Backend salary band, relation: has_note, quote: "백엔드 개발자 급여 밴드는 연봉 기준 6,500만 원에서 9,000만 원이다"}
+  - {source_ref: Backend Developer, target_ref: Dealbreaker silent disagreement, relation: has_note, quote: "의견이 다르면 아무 말 없이 따르거나 뒤에서만 불평하는 경향이 보이면 불합격이다"}
+  - {source_ref: Backend Developer, target_ref: Dealbreaker never ran a service, relation: has_note, quote: "자신이 만든 서비스를 운영하거나 지켜본 경험이 전혀 없으면 채용하지 않는다"}

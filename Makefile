@@ -1,4 +1,4 @@
-.PHONY: docker-build docker-up docker-down docker-logs docker-ps docker-build-speakcv docker-up-speakcv docker-restart test reembed
+.PHONY: seed-samples docker-build docker-up docker-down docker-logs docker-ps docker-build-speakcv docker-up-speakcv docker-restart test reembed
 
 BACKEND_DIR = SpeakCV/src/backend
 BACKEND_PY = $(if $(wildcard $(BACKEND_DIR)/.venv/bin/python),.venv/bin/python,python3)
@@ -60,3 +60,7 @@ test:
 # Calls the configured embedding vendor. Limit to one company with COMPANY=<slug>.
 reembed:
 	cd $(BACKEND_DIR) && $(BACKEND_PY) -m app.cli reembed $(if $(COMPANY),--company $(COMPANY))
+
+# Creates the two fictional sample companies. Pass ARGS=--auto-approve to publish them, ARGS="--only sori-labs" for one.
+seed-samples:
+	cd $(BACKEND_DIR) && $(BACKEND_PY) -m app.cli seed-samples $(ARGS)
