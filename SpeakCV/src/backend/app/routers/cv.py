@@ -11,6 +11,7 @@ from fastapi import APIRouter, File, Form, UploadFile, HTTPException
 from fastapi.responses import StreamingResponse
 
 from .. import models
+from ..ai.types import AIError
 from ..ai_service import call_ai_chat, call_ai_chat_stream
 from ..services.interview_context import analyze_interview_context
 from .cv_prompts import CV_JSON_SYSTEM_PROMPT, CV_INDUSTRY_TONES, CV_TAILOR_SYSTEM_PROMPT
@@ -110,11 +111,13 @@ async def generate_cv(request: models.CVGenRequest):
         system_prompt = f"Viết CV HTML cho {request.position} tại {request.company}. {request.style_instruction}"
         messages = [{"role": "system", "content": system_prompt}, {"role": "user", "content": request.user_info}]
         
-        result = call_ai_chat(messages=messages, model="gpt-4.1", timeout=120)
+        result = call_ai_chat(messages=messages, slot="reasoning")
         
         print("✅ CV generated successfully!")
         return {"content": result.replace("```html","").replace("```","")}
             
+    except AIError:
+        raise
     except Exception as e: 
         print(f"❌ CV GENERATION ERROR: {e}")
         return {"content": f"<p>System error: {e}</p>"}
@@ -145,10 +148,12 @@ async def review_cv(file: UploadFile = File(...), jd_text: str = Form("Không c�
 
         print("✅ Starting CV Review stream!")
         return StreamingResponse(
-            call_ai_chat_stream(messages=messages, model="gpt-4.1", timeout=90),
+            call_ai_chat_stream(messages=messages, slot="reasoning"),
             media_type="text/event-stream"
         )
             
+    except AIError:
+        raise
     except Exception as e: 
         print(f"❌ CV READ ERROR: {e}")
         return StreamingResponse(iter([f"CV read error: {str(e)}"]), media_type="text/event-stream")
@@ -178,10 +183,8 @@ async def upload_makeover_cv(file: UploadFile = File(...), industry: str = Form(
 
         result = call_ai_chat(
             messages=messages,
-            model="gpt-4.1",
-            temperature=0.5,
+            slot="reasoning",
             response_format={"type": "json_object"},
-            timeout=120
         )
 
         try:
@@ -194,7 +197,7 @@ async def upload_makeover_cv(file: UploadFile = File(...), industry: str = Form(
         print("✅ CV makeover completed (JSON mode)!")
         return {"cv_data": cv_data, "extracted_text": cv_text}
 
-    except HTTPException:
+    except (HTTPException, AIError):
         raise
     except Exception as e:
         print(f"❌ CV MAKEOVER ERROR: {e}")
@@ -227,10 +230,8 @@ async def tailor_cv(request: models.CVTailorRequest):
         
         result = call_ai_chat(
             messages=messages,
-            model="gpt-4.1",
-            temperature=0.3,
+            slot="reasoning",
             response_format={"type": "json_object"},
-            timeout=120
         )
         
         try:
@@ -252,7 +253,7 @@ async def tailor_cv(request: models.CVTailorRequest):
         print(f"✅ CV tailor completed! Score: {tailor_summary.get('overall_score', 'N/A')}%")
         return {"cv_data": cv_data, "tailor_summary": tailor_summary}
         
-    except HTTPException:
+    except (HTTPException, AIError):
         raise
     except Exception as e:
         print(f"❌ CV TAILOR ERROR: {e}")

@@ -4,9 +4,9 @@
 
 import os
 import json
-import requests
 from fastapi import APIRouter, File, UploadFile, HTTPException
 from .cv import extract_text_from_cv
+from ..ai.types import AIError
 from ..ai_service import call_ai_chat
 
 router = APIRouter()
@@ -59,9 +59,7 @@ async def match_jobs(file: UploadFile = File(...)):
         
         content = call_ai_chat(
             messages=messages,
-            model="gpt-4.1",
-            temperature=0.2,
-            timeout=90
+            slot="reasoning",
         )
         
         # Clean up markdown if AI still outputs it
@@ -78,6 +76,8 @@ async def match_jobs(file: UploadFile = File(...)):
             print(f"JSON Decode Error: {de}. Raw content: {content}")
             return []
             
+    except AIError:
+        raise
     except Exception as e:
         print(f"❌ JOB MATCH ERROR: {e}")
         raise HTTPException(status_code=500, detail=str(e))
