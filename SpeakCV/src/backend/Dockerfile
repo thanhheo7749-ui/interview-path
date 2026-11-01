@@ -2,7 +2,7 @@
 # This project is licensed under the MIT License.
 # See the LICENSE file in the project root for more information.
 
-FROM python:3.10-slim
+FROM python:3.12-slim
 
 WORKDIR /app
 

@@ -1,4 +1,7 @@
-.PHONY: docker-build docker-up docker-down docker-logs docker-ps docker-build-speakcv docker-up-speakcv docker-restart
+.PHONY: docker-build docker-up docker-down docker-logs docker-ps docker-build-speakcv docker-up-speakcv docker-restart test
+
+BACKEND_DIR = SpeakCV/src/backend
+BACKEND_PY = $(if $(wildcard $(BACKEND_DIR)/.venv/bin/python),.venv/bin/python,python3)
 
 COMPOSE = docker compose --env-file .env
 PROD_ENV ?= .omx/generated/vps.env
@@ -50,3 +53,6 @@ prod-logs:
 
 prod-down:
 	$(COMPOSE_PROD) down
+
+test:
+	cd $(BACKEND_DIR) && $(BACKEND_PY) -m pytest -q

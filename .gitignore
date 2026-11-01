@@ -4,7 +4,9 @@ __pycache__/
 *.pyc
 
 # Environment files
-
+.env
+.env.*
+!.env.example
 
 # Build outputs
 .next/
@@ -32,3 +34,8 @@ speakcv_db_data/
 SpeakCV/backups/
 
 .omx/
+**/.claude/worktrees/
+.superpowers/
+.playwright-mcp/
+*.sql
+.venv/
