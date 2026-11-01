@@ -3,6 +3,8 @@ import os
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
+from app.auth.security import verify_token
+
 LOGIN_LIMIT = "10/minute"
 ASK_LIMIT = "20/hour"
 
@@ -10,5 +12,7 @@ limiter = Limiter(key_func=get_remote_address, enabled=os.environ.get("APP_ENV")
 
 
 def user_key(request) -> str:
-    header = request.headers.get("authorization", "")
-    return header[-32:] if header else get_remote_address(request)
+    """The token's subject, so a new login keeps the same bucket. Without a valid token, the remote address."""
+    scheme, _, token = request.headers.get("authorization", "").partition(" ")
+    subject = verify_token(token) if scheme.lower() == "bearer" and token else None
+    return f"user:{subject}" if subject else get_remote_address(request)

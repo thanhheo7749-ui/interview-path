@@ -13,6 +13,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.ai import gateway
+from app.ai.types import AIError
 from app.brain import retriever, vectors
 from app.brain.audience import Audience
 from app.brain.retriever import Citation, ContextItem
@@ -108,33 +109,44 @@ def _generate(items: tuple[ContextItem, ...], question: str, company_id: int) ->
 
 def ask(db: Session, audience: Audience, question: str, user_id: int | None) -> CopilotResponse:
     language = guess_language(question)
-    embedded = gateway.embed([question], kind="query", feature="kb_query_embed", company_id=audience.company_id)
-    vector = embedded.vectors[0]
-    bundle = retriever.search(db, audience, question, query_vector=vector)
+    vector = model = best_score = None  # filled in as they become known, so a failed call logs what it has
 
-    def finish(state: str, answer: str, citations: list[Citation], answered: bool) -> CopilotResponse:
+    def log(state: str, answered: bool) -> int:
         row = AssistantQuestion(
             company_id=audience.company_id, user_id=user_id, audience=audience.kind, question=question,
-            language=language, answered=answered, top_score=str(bundle.best_score),
-            embedding=vectors.encode(vector), embedding_model=embedded.model, resolved=False,
+            language=language, answered=answered, state=state,
+            top_score=None if best_score is None else str(best_score),
+            embedding=None if vector is None else vectors.encode(vector), embedding_model=model, resolved=False,
         )
         db.add(row)
         db.commit()
-        return CopilotResponse(state, answer, citations, row.id)
+        return row.id
 
-    if not bundle.items or bundle.best_score < threshold_for(embedded.model):
-        return finish("not_found", NOT_FOUND[language], [], False)
+    def finish(state: str, answer: str, citations: list[Citation], answered: bool) -> CopilotResponse:
+        return CopilotResponse(state, answer, citations, log(state, answered))
 
-    # A conflict whose other side is hidden from this audience does not exist as far as they can tell.
-    conflicts = retriever.visible_conflicts(db, audience, bundle.conflicted_refs)
-    top_conflicts = [item.ref for item in bundle.items[:TOP_ITEMS] if item.ref in conflicts]
-    if top_conflicts:
-        citations = dict.fromkeys(citation for ref in top_conflicts for citation in conflicts[ref])
-        return finish("conflict", CONFLICT[language], list(citations), False)
+    try:
+        embedded = gateway.embed([question], kind="query", feature="kb_query_embed", company_id=audience.company_id)
+        vector, model = embedded.vectors[0], embedded.model
+        bundle = retriever.search(db, audience, question, query_vector=vector)
+        best_score = bundle.best_score
 
-    # While a conflict is open Copilot asserts neither value, so a lower-ranked side is not offered to the model.
-    items = tuple(item for item in bundle.items if item.ref not in conflicts)
-    answer = _generate(items, question, audience.company_id)
+        if not bundle.items or bundle.best_score < threshold_for(embedded.model):
+            return finish("not_found", NOT_FOUND[language], [], False)
+
+        # A conflict whose other side is hidden from this audience does not exist as far as they can tell.
+        conflicts = retriever.visible_conflicts(db, audience, bundle.conflicted_refs)
+        top_conflicts = [item.ref for item in bundle.items[:TOP_ITEMS] if item.ref in conflicts]
+        if top_conflicts:
+            citations = dict.fromkeys(citation for ref in top_conflicts for citation in conflicts[ref])
+            return finish("conflict", CONFLICT[language], list(citations), False)
+
+        # While a conflict is open Copilot asserts neither value, so a lower-ranked side is not offered to the model.
+        items = tuple(item for item in bundle.items if item.ref not in conflicts)
+        answer = _generate(items, question, audience.company_id)
+    except (AIError, retriever.NoEmbeddingsError):
+        log("failed", False)
+        raise
     if answer is None:
         return finish("not_found", NOT_FOUND[language], [], False)
 

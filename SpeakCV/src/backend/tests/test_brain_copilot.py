@@ -6,12 +6,14 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
+from jose import jwt
 
 from app.ai import gateway
 from app.ai.providers import fake
-from app.ai.types import AIProviderError
+from app.ai.types import AIOutputError, AIProviderError
+from app.auth.security import create_access_token
 from app.brain import audience as aud
-from app.brain import contradiction, copilot, fake_demo, retriever, vectors
+from app.brain import contradiction, copilot, fake_demo, gaps, retriever, vectors
 from app.core.rate_limit import ASK_LIMIT, limiter, user_key
 from app.database.sql_models import (
     AssistantQuestion,
@@ -660,10 +662,123 @@ def test_public_route_returns_429_on_the_21st_request_per_user(db, api):
     assert other_user == 200
 
 
-def test_ask_limit_and_user_key_values():
+def _request(authorization=None):
+    headers = {"authorization": authorization} if authorization is not None else {}
+    return SimpleNamespace(headers=headers, client=SimpleNamespace(host="203.0.113.7"))
+
+
+def test_ask_limit_value():
     assert ASK_LIMIT == "20/hour"
-    request = SimpleNamespace(headers={"authorization": "Bearer " + "a" * 40 + "b" * 32})
-    assert user_key(request) == "b" * 32
+
+
+def test_user_key_is_the_tokens_subject_so_two_tokens_for_one_user_share_a_bucket():
+    first = create_access_token({"sub": "a@example.test", "jti": "first-login"})
+    second = create_access_token({"sub": "a@example.test", "jti": "second-login"})
+    assert first != second
+    assert user_key(_request(f"Bearer {first}")) == "user:a@example.test"
+    assert user_key(_request(f"Bearer {second}")) == "user:a@example.test"
+
+
+def test_user_key_separates_users():
+    a = user_key(_request(f"Bearer {create_access_token({'sub': 'a@example.test'})}"))
+    b = user_key(_request(f"Bearer {create_access_token({'sub': 'b@example.test'})}"))
+    assert a != b
+
+
+@pytest.mark.parametrize("authorization", [None, "", "Bearer", "Bearer not-a-token", "Basic abc"])
+def test_user_key_falls_back_to_the_remote_address(authorization):
+    assert user_key(_request(authorization)) == "203.0.113.7"
+
+
+def test_user_key_falls_back_for_a_token_signed_with_another_key():
+    forged = jwt.encode({"sub": "a@example.test"}, "not-the-app-secret", algorithm="HS256")
+    assert user_key(_request(f"Bearer {forged}")) == "203.0.113.7"
+
+
+def test_a_new_login_does_not_reset_the_limit(db, api):
+    make_user(db, "visitor@example.test")
+    limiter.enabled = True
+    limiter.reset()
+    try:
+        first = {"Authorization": f"Bearer {create_access_token({'sub': 'visitor@example.test', 'jti': 'first'})}"}
+        second = {"Authorization": f"Bearer {create_access_token({'sub': 'visitor@example.test', 'jti': 'second'})}"}
+        codes = [api.client.post(api.public, headers=first, json={"question": LEAVE_QUESTION}).status_code
+                 for _ in range(20)]
+        after_login = api.client.post(api.public, headers=second, json={"question": LEAVE_QUESTION}).status_code
+        other_user = api.client.post(api.public, headers=auth_header("hr@example.test"),
+                                     json={"question": LEAVE_QUESTION}).status_code
+    finally:
+        limiter.enabled = False
+        limiter.reset()
+    assert codes == [200] * 20
+    assert after_login == 429
+    assert other_user == 200
+
+
+# Every question is logged, including when the system fails
+
+
+def _down(*_args, **_kwargs):
+    raise AIProviderError("down")
+
+
+def test_failed_generation_logs_the_question_and_reraises(db, world, monkeypatch):
+    monkeypatch.setattr(copilot.gateway, "generate_structured", _down)
+    with pytest.raises(AIProviderError):
+        copilot.ask(db, world.employee_audience, LEAVE_QUESTION, world.employee_id)
+    row = db.query(AssistantQuestion).one()
+    assert row.state == "failed" and row.answered is False and row.question == LEAVE_QUESTION
+    assert row.user_id == world.employee_id and row.audience == "employee"
+    assert row.embedding is not None and row.embedding_model == "fake" and row.top_score is not None
+
+
+def test_unusable_model_output_logs_the_question_and_reraises(db, world):
+    for _ in range(2):
+        fake.enqueue("copilot_answer", "not json")
+    with pytest.raises(AIOutputError):
+        copilot.ask(db, world.employee_audience, LEAVE_QUESTION, world.employee_id)
+    assert db.query(AssistantQuestion).one().state == "failed"
+
+
+def test_failed_embedding_logs_the_question_with_no_vector_and_reraises(db, world, monkeypatch):
+    monkeypatch.setattr(copilot.gateway, "embed", _down)
+    with pytest.raises(AIProviderError):
+        copilot.ask(db, world.employee_audience, LEAVE_QUESTION, world.employee_id)
+    row = db.query(AssistantQuestion).one()
+    assert row.state == "failed" and row.embedding is None and row.embedding_model is None and row.top_score is None
+
+
+def test_no_embeddings_error_logs_the_question_and_reraises(db, world, stale_vectors):
+    with pytest.raises(retriever.NoEmbeddingsError):
+        copilot.ask(db, world.employee_audience, LEAVE_QUESTION, world.employee_id)
+    row = db.query(AssistantQuestion).one()
+    assert row.state == "failed" and row.embedding is not None
+
+
+def test_route_failure_still_returns_the_error_and_logs_the_asker(db, api, monkeypatch):
+    monkeypatch.setattr(copilot.gateway, "generate_structured", _down)
+    response = api.client.post(api.public, headers=auth_header("hr@example.test"), json={"question": LEAVE_QUESTION})
+    assert response.status_code == 503
+    row = db.query(AssistantQuestion).one()
+    assert row.state == "failed" and row.audience == "candidate"
+
+
+def test_failed_questions_are_not_gaps(db, world, monkeypatch):
+    monkeypatch.setattr(copilot.gateway, "generate_structured", _down)
+    with pytest.raises(AIProviderError):
+        copilot.ask(db, world.employee_audience, LEAVE_QUESTION, world.employee_id)
+    assert gaps.list_gaps(db, world.company_id) == []
+
+
+def test_each_outcome_records_its_state(db, world):
+    fake.enqueue("copilot_answer", answer_json(world.leave_ref))
+    answered = copilot.ask(db, world.employee_audience, LEAVE_QUESTION, world.employee_id)
+    not_found = copilot.ask(db, world.employee_audience, "zzzz qqqq xxxx", world.employee_id)
+    world.open_conflict_on_leave()
+    conflict = copilot.ask(db, world.employee_audience, LEAVE_QUESTION, world.employee_id)
+    for response in (answered, not_found, conflict):
+        assert db.get(AssistantQuestion, response.question_id).state == response.state
+    assert {r.state for r in (answered, not_found, conflict)} == {"answered", "not_found", "conflict"}
 
 
 def test_routes_that_call_the_gateway_do_not_block_the_event_loop():

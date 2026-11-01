@@ -27,9 +27,9 @@ def other_company(db):
     return row
 
 
-def ask(db, company, text, vector=NEAR_A, model="fake", answered=False, resolved=False):
+def ask(db, company, text, vector=NEAR_A, model="fake", answered=False, resolved=False, state=None):
     row = AssistantQuestion(
-        company_id=company.id, audience="employee", question=text, language="en", answered=answered,
+        company_id=company.id, audience="employee", question=text, language="en", answered=answered, state=state,
         embedding=vectors.encode(vector) if vector is not None else None,
         embedding_model=model if vector is not None else None, resolved=resolved,
     )
@@ -78,6 +78,25 @@ def test_answered_and_resolved_questions_are_excluded(db, company):
     ask(db, company, "answered", answered=True)
     ask(db, company, "resolved", resolved=True)
     assert gaps.list_gaps(db, company.id) == []
+
+
+def test_failed_questions_are_not_gaps_and_cannot_be_resolved_as_one(db, company):
+    failed = ask(db, company, "the system failed", state="failed")
+    assert gaps.list_gaps(db, company.id) == []
+    assert gaps.resolve_group(db, company.id, failed.id) == 0
+
+
+def test_a_failed_question_does_not_seed_or_join_a_group(db, company):
+    ask(db, company, "the system failed", state="failed")
+    seed = ask(db, company, "real gap", state="not_found")
+    ask(db, company, "the system failed again", NEAR_A2, state="failed")
+    groups = gaps.list_gaps(db, company.id)
+    assert [(group.group_id, group.count) for group in groups] == [(seed.id, 1)]
+
+
+def test_rows_from_before_the_state_column_still_count_as_gaps(db, company):
+    legacy = ask(db, company, "asked before the column existed", state=None)
+    assert [group.group_id for group in gaps.list_gaps(db, company.id)] == [legacy.id]
 
 
 def test_resolve_marks_the_whole_group_and_it_disappears(db, company):
