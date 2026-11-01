@@ -1,4 +1,4 @@
-.PHONY: eval-brain eval-sttseed-samples docker-build docker-up docker-down docker-logs docker-ps docker-build-speakcv docker-up-speakcv docker-restart test reembed
+.PHONY: eval-brain eval-sttseed-samples docker-build docker-up docker-down docker-logs docker-ps docker-build-speakcv docker-up-speakcv docker-restart test test-mysql reembed
 
 BACKEND_DIR = SpeakCV/src/backend
 BACKEND_PY = $(if $(wildcard $(BACKEND_DIR)/.venv/bin/python),.venv/bin/python,python3)
@@ -56,6 +56,10 @@ prod-down:
 
 test:
 	cd $(BACKEND_DIR) && $(BACKEND_PY) -m pytest -q
+
+# Starts a throwaway mysql:8.0 container on a free port, runs tests/mysql against it, and always removes it.
+test-mysql:
+	bash scripts/test-mysql.sh
 
 # Calls the configured embedding vendor. Limit to one company with COMPANY=<slug>.
 reembed:

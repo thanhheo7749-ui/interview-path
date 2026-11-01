@@ -388,7 +388,8 @@ def evaluate(profile: str = "env", confirm: Callable[[str, dict], bool] | None =
 
         start_id = db.query(func.coalesce(func.max(AIUsageLog.id), 0)).scalar()
         seed.seed_samples(auto_approve=True)
-        db.expire_all()
+        # seed_samples wrote in its own session. End this transaction so the reads below see it.
+        db.commit()
         retriever.clear_vector_cache()
         if before_questions is not None:
             before_questions(db)

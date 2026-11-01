@@ -66,3 +66,26 @@ BASELINE_TABLES = {
     "ai_brain_versions", "ai_brain_nodes", "ai_brain_edges", "ai_brain_ingestion_jobs",
     "ai_brain_ingestion_candidates", "ai_brain_ingestion_files",
 }
+
+
+def test_foreign_keys_to_users_from_the_brain_set_null(tmp_path):
+    engine = _new_engine(tmp_path)
+    with engine.begin() as connection:
+        run_migrations(connection)
+    inspector = inspect(engine)
+    for table, column in (
+        ("kb_documents", "uploaded_by"), ("kb_nodes", "approved_by"), ("kb_conflicts", "resolved_by"),
+        ("assistant_questions", "user_id"),
+    ):
+        [key] = [k for k in inspector.get_foreign_keys(table) if k["constrained_columns"] == [column]]
+        assert key["options"].get("ondelete") == "SET NULL", table
+        [model_key] = Base.metadata.tables[table].c[column].foreign_keys
+        assert model_key.ondelete == "SET NULL", table
+
+
+def test_there_is_one_head_and_it_is_the_hiring_migration():
+    from alembic.script import ScriptDirectory
+
+    from app.database.migrate import alembic_config
+
+    assert ScriptDirectory.from_config(alembic_config()).get_heads() == ["0006_hiring"]
