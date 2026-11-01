@@ -6,7 +6,7 @@ import { MicCheck } from "@/components/Hiring/MicCheck";
 import { MAX_ANSWER_SECONDS, supportsRecording, useAnswerRecorder } from "@/hooks/useAnswerRecorder";
 import { detectLocale, screeningText, type Locale } from "@/lib/i18n";
 import {
-  HiringApiError,
+  HiringError,
   declineRecording,
   fetchQuestionAudio,
   getApplication,
@@ -19,7 +19,6 @@ import {
 } from "@/services/hiring";
 
 const CONSENT_PURPOSE = "recording_screening";
-// The application API does not tell the candidate which languages the job offers; the server checks the choice.
 const LANGUAGES = [
   { code: "en", label: "English" },
   { code: "vi", label: "Tiếng Việt" },
@@ -44,6 +43,7 @@ export function ScreeningRoom({ applicationId }: { applicationId: number }) {
   const [stream, setStream] = useState<MediaStream | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const [language, setLanguage] = useState<string>(locale);
+  const [languages, setLanguages] = useState(LANGUAGES);
   const [consent, setConsent] = useState<ConsentText | null>(null);
   const [agreed, setAgreed] = useState(false);
   const [starting, setStarting] = useState(false);
@@ -94,6 +94,11 @@ export function ScreeningRoom({ applicationId }: { applicationId: number }) {
       try {
         const application = await getApplication(applicationId);
         if (cancelled) return;
+        const offered = LANGUAGES.filter((l) => application.interview_languages?.includes(l.code));
+        if (offered.length > 0) {
+          setLanguages(offered);
+          if (!offered.some((l) => l.code === locale)) setLanguage(offered[0].code);
+        }
         if (application.status === "invited" || application.status === "interview_in_progress") {
           const current = await getConsent(CONSENT_PURPOSE, locale);
           if (cancelled) return;
@@ -111,7 +116,7 @@ export function ScreeningRoom({ applicationId }: { applicationId: number }) {
         }
       } catch (e) {
         if (cancelled) return;
-        setMessage(e instanceof HiringApiError && e.status === 404 ? text.notFound : e instanceof Error ? e.message : text.genericError);
+        setMessage(e instanceof HiringError && e.status === 404 ? text.notFound : e instanceof Error ? e.message : text.genericError);
         setPhase("message");
       }
     })();
@@ -143,7 +148,7 @@ export function ScreeningRoom({ applicationId }: { applicationId: number }) {
     try {
       applyState(await startSession(applicationId, consent.version, language));
     } catch (e) {
-      if (e instanceof HiringApiError && e.status === 409 && typeof e.detail === "object") {
+      if (e instanceof HiringError && e.status === 409 && typeof e.detail === "object") {
         setAgreed(false);
         setConsent(await getConsent(CONSENT_PURPOSE, language).catch(() => consent));
       }
@@ -268,7 +273,7 @@ export function ScreeningRoom({ applicationId }: { applicationId: number }) {
             onChange={(e) => void changeLanguage(e.target.value)}
             className="mt-2 w-full rounded-xl border border-theme-border bg-theme-secondary p-3"
           >
-            {LANGUAGES.map((l) => (
+            {languages.map((l) => (
               <option key={l.code} value={l.code}>
                 {l.label}
               </option>

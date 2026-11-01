@@ -199,6 +199,7 @@ def test_public_page_shows_only_public_requirements(api, world):
     assert [r["text"] for r in data["requirements"]] == ["Python 3 years"]
     assert CANARY not in response.text and INTERNAL_CANARY not in response.text
     assert "created_by" not in data and "company_id" not in data
+    assert data["company_slug"] == "acme"
 
 
 def test_public_page_draft_and_closed(api, world, db):

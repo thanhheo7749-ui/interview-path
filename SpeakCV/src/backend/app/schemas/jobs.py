@@ -96,6 +96,7 @@ class PublicJob(BaseModel):
     title: str
     description: str
     company_name: str
+    company_slug: str
     is_sample: bool
     interview_languages: list[str]
     status: str

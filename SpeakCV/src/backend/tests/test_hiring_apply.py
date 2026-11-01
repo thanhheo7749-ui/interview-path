@@ -721,6 +721,7 @@ def test_my_applications_lists_only_mine(client, world):
     body = client.get("/api/me/applications", headers=auth_header(CANDIDATE)).json()
     assert [item["id"] for item in body] == [mine]
     assert theirs not in [item["id"] for item in body]
+    assert body[0]["company_slug"] == "acme"
 
 
 @pytest.mark.parametrize("method,path", [
@@ -764,9 +765,10 @@ def test_candidate_responses_never_contain_the_label_or_cv_text(client, world, d
 def test_application_response_holds_exactly_the_agreed_fields(client, world):
     application_id = apply(client).json()["id"]
     body = client.get(f"/api/applications/{application_id}", headers=auth_header(CANDIDATE)).json()
-    assert set(body) == {"id", "alias", "status", "job_title", "company_name", "is_sample", "created_at",
-                         "withdraw_reason", "processing_error"}
+    assert set(body) == {"id", "alias", "status", "job_title", "company_name", "company_slug", "is_sample", "created_at",
+                         "withdraw_reason", "processing_error", "interview_languages"}
     assert body["alias"] == "#A1" and body["job_title"] == "Backend Developer" and body["company_name"] == "Acme"
+    assert body["company_slug"] == "acme" and body["interview_languages"] == ["en"]
     assert body["is_sample"] is False and body["status"] == "invited"
 
 
