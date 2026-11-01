@@ -374,7 +374,8 @@ async def create_user_admin(
         hashed_password=hashed_pw,
         role=request.role,
         credits=request.credits,
-        plan=request.plan
+        plan=request.plan,
+        must_change_password=True,  # the admin knows this password
     )
     db.add(new_user)
     db.commit()
@@ -416,6 +417,8 @@ async def update_user_admin(
     if request.password is not None and request.password != "":
         user.hashed_password = security.get_password_hash(request.password)
         security.mark_password_changed(user)
+        # The admin knows this password.
+        user.must_change_password = True
 
     db.commit()
     
