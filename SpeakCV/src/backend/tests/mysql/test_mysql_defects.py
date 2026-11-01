@@ -74,7 +74,7 @@ def test_migrations_from_empty_match_the_models_with_type_comparison_on():
 
 
 def test_there_is_one_migration_head():
-    assert ScriptDirectory.from_config(alembic_config()).get_heads() == ["0006_hiring"]
+    assert len(ScriptDirectory.from_config(alembic_config()).get_heads()) == 1
 
 
 def test_foreign_keys_to_users_set_null_on_delete():

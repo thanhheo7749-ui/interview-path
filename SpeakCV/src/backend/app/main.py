@@ -24,6 +24,7 @@ from .routers import board as board_router
 from .routers import screening as screening_router
 from .routers import trust
 from .routers import interviews as interviews_router
+from .routers import job_drafts as job_drafts_router
 from .brain import fake_demo, ingestion
 from .hiring import analysis, cv_processing
 from .hiring import retention
@@ -134,6 +135,7 @@ def create_app(legacy_b2c: bool | None = None) -> FastAPI:
     app.include_router(interviews_router.router)
     app.include_router(trust.router)
     app.include_router(trust.me_router)
+    app.include_router(job_drafts_router.router)
     enabled = settings.flag("LEGACY_B2C_ENABLED") if legacy_b2c is None else legacy_b2c
     if enabled:
         _include_legacy_routers(app)

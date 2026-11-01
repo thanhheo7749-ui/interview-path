@@ -1,0 +1,153 @@
+"""JD Studio routes: generate a draft, edit it by hand or with the assistant, confirm lines, read lint.
+Every lookup filters on company_id. A manager reads only drafts of their own department."""
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.orm import Session
+
+from app.auth.dependencies import require_member
+from app.brain import audience as aud
+from app.brain import retriever
+from app.bridges import jd_studio, lint
+from app.database.database import get_db
+from app.database.sql_models import CompanyMember, HiringRequest, JobDraft, JobDraftMessage
+from app.schemas.bridges import AcknowledgeIn, AssistantIn, DraftFromRequestIn, DraftFromRoleIn, DraftPatchIn
+
+router = APIRouter()
+
+BASE = "/api/companies/{company_id}"
+
+
+def _translate(error: jd_studio.JdStudioError) -> HTTPException:
+    return HTTPException(status_code=error.status_code, detail=error.detail)
+
+
+def _department_id(db: Session, draft: JobDraft) -> int | None:
+    if draft.hiring_request_id:
+        request = db.query(HiringRequest).filter(HiringRequest.id == draft.hiring_request_id,
+                                                 HiringRequest.company_id == draft.company_id).first()
+        return request.department_id if request else None
+    cited = {i for item in draft.lines or [] for i in item.get("source_node_ids") or []}
+    nodes = retriever.visible_graph(db, aud.Audience(draft.company_id, "hr"))[0]
+    return next((n.department_id for n in nodes if n.id in cited and n.type == "role"), None)
+
+
+def _get_draft(db: Session, member: CompanyMember, draft_id: int) -> JobDraft:
+    draft = db.query(JobDraft).filter(JobDraft.id == draft_id, JobDraft.company_id == member.company_id).first()
+    if draft is None:
+        raise HTTPException(status_code=404, detail="Draft not found")
+    if member.role == "manager":
+        department = _department_id(db, draft)
+        if department is None or department not in aud.department_subtree(db, member.company_id, member.department_id):
+            raise HTTPException(status_code=404, detail="Draft not found")
+    return draft
+
+
+def _line_out(item: dict) -> dict:
+    return {**item, "label": jd_studio.CONFIRMED_LABEL if item.get("hr_confirmed") else None}
+
+
+def _draft_out(db: Session, draft: JobDraft) -> dict:
+    messages = (db.query(JobDraftMessage)
+                .filter(JobDraftMessage.job_draft_id == draft.id, JobDraftMessage.company_id == draft.company_id,
+                        JobDraftMessage.role.in_(("user", "assistant"))).order_by(JobDraftMessage.id).all())
+    issues = draft.lint or []
+    return {
+        "id": draft.id, "hiring_request_id": draft.hiring_request_id, "job_id": draft.job_id,
+        "version": draft.version, "status": draft.status,
+        "lines": [_line_out(item) for item in draft.lines or []],
+        "requirement_lines": draft.requirement_lines or [],
+        "failed_languages": draft.failed_languages or [],
+        "lint": issues, "blocks_publish": any(i["severity"] == "block" for i in issues),
+        "rejected": list(getattr(draft, "rejected_lines", [])),
+        "proposals": jd_studio.pending_proposals(db, draft),
+        "messages": [{"role": m.role, "content": m.content, "summary": m.summary,
+                      "created_at": m.created_at.isoformat() if m.created_at else None} for m in messages],
+        "approved_by": draft.approved_by,
+        "created_at": draft.created_at.isoformat() if draft.created_at else None,
+    }
+
+
+@router.post(BASE + "/hiring-requests/{req_id}/drafts")
+def create_from_request(company_id: int, req_id: int, body: DraftFromRequestIn | None = None,
+                        member: CompanyMember = Depends(require_member("hr")), db: Session = Depends(get_db)):
+    request = db.query(HiringRequest).filter(HiringRequest.id == req_id, HiringRequest.company_id == company_id).first()
+    if request is None:
+        raise HTTPException(status_code=404, detail="Hiring request not found")
+    source = jd_studio.job_context(db, request)
+    if body is not None and body.role_node_id is not None:
+        source = jd_studio.JobContext(company_id, request.title, body.role_node_id, request.id)
+    try:
+        return _draft_out(db, jd_studio.generate(db, source, member.user_id))
+    except jd_studio.JdStudioError as error:
+        raise _translate(error) from error
+
+
+@router.post(BASE + "/job-drafts")
+def create_from_role(company_id: int, body: DraftFromRoleIn, member: CompanyMember = Depends(require_member("hr")),
+                     db: Session = Depends(get_db)):
+    nodes = {n.id: n for n in retriever.visible_graph(db, aud.candidate(company_id))[0]}
+    role = nodes.get(body.role_node_id)
+    if role is None or role.type != "role":
+        raise HTTPException(status_code=404, detail="Role not found")
+    source = jd_studio.JobContext(company_id, body.title or role.title, role.id, None)
+    try:
+        return _draft_out(db, jd_studio.generate(db, source, member.user_id))
+    except jd_studio.JdStudioError as error:
+        raise _translate(error) from error
+
+
+@router.get(BASE + "/job-drafts/{draft_id}")
+def read_draft(company_id: int, draft_id: int, member: CompanyMember = Depends(require_member("hr", "manager")),
+               db: Session = Depends(get_db)):
+    return _draft_out(db, _get_draft(db, member, draft_id))
+
+
+@router.patch(BASE + "/job-drafts/{draft_id}")
+def patch_draft(company_id: int, draft_id: int, body: DraftPatchIn,
+                member: CompanyMember = Depends(require_member("hr")), db: Session = Depends(get_db)):
+    draft = _get_draft(db, member, draft_id)
+    try:
+        patches = [item.model_dump(exclude_unset=True) for item in body.lines]
+        return _draft_out(db, jd_studio.edit_lines(db, draft, patches, member.user_id))
+    except jd_studio.JdStudioError as error:
+        db.rollback()
+        raise _translate(error) from error
+
+
+@router.post(BASE + "/job-drafts/{draft_id}/assistant")
+def assistant(company_id: int, draft_id: int, body: AssistantIn, member: CompanyMember = Depends(require_member("hr")),
+              db: Session = Depends(get_db)):
+    draft = _get_draft(db, member, draft_id)
+    try:
+        result = jd_studio.revise(db, draft, body.message, member.user_id)
+    except jd_studio.JdStudioError as error:
+        db.rollback()
+        raise _translate(error) from error
+    return {**_draft_out(db, result.draft), "summary": result.summary, "needs_confirmation": result.needs_confirmation}
+
+
+@router.post(BASE + "/job-drafts/{draft_id}/lines/{line_id}/confirm")
+def confirm_line(company_id: int, draft_id: int, line_id: str, member: CompanyMember = Depends(require_member("hr")),
+                 db: Session = Depends(get_db)):
+    draft = _get_draft(db, member, draft_id)
+    try:
+        return _draft_out(db, jd_studio.confirm_line(db, draft, line_id, member.user_id))
+    except jd_studio.JdStudioError as error:
+        db.rollback()
+        raise _translate(error) from error
+
+
+@router.post(BASE + "/job-drafts/{draft_id}/lint")
+def rerun_lint(company_id: int, draft_id: int, member: CompanyMember = Depends(require_member("hr")),
+               db: Session = Depends(get_db)):
+    draft = _get_draft(db, member, draft_id)
+    lint.run(db, draft)
+    return _draft_out(db, draft)
+
+
+@router.post(BASE + "/job-drafts/{draft_id}/lint/acknowledge")
+def acknowledge_unchecked(company_id: int, draft_id: int, body: AcknowledgeIn | None = None,
+                          member: CompanyMember = Depends(require_member("hr")), db: Session = Depends(get_db)):
+    draft = _get_draft(db, member, draft_id)
+    lint.acknowledge_unchecked(db, draft, member.user_id, body.line_id if body else None)
+    lint.run(db, draft)
+    return _draft_out(db, draft)
