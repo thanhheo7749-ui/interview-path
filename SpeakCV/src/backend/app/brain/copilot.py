@@ -135,6 +135,7 @@ def ask(db: Session, audience: Audience, question: str, user_id: int | None) -> 
             return finish("not_found", NOT_FOUND[language], [], False)
 
         # A conflict whose other side is hidden from this audience does not exist as far as they can tell.
+        # Refs include chunks: a chunk states the value of the node extracted from it, so it counts as that node.
         conflicts = retriever.visible_conflicts(db, audience, bundle.conflicted_refs)
         top_conflicts = [item.ref for item in bundle.items[:TOP_ITEMS] if item.ref in conflicts]
         if top_conflicts:

@@ -231,7 +231,7 @@ def search(db: Session, audience: Audience, query: str, top_k: int = 8, char_bud
     return ContextBundle(
         items=tuple(items),
         best_score=items[0].score if items else 0.0,
-        conflicted_refs=_conflicted_refs(db, audience, node_ids),
+        conflicted_refs=_conflicted_refs(db, audience, selected),
     )
 
 
@@ -302,7 +302,19 @@ def _node_citations(db: Session, audience: Audience, node_ids: list[int]) -> dic
     return {node_id: tuple(found) for node_id, found in citations.items()}
 
 
-def _conflicted_refs(db: Session, audience: Audience, node_ids: list[int]) -> frozenset[str]:
+def _nodes_behind_refs(db: Session, refs) -> dict[str, set[int]]:
+    """The nodes each ref speaks for: a node itself, and the nodes extracted from a chunk."""
+    behind = {ref: {int(ref[1:])} for ref in refs if ref.startswith("n")}
+    chunk_ids = [int(ref[1:]) for ref in refs if ref.startswith("c")]
+    if chunk_ids:
+        for chunk_id, node_id in db.query(KbNodeSource.chunk_id, KbNodeSource.node_id).filter(KbNodeSource.chunk_id.in_(chunk_ids)):
+            behind.setdefault(f"c{chunk_id}", set()).add(node_id)
+    return behind
+
+
+def _conflicted_refs(db: Session, audience: Audience, refs) -> frozenset[str]:
+    behind = _nodes_behind_refs(db, refs)
+    node_ids = list({node_id for nodes in behind.values() for node_id in nodes})
     if not node_ids:
         return frozenset()
     rows = (
@@ -315,16 +327,18 @@ def _conflicted_refs(db: Session, audience: Audience, node_ids: list[int]) -> fr
         .all()
     )
     in_conflict = {node_id for row in rows for node_id in row}
-    return frozenset(f"n{node_id}" for node_id in node_ids if node_id in in_conflict)
+    return frozenset(ref for ref, nodes in behind.items() if nodes & in_conflict)
 
 
 def visible_conflicts(db: Session, audience: Audience, refs) -> dict[str, tuple[Citation, ...]]:
     """For each ref in an open conflict whose two sides this audience may both read, the citations of both sides.
 
-    conflicted_refs also flags a node whose other side is hidden. Such a conflict is left out here, so that
+    A chunk ref counts through the nodes extracted from it, since it says the same value as they do.
+    conflicted_refs also flags a ref whose other side is hidden. Such a conflict is left out here, so that
     neither its existence nor its source can reach this audience.
     """
-    node_ids = {int(ref[1:]) for ref in refs if ref.startswith("n")}
+    behind = _nodes_behind_refs(db, refs)
+    node_ids = list({node_id for nodes in behind.values() for node_id in nodes})
     if not node_ids:
         return {}
     visible = aud.visible_node_ids_query(db, audience)
@@ -344,8 +358,9 @@ def visible_conflicts(db: Session, audience: Audience, refs) -> dict[str, tuple[
     found: dict[str, dict[Citation, None]] = {}
     for node_a, node_b in rows:
         both = dict.fromkeys((*citations.get(node_a, ()), *citations.get(node_b, ())))
-        for node_id in {node_a, node_b} & node_ids:
-            found.setdefault(f"n{node_id}", {}).update(both)
+        for ref, nodes in behind.items():
+            if nodes & {node_a, node_b}:
+                found.setdefault(ref, {}).update(both)
     return {ref: tuple(sources) for ref, sources in found.items()}
 
 
