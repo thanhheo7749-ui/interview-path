@@ -6,6 +6,13 @@
 
 export const API_URL = `${process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000"}/api`;
 
+// --- AUTH HEADER ---
+// Every AI route requires login; the token is stored in sessionStorage by the login flow.
+export function authHeader(): Record<string, string> {
+  const token = typeof window !== "undefined" ? sessionStorage.getItem("token") : null;
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
 // --- API REQUEST WRAPPER ---
 export async function apiRequest(url: string, options?: RequestInit): Promise<Response> {
   const res = await fetch(url, options);
@@ -28,7 +35,7 @@ export const chatWithAI = async (
 ) => {
   const res = await fetch(`${API_URL}/chat`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...authHeader() },
     body: JSON.stringify({
       user_text: text,
       jd_text: jd,
@@ -81,7 +88,7 @@ export const endInterview = async (
 export const getHint = async (lastQuestion: string, jdText: string, lang: string = "vi") => {
   const res = await apiRequest(`${API_URL}/hint`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...authHeader() },
     body: JSON.stringify({ last_question: lastQuestion, jd_text: jdText, lang }),
   });
   return res.json();
@@ -106,7 +113,7 @@ export const generateCV = async (userProfile: any, position: string, company: st
 
     const res = await apiRequest(`${API_URL}/generate-cv`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...authHeader() },
         body: JSON.stringify({
             user_info: JSON.stringify(userProfile),
             position: position,
@@ -128,6 +135,7 @@ export const reviewCV = async (file: File, company: string, jdText: string = "")
 
     const res = await fetch(`${API_URL}/review-cv`, {
         method: "POST",
+        headers: authHeader(),
         body: formData
     });
     
@@ -198,6 +206,7 @@ export const extractCVText = async (file: File) => {
 
     const res = await fetch(`${API_URL}/cv/extract-text`, {
         method: "POST",
+        headers: authHeader(),
         body: formData,
     });
 
@@ -208,7 +217,7 @@ export const extractCVText = async (file: File) => {
 export const buildInterviewContext = async (cvText: string, jdText: string) => {
     const res = await apiRequest(`${API_URL}/cv/interview-context`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...authHeader() },
         body: JSON.stringify({ cv_text: cvText, jd_text: jdText }),
     });
     return res.json();
@@ -493,6 +502,7 @@ export const transcribeAudio = async (audioBlob: Blob, position: string = "", la
 
   const res = await apiRequest(fetchUrl, {
     method: "POST",
+    headers: authHeader(),
     body: formData,
   });
   return res.json();
@@ -618,6 +628,7 @@ export const matchJobs = async (file: File) => {
 
   const res = await fetch(`${API_URL}/jobs/match`, {
     method: "POST",
+    headers: authHeader(),
     body: formData,
   });
 
@@ -635,6 +646,7 @@ export const uploadMakeoverCV = async (file: File, industry: string) => {
 
   const res = await fetch(`${API_URL}/cv/upload-makeover`, {
     method: "POST",
+    headers: authHeader(),
     body: formData,
   });
   if (!res.ok) {

@@ -4,7 +4,9 @@
 
 import os
 import json
-from fastapi import APIRouter, File, UploadFile, HTTPException
+from fastapi import APIRouter, Depends, File, UploadFile, HTTPException
+from ..database import sql_models
+from .profile import get_current_user
 from .cv import extract_text_from_cv
 from ..ai.types import AIError
 from ..ai_service import call_ai_chat
@@ -45,7 +47,7 @@ MOCK_JOBS = [
 ]
 
 @router.post("/api/jobs/match")
-async def match_jobs(file: UploadFile = File(...)):
+async def match_jobs(file: UploadFile = File(...), current_user: sql_models.User = Depends(get_current_user)):
     try:
         print(f"⏳ Extracting text from CV for Job Matching: {file.filename}")
         cv_text = await extract_text_from_cv(file)
