@@ -1,4 +1,4 @@
-import { AlertTriangle, BrainCircuit, ClipboardCheck, FileText, HelpCircle, KeyRound, LogOut, MessageSquare, Network, Settings } from "lucide-react";
+import { AlertTriangle, BrainCircuit, ClipboardCheck, FileText, HelpCircle, KeyRound, LogOut, MessageSquare, Network, Settings, ShieldCheck } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { NavLink } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext.jsx";
@@ -12,6 +12,7 @@ const kbNavItems = [
   { labelKey: "navKb.review", to: "/review", icon: ClipboardCheck, badge: "review" },
   { labelKey: "navKb.conflicts", to: "/conflicts", icon: AlertTriangle, badge: "conflicts" },
   { labelKey: "navKb.gaps", to: "/gaps", icon: HelpCircle },
+  { labelKey: "trust.nav", to: "/trust", icon: ShieldCheck },
 ];
 
 const navItems = [

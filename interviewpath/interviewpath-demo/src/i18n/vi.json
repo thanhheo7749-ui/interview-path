@@ -256,5 +256,101 @@
       "provider": "Dịch vụ AI không phản hồi. Vui lòng thử lại sau.",
       "generic": "Copilot không thể trả lời câu hỏi này. Vui lòng thử lại."
     }
+  },
+  "trust": {
+    "nav": "Trung tâm tin cậy",
+    "title": "Trung tâm tin cậy",
+    "intro": "Sự đồng ý, nhật ký kiểm toán, thời hạn lưu trữ dữ liệu và kiểm tra công bằng của công ty bạn.",
+    "legalNote": "Nội dung đồng ý và thời hạn lưu trữ chỉ là đề xuất và chưa qua thẩm định pháp lý.",
+    "previous": "Trước",
+    "next": "Sau",
+    "pageOf": "Trang {{page}} / {{pages}}",
+    "tabs": {
+      "consents": "Đồng ý",
+      "audit": "Nhật ký kiểm toán",
+      "retention": "Lưu trữ",
+      "fairness": "Kiểm tra công bằng"
+    },
+    "purposes": {
+      "cv_processing": "Xử lý CV",
+      "recording_screening": "Phỏng vấn sàng lọc có ghi âm"
+    },
+    "consents": {
+      "intro": "Mỗi sự đồng ý của ứng viên được liệt kê theo mã ẩn danh. Không hiển thị tên và email.",
+      "empty": "Chưa có sự đồng ý nào được ghi nhận.",
+      "alias": "Mã ẩn danh",
+      "purpose": "Mục đích",
+      "version": "Phiên bản nội dung",
+      "granted": "Thời điểm đồng ý",
+      "status": "Trạng thái",
+      "noAlias": "(chưa liên kết)",
+      "active": "Đang hiệu lực",
+      "withdrawn": "Đã rút {{date}}"
+    },
+    "audit": {
+      "intro": "Mọi quyết định, lần xem danh tính và bước AI đều được ghi lại ở đây. Ứng viên chỉ xuất hiện dưới dạng số hồ sơ.",
+      "filter": "Hành động",
+      "allActions": "Tất cả hành động",
+      "empty": "Không có mục nhật ký phù hợp.",
+      "when": "Thời điểm",
+      "action": "Hành động",
+      "actor": "Bởi",
+      "target": "Đối tượng",
+      "ai": "Bước AI",
+      "details": "Chi tiết",
+      "staff": "Nhân viên #{{id}}",
+      "system": "Hệ thống"
+    },
+    "actions": {
+      "cv_assessed": "Đã đánh giá CV",
+      "voice_session_started": "Bắt đầu phỏng vấn",
+      "voice_session_completed": "Hoàn tất phỏng vấn",
+      "voice_session_expired": "Phỏng vấn hết hạn",
+      "recording_declined": "Từ chối ghi âm",
+      "fast_tracked": "Đi nhanh",
+      "hr_decision": "Quyết định của HR",
+      "cv_status_corrected": "Sửa nhãn CV",
+      "identity_revealed": "Đã xem danh tính",
+      "audio_played": "Đã nghe ghi âm",
+      "restart_granted": "Cho phép làm lại",
+      "analysis_retried": "Thử phân tích lại",
+      "fairness_check": "Kiểm tra công bằng",
+      "consent_withdrawn": "Rút sự đồng ý",
+      "application_withdrawn": "Rút hồ sơ",
+      "application_anonymized": "Đã ẩn danh hồ sơ",
+      "reminder_queued": "Đã xếp lịch nhắc"
+    },
+    "retention": {
+      "period": "Thời hạn lưu trữ",
+      "days_one": "{{count}} ngày",
+      "days_other": "{{count}} ngày",
+      "periodHint": "Hồ sơ chưa có quyết định sẽ bị xóa sau {{undecided}} ngày.",
+      "awaiting": "Chờ xóa",
+      "awaitingHint": "Các hồ sơ vẫn còn dữ liệu cá nhân.",
+      "dueNow": "Đến hạn",
+      "dueNowHint": "Đã quá thời hạn lưu trữ; lần chạy theo lịch tiếp theo sẽ xóa.",
+      "anonymized": "Đã ẩn danh",
+      "anonymizedHint": "Dữ liệu cá nhân đã xóa; bản ghi trạng thái vẫn còn.",
+      "deletedLabel": "Được xóa:",
+      "deleted": "tệp và nội dung CV, ghi âm và bản ghi phỏng vấn, kết quả đánh giá, sự đồng ý và thông báo của hồ sơ, cùng liên kết giữa nhật ký kiểm toán và ứng viên.",
+      "keptLabel": "Được giữ lại:",
+      "kept": "mã ẩn danh, giai đoạn và quyết định của hồ sơ, cùng nhật ký kiểm toán, để thống kê tuyển dụng và trách nhiệm giải trình vẫn còn."
+    },
+    "fairness": {
+      "intro": "Hoán đổi tên và giới tính trong CV của một hồ sơ, che lại rồi so sánh văn bản đã ẩn danh. Không chấm lại điểm và không thay đổi gì ở hồ sơ.",
+      "noApplications": "Chưa có hồ sơ nào để kiểm tra.",
+      "application": "Hồ sơ",
+      "choose": "Chọn một hồ sơ",
+      "run": "Chạy kiểm tra",
+      "running": "Đang kiểm tra...",
+      "unavailable": "Không thể kiểm tra hồ sơ này: {{reason}}.",
+      "resultSame": "Sau khi hoán đổi tên và giới tính, văn bản ẩn danh giống hệt nhau và kết quả sàng lọc đã lưu là như nhau.",
+      "resultTextSameOnly": "Sau khi hoán đổi tên và giới tính, văn bản ẩn danh giống hệt nhau, nhưng chưa xác nhận được kết quả sàng lọc đã lưu là như nhau.",
+      "resultTextDiffers": "Sau khi hoán đổi tên và giới tính, văn bản ẩn danh khác nhau, dù kết quả sàng lọc đã lưu là như nhau. Hãy so sánh hai văn bản bên dưới.",
+      "resultDiffers": "Sau khi hoán đổi tên và giới tính, văn bản ẩn danh khác nhau và kết quả sàng lọc đã lưu không như nhau. Hãy so sánh hai văn bản bên dưới.",
+      "original": "Văn bản ẩn danh (gốc)",
+      "swapped": "Văn bản ẩn danh (đã hoán đổi tên và giới tính)",
+      "limit": "Tên trường và nội dung kinh nghiệm vẫn còn, nên việc này giúp giảm thiên kiến nhưng không loại bỏ hoàn toàn."
+    }
   }
 }
