@@ -28,6 +28,8 @@ class DecisionItem(BaseModel):
     fact_value: str | None = Field(default=None, max_length=255)
     fact_unit: str | None = Field(default=None, max_length=50)
     scope_text: str | None = Field(default=None, max_length=500)
+    # Publish an item whose automatic discrimination check could not run, after HR has read it.
+    confirm_unchecked: bool = False
 
     @model_validator(mode="after")
     def _required_ids(self):
@@ -50,7 +52,7 @@ def _node_out(node: KbNode, sources: list[dict]) -> dict:
         "id": node.id, "type": node.type, "title": node.title, "body": node.body, "visibility": node.visibility,
         "language": node.language, "fact_kind": node.fact_kind, "fact_value": node.fact_value,
         "fact_unit": node.fact_unit, "scope_text": node.scope_text, "department_id": node.department_id,
-        "sources": sources,
+        "guard_category": node.guard_category, "guard_reason": node.guard_reason, "sources": sources,
     }
 
 

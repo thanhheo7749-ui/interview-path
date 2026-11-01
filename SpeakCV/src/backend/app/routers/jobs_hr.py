@@ -37,7 +37,7 @@ def _check_nodes(db: Session, company_id: int, node_ids: set[int]) -> None:
         raise HTTPException(status_code=404, detail="Knowledge node not found")
 
 
-def _out(db: Session, job: Job) -> dict:
+def _out(db: Session, job: Job, warnings: list[str] | None = None) -> dict:
     channels = db.query(JobChannelLink).filter_by(job_id=job.id, company_id=job.company_id).order_by(JobChannelLink.id).all()
     return {
         "id": job.id, "title": job.title, "slug": job.slug, "status": job.status, "version": job.version,
@@ -45,6 +45,7 @@ def _out(db: Session, job: Job) -> dict:
         "role_node_id": job.role_node_id, "interview_languages": job.interview_languages or [],
         "requirements": jobs.active_requirements(db, job.id),
         "channels": [ChannelOut.model_validate(c, from_attributes=True) for c in channels],
+        "warnings": list(warnings or []),
     }
 
 
@@ -92,10 +93,14 @@ def create_job(company_id: int, body: JobCreate, member: CompanyMember = Depends
     )
     db.add(job)
     db.flush()
-    jobs.update_requirements(db, job, body.requirements)
+    try:
+        warnings = jobs.update_requirements(db, job, body.requirements)
+    except jobs.JobError as error:
+        db.rollback()
+        raise _translate(error) from error
     audit.record(db, company_id, member.user_id, "job.create", "job", job.id)
     db.commit()
-    return _out(db, job)
+    return _out(db, job, warnings)
 
 
 @router.get(JOBS, response_model=list[JobSummary])
@@ -119,9 +124,14 @@ def patch_job(company_id: int, job_id: int, body: JobPatch, member: CompanyMembe
     if "department_id" in fields:
         _check_department(db, company_id, body.department_id)
         job.department_id = body.department_id
+    warnings: list[str] = []
     if body.requirements is not None:
         _check_nodes(db, company_id, {r.node_id for r in body.requirements if r.node_id is not None})
-        jobs.update_requirements(db, job, body.requirements)
+        try:
+            warnings = jobs.update_requirements(db, job, body.requirements)
+        except jobs.JobError as error:
+            db.rollback()
+            raise _translate(error) from error
     if body.title is not None:
         job.title = body.title
     if body.description is not None:
@@ -130,7 +140,7 @@ def patch_job(company_id: int, job_id: int, body: JobPatch, member: CompanyMembe
         job.interview_languages = list(body.interview_languages)
     audit.record(db, company_id, member.user_id, "job.update", "job", job.id)
     db.commit()
-    return _out(db, job)
+    return _out(db, job, warnings)
 
 
 @router.post(JOBS + "/{job_id}/publish", response_model=JobOut)

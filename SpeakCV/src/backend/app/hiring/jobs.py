@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.brain import audience as aud
 from app.brain import retriever
+from app.bridges import discrimination
 from app.database.sql_models import Company, Job, JobChannelLink, JobRequirement
 
 
@@ -36,15 +37,39 @@ def _field(item, name, default=None):
     return item.get(name, default) if isinstance(item, dict) else getattr(item, name, default)
 
 
-def update_requirements(db: Session, job: Job, items) -> None:
+def _guard_new_rows(job: Job, items, unmatched: dict[tuple, list]) -> list[str]:
+    """Check the text of every row that is about to be added. Raises JobError(422) for a requirement that asks for a
+    protected trait. Returns warnings for texts the automatic check could not look at: HR typed them, so they are not
+    blocked."""
+    remaining = {key: len(rows) for key, rows in unmatched.items()}
+    warnings = []
+    for item in items:
+        key = _key(_field(item, "text"), _field(item, "must_have", False), _field(item, "visibility", "public"),
+                   _field(item, "node_id"))
+        if remaining.get(key):
+            remaining[key] -= 1
+            continue
+        result = discrimination.check(key[0], job.company_id)
+        if result is None:
+            continue
+        if result.unchecked:
+            warnings.append(f"The discrimination check could not run for: {key[0][:80]}")
+        else:
+            raise JobError(422, f"Requirement not allowed ({result.category}): {result.reason}")
+    return warnings
+
+
+def update_requirements(db: Session, job: Job, items) -> list[str]:
     """Unchanged rows stay, removed or changed rows go inactive, new rows are added. Any difference bumps version once.
 
-    Old rows are kept (inactive) so results that point at them stay valid.
+    Old rows are kept (inactive) so results that point at them stay valid. Raises JobError(422) before changing
+    anything when a new requirement asks for a protected trait. Returns warnings.
     """
     existing_any = db.query(JobRequirement.id).filter(JobRequirement.job_id == job.id).first() is not None
     unmatched: dict[tuple, list[JobRequirement]] = {}
     for row in active_requirements(db, job.id):
         unmatched.setdefault(_key(row.text, row.must_have, row.visibility, row.node_id), []).append(row)
+    warnings = _guard_new_rows(job, items, unmatched)
 
     changed = False
     for position, item in enumerate(items):
@@ -67,6 +92,7 @@ def update_requirements(db: Session, job: Job, items) -> None:
     if changed and existing_any:
         job.version += 1
     db.flush()
+    return warnings
 
 
 def prefill(db: Session, company_id: int, role_node_id: int) -> dict | None:

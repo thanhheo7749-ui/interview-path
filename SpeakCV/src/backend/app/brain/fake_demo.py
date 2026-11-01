@@ -49,6 +49,11 @@ def _conflict(_system, _messages, _schema) -> str:
     return json.dumps({"same_topic": True, "same_scope": True, "same_value": False})
 
 
+def _not_discriminating(_system, _messages, _schema) -> str:
+    # The rules in app.bridges.discrimination still fire; the demo classifier never adds a flag of its own.
+    return json.dumps({"flagged": False, "category": "age", "reason": ""})
+
+
 def _copilot(_system, messages, _schema) -> str:
     match = _FIRST_CONTEXT_ITEM.search(messages[0]["content"])
     if not match:
@@ -64,5 +69,6 @@ def install() -> None:
     if config.slot("bulk").provider == "fake":
         fake.register("kb_extract", _extract)
         fake.register("kb_conflict_check", _conflict)
+        fake.register("discrimination_check", _not_discriminating)
     if config.slot("reasoning").provider == "fake":
         fake.register("copilot_answer", _copilot)
