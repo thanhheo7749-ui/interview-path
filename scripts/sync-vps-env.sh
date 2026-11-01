@@ -229,6 +229,18 @@ VNPAY_HASH_SECRET=$(first_real "$(source_value VNPAY_HASH_SECRET)" "$(base_value
 VNPAY_PAYMENT_URL=$(first_real "$(source_value VNPAY_PAYMENT_URL)" "$(base_value VNPAY_PAYMENT_URL)" "https://sandbox.vnpayment.vn/paymentv2/vpcpay.html")
 EOF
 
+# Keep operator settings the template does not know about. Whole lines are copied; values are never printed.
+if [[ -f "$OUT_FILE" ]]; then
+  kept_lines="$(awk '
+    { key = $0; sub(/=.*/, "", key) }
+    FNR == NR { if ($0 ~ /^[A-Za-z_][A-Za-z0-9_]*=/) written[key] = 1; next }
+    $0 ~ /^[A-Za-z_][A-Za-z0-9_]*=/ && !(key in written)
+  ' "$tmp_file" "$OUT_FILE")"
+  if [[ -n "$kept_lines" ]]; then
+    printf '\n# Kept from the previous file: settings this template does not write.\n%s\n' "$kept_lines" >>"$tmp_file"
+  fi
+fi
+
 chmod 600 "$tmp_file"
 mv "$tmp_file" "$OUT_FILE"
 

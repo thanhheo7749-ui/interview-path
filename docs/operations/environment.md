@@ -16,3 +16,9 @@ Switching between a branch that tracks `.env` and one that does not has the same
 History was not rewritten, because the repository is private. Rotate every value that was tracked:
 the AI proxy key, `SECRET_KEY`, the MySQL root password and the admin password. If this repository
 ever goes public or to the organiser, publish from a new repository, because old dumps remain in history.
+
+## Upload size limits
+
+The backend enforces `MAX_UPLOAD_MB` while reading a file, but multipart parsing has already spooled the
+whole request to disk by then. So `deploy/Caddyfile` also sets `request_body max_size` on the API domain.
+If you raise `MAX_UPLOAD_MB`, raise that limit too, keeping it a little above the upload limit.

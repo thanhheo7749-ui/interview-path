@@ -107,6 +107,7 @@ write_resolved_env() {
   local enable_proxy public_host demo_port frontend_port backend_port
   local primary_domain speakcv_domain api_domain
   local vite_speakcv_url next_public_api_url allowed_origins vnpay_return_url
+  local backend_bind forwarded_allow_ips
 
   enable_proxy="$(read_env ENABLE_PROXY)"
   demo_port="$(read_env INTERVIEWPATH_PORT)"
@@ -131,12 +132,18 @@ write_resolved_env() {
     next_public_api_url="https://${api_domain}"
     allowed_origins="https://${primary_domain},https://${speakcv_domain}"
     vnpay_return_url="https://${speakcv_domain}/upgrade/success"
+    # Only Caddy can reach the backend, so its X-Forwarded-For can be trusted for per-client rate limits.
+    backend_bind="127.0.0.1"
+    forwarded_allow_ips="*"
   else
     public_host="$(detect_public_host)"
     vite_speakcv_url="http://${public_host}:${frontend_port}"
     next_public_api_url="http://${public_host}:${backend_port}"
     allowed_origins="http://${public_host}:${frontend_port},http://${public_host}:${demo_port}"
     vnpay_return_url="http://${public_host}:${frontend_port}/upgrade/success"
+    # Clients connect directly, so a forwarded header from them must not be believed.
+    backend_bind="0.0.0.0"
+    forwarded_allow_ips="127.0.0.1"
   fi
 
   mkdir -p "$(dirname "$RESOLVED_ENV_FILE")"
@@ -163,6 +170,8 @@ write_resolved_env() {
   set_key VITE_API_URL "$next_public_api_url"
   set_key ALLOWED_ORIGINS "$allowed_origins"
   set_key VNPAY_RETURN_URL "$vnpay_return_url"
+  set_key SPEAKCV_BACKEND_BIND "$backend_bind"
+  set_key FORWARDED_ALLOW_IPS "$forwarded_allow_ips"
 }
 
 required_keys=(

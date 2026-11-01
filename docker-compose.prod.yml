@@ -67,11 +67,14 @@ services:
     env_file:
       - ./.env
     ports:
-      - "${SPEAKCV_BACKEND_PORT:-8000}:8000"
+      - "${SPEAKCV_BACKEND_BIND:-127.0.0.1}:${SPEAKCV_BACKEND_PORT:-8000}:8000"
     expose:
       - "8000"
     environment:
       STORAGE_DIR: /data/storage
+      # .env holds localhost values; these come from scripts/vps-deploy.sh, which resolves the real ones.
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS}
+      FORWARDED_ALLOW_IPS: ${FORWARDED_ALLOW_IPS}
     volumes:
       - speakcv_storage:/data/storage
     depends_on:

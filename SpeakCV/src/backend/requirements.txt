@@ -1,34 +1,35 @@
 # 1. CORE WEB SERVER & API
-fastapi
-uvicorn[standard]
-python-multipart
-pydantic
+fastapi==0.162.0
+uvicorn[standard]==0.54.0
+python-multipart==0.0.33
+pydantic==2.14.2
+httpx==0.28.1
 
 # 2. DATABASE & ORM
-sqlalchemy
-alembic
-pymysql
+sqlalchemy==2.1.6
+alembic==1.20.1
+pymysql==1.2.3
 
 # 3. Authentication & Security
-passlib[argon2]     
-argon2-cffi         
-python-jose[cryptography]
+passlib[argon2]==1.7.4
+argon2-cffi==25.1.0
+python-jose[cryptography]==3.5.0
 
 # 4. System Utilities
-python-dotenv       
-google-auth
-requests
+python-dotenv==1.2.4
+google-auth==2.62.0
+requests==2.34.2
 
 # 5. CV & AI Processing
-PyPDF2
-pdfplumber
-python-docx
-openai
-google-genai
-voyageai
-edge-tts
+PyPDF2==3.0.1
+pdfplumber==0.11.10
+python-docx==1.2.0
+openai==3.42.0
+google-genai==2.34.0
+voyageai==0.5.0
+edge-tts==7.3.1
 
-slowapi
-pyyaml
-anthropic
-numpy
+slowapi==0.1.10
+pyyaml==6.0.3
+anthropic==2.3.0
+numpy==2.5.4
