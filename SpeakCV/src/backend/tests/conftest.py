@@ -35,9 +35,11 @@ def _fresh_tables():
     from app.database.database import Base, engine
 
     from app.ai.providers import fake
+    from app.brain import retriever
 
     reset_config()
     fake.reset()
+    retriever.clear_vector_cache()
     Base.metadata.drop_all(bind=engine)
     Base.metadata.create_all(bind=engine)
     yield
