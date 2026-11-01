@@ -136,6 +136,7 @@ class AssistantQuestion(Base):
     question = Column(Text, nullable=False)
     language = Column(String(10), nullable=False)
     answered = Column(Boolean, nullable=False)
+    state = Column(String(20), nullable=True)  # answered, conflict, not_found or failed; NULL on older rows
     top_score = Column(String(32), nullable=True)
     embedding = Column(LargeBinary, nullable=True)
     embedding_model = Column(String(100), nullable=True)

@@ -2,6 +2,7 @@
 from dataclasses import dataclass
 
 import numpy as np
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from app.ai.config import get_config
@@ -28,7 +29,9 @@ def _clusters(db: Session, company_id: int) -> list[GapGroup]:
         db.query(AssistantQuestion.id, AssistantQuestion.question, AssistantQuestion.embedding,
                  AssistantQuestion.embedding_model)
         .filter(AssistantQuestion.company_id == company_id, AssistantQuestion.answered.is_(False),
-                AssistantQuestion.resolved.is_(False))
+                AssistantQuestion.resolved.is_(False),
+                # A failure is the system's, not the knowledge's. Older rows have no state and still count.
+                or_(AssistantQuestion.state.is_(None), AssistantQuestion.state != "failed"))
         .order_by(AssistantQuestion.id)
         .all()
     )

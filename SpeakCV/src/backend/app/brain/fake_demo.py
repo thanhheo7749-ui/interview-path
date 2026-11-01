@@ -7,7 +7,6 @@ from app.ai.providers import fake
 
 _fixture: list[dict] = []
 _fixture_edges: list[dict] = []
-_REF = re.compile(r"\[([nc]\d+)\]\s*(.*)")
 _FIRST_CONTEXT_ITEM = re.compile(r"<context>\n\[([nc]\d+)\] (.*?)(?=\n\[[nc]\d+\] |\n</context>)", re.DOTALL)
 _DOCUMENT = re.compile(r"<document>\n(.*)\n</document>", re.DOTALL)
 
