@@ -4,6 +4,7 @@ import re
 
 from app.ai.config import get_config
 from app.ai.providers import fake
+from app.brain.text import MIN_QUOTE_CHARS
 
 _fixture: list[dict] = []
 _fixture_edges: list[dict] = []
@@ -32,16 +33,20 @@ def _extract(_system, messages, _schema) -> str:
             },
             ensure_ascii=False,
         )
-    first_line = next((line.strip(" #") for line in chunk.splitlines() if line.strip(" #")), "")
-    if not first_line:
+    lines = [line.strip(" #") for line in chunk.splitlines() if line.strip(" #")]
+    if not lines:
         return json.dumps({"nodes": [], "edges": []})
-    node = {"ref": first_line[:80], "type": "policy", "title": first_line[:80], "body": chunk[:200], "quote": first_line,
+    first_line = lines[0]
+    # A short heading alone would fail the quote gate.
+    quote = next((line for line in lines if len(line) >= MIN_QUOTE_CHARS), first_line)
+    node = {"ref": first_line[:80], "type": "policy", "title": first_line[:80], "body": chunk[:200], "quote": quote,
             "fact_kind": "none", "fact_value": "", "fact_unit": "", "scope_text": "", "effective_date": ""}
     return json.dumps({"nodes": [node], "edges": []}, ensure_ascii=False)
 
 
 def _conflict(_system, _messages, _schema) -> str:
-    return json.dumps({"same_topic": True, "same_scope": True})
+    # Pairs whose values code can read and match never get here, so the demo treats the rest as different.
+    return json.dumps({"same_topic": True, "same_scope": True, "same_value": False})
 
 
 def _copilot(_system, messages, _schema) -> str:

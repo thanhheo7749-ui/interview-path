@@ -90,6 +90,8 @@ def _reembed_rows(rows, texts, company_id) -> None:
 
 
 def reembed(args) -> int:
+    from app.brain import retriever
+
     db = SessionLocal()
     try:
         query = db.query(Company).order_by(Company.id)
@@ -109,7 +111,7 @@ def reembed(args) -> int:
                 .all()
             )
             _reembed_rows(chunks, [chunk.text for chunk in chunks], company.id)
-            _reembed_rows(nodes, [f"{node.title}\n{node.body}" for node in nodes], company.id)
+            _reembed_rows(nodes, [retriever.node_text(node) for node in nodes], company.id)
             # One commit per company, so a failed vendor call leaves its old vectors and version in place.
             company.kb_version = Company.kb_version + 1
             db.commit()

@@ -1,4 +1,4 @@
-from sqlalchemy import Boolean, Column, Date, DateTime, ForeignKey, Index, Integer, LargeBinary, String, Text
+from sqlalchemy import JSON, Boolean, Column, Date, DateTime, ForeignKey, Index, Integer, LargeBinary, String, Text
 from sqlalchemy.sql import func
 
 from .database import Base
@@ -33,8 +33,8 @@ class KbDocument(Base):
     file_path = Column(String(500), nullable=True)
     visibility = Column(String(20), nullable=False)
     effective_date = Column(Date, nullable=True)
-    uploaded_by = Column(Integer, ForeignKey("users.id"), nullable=True)
-    status = Column(String(20), nullable=False, default="processing")  # processing | review | published | failed
+    uploaded_by = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    status = Column(String(20), nullable=False, default="processing")  # processing | review | published | failed | withdrawn
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
 
@@ -47,7 +47,9 @@ class KbIngestionJob(Base):
     progress = Column(Integer, nullable=False, default=0)
     error = Column(Text, nullable=True)
     dropped_items = Column(Integer, nullable=False, default=0)
-    failed_chunks = Column(Integer, nullable=False, default=0)
+    failed_chunks = Column(Integer, nullable=False, default=0)  # chunks in failed_chunk_ids, plus 1 for a failed check
+    failed_chunk_ids = Column(JSON, nullable=False, default=list)
+    contradiction_check_failed = Column(Boolean, nullable=False, default=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
 
@@ -86,7 +88,7 @@ class KbNode(Base):
     embedding = Column(LargeBinary, nullable=True)
     embedding_model = Column(String(100), nullable=True)
     embedding_dim = Column(Integer, nullable=True)
-    approved_by = Column(Integer, ForeignKey("users.id"), nullable=True)
+    approved_by = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     approved_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
@@ -120,8 +122,8 @@ class KbConflict(Base):
     node_a_id = Column(Integer, ForeignKey("kb_nodes.id", ondelete="CASCADE"), nullable=False, index=True)
     node_b_id = Column(Integer, ForeignKey("kb_nodes.id", ondelete="CASCADE"), nullable=False, index=True)
     status = Column(String(20), nullable=False, default="open")  # open | resolved | dismissed
-    resolution = Column(String(20), nullable=True)  # a | b | different_scope | node_rejected | edit_resolved
-    resolved_by = Column(Integer, ForeignKey("users.id"), nullable=True)
+    resolution = Column(String(20), nullable=True)  # a | b | different_scope | node_rejected | node_superseded | edit_resolved
+    resolved_by = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     resolved_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
@@ -131,7 +133,7 @@ class AssistantQuestion(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     company_id = Column(Integer, ForeignKey("companies.id", ondelete="CASCADE"), nullable=False, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     audience = Column(String(20), nullable=False)
     question = Column(Text, nullable=False)
     language = Column(String(10), nullable=False)

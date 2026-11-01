@@ -38,6 +38,9 @@ def register(request: Request, user: models.UserCreate, db: Session = Depends(ge
 @limiter.limit(LOGIN_LIMIT)
 def login(request: Request, user_data: models.UserLogin, db: Session = Depends(get_db)):
     email = user_data.email.strip().lower()
+    # No account has a longer password, so it is refused before any costly hash.
+    if len(user_data.password) > security.MAX_PASSWORD_LENGTH:
+        raise HTTPException(status_code=401, detail="Invalid email or password")
     user = db.query(sql_models.User).filter(func.lower(sql_models.User.email) == email).first()
     if not user or not security.verify_password(user_data.password, user.hashed_password):
         raise HTTPException(status_code=401, detail="Invalid email or password")

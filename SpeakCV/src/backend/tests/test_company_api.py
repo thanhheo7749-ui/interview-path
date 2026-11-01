@@ -77,7 +77,8 @@ def test_patch_company_cannot_change_protected_fields(api, db, company, people):
     assert response.status_code == 200
     db.expire_all()
     row = db.get(Company, company)
-    assert (row.name, row.slug, row.is_sample, row.kb_version) == ("New", "acme", True, 0)
+    # The rename moves kb_version once through the org sync; the 99 in the request is ignored.
+    assert (row.name, row.slug, row.is_sample, row.kb_version) == ("New", "acme", True, 1)
 
 
 def test_department_tree_rules(api, company, people):

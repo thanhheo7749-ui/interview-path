@@ -3,7 +3,6 @@
 Company knowledge comes only from app.brain.retriever, whose queries filter by audience, so hidden
 content never reaches a prompt. Every answer returned cites refs that code has checked against the context.
 """
-import re
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
@@ -16,6 +15,7 @@ from app.ai import gateway
 from app.ai.types import AIError
 from app.brain import retriever, vectors
 from app.brain.audience import Audience
+from app.brain.prompting import as_data
 from app.brain.retriever import Citation, ContextItem
 from app.brain.text import guess_language
 from app.database.sql_models import AssistantQuestion
@@ -47,8 +47,6 @@ CONFLICT = {
     "vi": "Hai nguồn tài liệu của công ty đang khác nhau về nội dung này. Bộ phận nhân sự đang xác nhận.",
     "ko": "이 내용에 대해 회사 문서 두 건이 서로 다릅니다. 인사팀이 확인 중입니다.",
 }
-
-_DELIMITER = re.compile(r"<(?=\s*/?\s*(?:context|question)\b)", re.IGNORECASE)
 
 
 class CopilotAnswer(BaseModel):
@@ -85,15 +83,10 @@ def _is_relevant(cosine: float, coverage: float, model: str) -> bool:
     return cosine >= threshold_for(model) or coverage >= min_keyword_coverage()
 
 
-def _as_data(text: str) -> str:
-    """Stop text from closing or opening the tags that mark it as data."""
-    return _DELIMITER.sub("&lt;", text)
-
-
 def _prompt(items: tuple[ContextItem, ...], citable: list[str], question: str) -> str:
-    context = "\n".join(f"[{item.ref}] {_as_data(item.text)}" for item in items)
+    context = "\n".join(f"[{item.ref}] {as_data(item.text)}" for item in items)
     return (f"<context>\n{context}\n</context>\n\nRefs you may cite: {', '.join(citable)}\n\n"
-            f"<question>\n{_as_data(question)}\n</question>")
+            f"<question>\n{as_data(question)}\n</question>")
 
 
 def _generate(items: tuple[ContextItem, ...], question: str, company_id: int) -> CopilotAnswer | None:

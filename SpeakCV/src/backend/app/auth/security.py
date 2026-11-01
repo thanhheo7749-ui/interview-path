@@ -14,6 +14,7 @@ SECRET_KEY = settings.secret_key()
 ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "3000"))
 MIN_PASSWORD_LENGTH = 10
+MAX_PASSWORD_LENGTH = 128
 
 pwd_context = CryptContext(schemes=["argon2"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/login")

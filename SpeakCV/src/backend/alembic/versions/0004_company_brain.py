@@ -36,7 +36,7 @@ def upgrade() -> None:
     sa.Column('resolved', sa.Boolean(), nullable=False),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('(CURRENT_TIMESTAMP)'), nullable=False),
     sa.ForeignKeyConstraint(['company_id'], ['companies.id'], ondelete='CASCADE'),
-    sa.ForeignKeyConstraint(['user_id'], ['users.id'], ),
+    sa.ForeignKeyConstraint(['user_id'], ['users.id'], ondelete='SET NULL'),
     sa.PrimaryKeyConstraint('id')
     )
     with op.batch_alter_table('assistant_questions', schema=None) as batch_op:
@@ -58,7 +58,7 @@ def upgrade() -> None:
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('(CURRENT_TIMESTAMP)'), nullable=False),
     sa.ForeignKeyConstraint(['company_id'], ['companies.id'], ondelete='CASCADE'),
     sa.ForeignKeyConstraint(['department_id'], ['departments.id'], ),
-    sa.ForeignKeyConstraint(['uploaded_by'], ['users.id'], ),
+    sa.ForeignKeyConstraint(['uploaded_by'], ['users.id'], ondelete='SET NULL'),
     sa.PrimaryKeyConstraint('id')
     )
     with op.batch_alter_table('kb_documents', schema=None) as batch_op:
@@ -87,7 +87,7 @@ def upgrade() -> None:
     sa.Column('approved_by', sa.Integer(), nullable=True),
     sa.Column('approved_at', sa.DateTime(timezone=True), nullable=True),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('(CURRENT_TIMESTAMP)'), nullable=False),
-    sa.ForeignKeyConstraint(['approved_by'], ['users.id'], ),
+    sa.ForeignKeyConstraint(['approved_by'], ['users.id'], ondelete='SET NULL'),
     sa.ForeignKeyConstraint(['company_id'], ['companies.id'], ondelete='CASCADE'),
     sa.ForeignKeyConstraint(['department_id'], ['departments.id'], ),
     sa.PrimaryKeyConstraint('id')
@@ -130,7 +130,7 @@ def upgrade() -> None:
     sa.ForeignKeyConstraint(['company_id'], ['companies.id'], ondelete='CASCADE'),
     sa.ForeignKeyConstraint(['node_a_id'], ['kb_nodes.id'], ondelete='CASCADE'),
     sa.ForeignKeyConstraint(['node_b_id'], ['kb_nodes.id'], ondelete='CASCADE'),
-    sa.ForeignKeyConstraint(['resolved_by'], ['users.id'], ),
+    sa.ForeignKeyConstraint(['resolved_by'], ['users.id'], ondelete='SET NULL'),
     sa.PrimaryKeyConstraint('id')
     )
     with op.batch_alter_table('kb_conflicts', schema=None) as batch_op:
@@ -166,6 +166,8 @@ def upgrade() -> None:
     sa.Column('error', sa.Text(), nullable=True),
     sa.Column('dropped_items', sa.Integer(), nullable=False),
     sa.Column('failed_chunks', sa.Integer(), nullable=False),
+    sa.Column('failed_chunk_ids', sa.JSON(), nullable=False),
+    sa.Column('contradiction_check_failed', sa.Boolean(), nullable=False),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('(CURRENT_TIMESTAMP)'), nullable=False),
     sa.ForeignKeyConstraint(['document_id'], ['kb_documents.id'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id')

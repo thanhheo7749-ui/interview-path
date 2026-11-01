@@ -6,6 +6,8 @@ from typing import Any, List, Optional
 from pydantic import BaseModel, Field
 from datetime import date
 
+from app.auth.security import MAX_PASSWORD_LENGTH
+
 # ── Profile & Experience ──────────────────────
 
 class ProfileUpdate(BaseModel):
@@ -99,13 +101,13 @@ class InterviewContextResponse(BaseModel):
 
 class UserCreate(BaseModel):
     email: str
-    password: str
+    password: str = Field(max_length=MAX_PASSWORD_LENGTH)
     full_name: str
     credits: int = 100
 
 class AdminUserCreate(BaseModel):
     email: str
-    password: str
+    password: str = Field(max_length=MAX_PASSWORD_LENGTH)
     full_name: str
     role: str = "user"
     credits: int = 100
@@ -117,7 +119,7 @@ class AdminUserUpdate(BaseModel):
     role: Optional[str] = None
     credits: Optional[int] = None
     plan: Optional[str] = None
-    password: Optional[str] = None # Admin can optionally reset password
+    password: Optional[str] = Field(default=None, max_length=MAX_PASSWORD_LENGTH) # Admin can optionally reset password
 
 class GoogleAuthRequest(BaseModel):
     token: str
@@ -2542,13 +2544,13 @@ class InterviewContextResponse(BaseModel):
 
 class UserCreate(BaseModel):
     email: str
-    password: str
+    password: str = Field(max_length=MAX_PASSWORD_LENGTH)
     full_name: str
     credits: int = 100
 
 class AdminUserCreate(BaseModel):
     email: str
-    password: str
+    password: str = Field(max_length=MAX_PASSWORD_LENGTH)
     full_name: str
     role: str = "user"
     credits: int = 100
@@ -2560,7 +2562,7 @@ class AdminUserUpdate(BaseModel):
     role: Optional[str] = None
     credits: Optional[int] = None
     plan: Optional[str] = None
-    password: Optional[str] = None # Admin can optionally reset password
+    password: Optional[str] = Field(default=None, max_length=MAX_PASSWORD_LENGTH) # Admin can optionally reset password
 
 class GoogleAuthRequest(BaseModel):
     token: str

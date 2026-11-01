@@ -145,11 +145,12 @@ def _seed_company(db, folder: Path, passwords: _Passwords, auto_approve: bool, u
     if auto_approve:
         from app.brain.review import auto_approve_document
 
-        db.expire_all()
+        # The pipeline wrote in another session. End this transaction so the query below sees all of it.
+        db.commit()
         for document in db.query(KbDocument).filter_by(company_id=company.id, status="review").order_by(KbDocument.id).all():
             auto_approve_document(db, document.id, hr.id if hr else None)
 
-    db.expire_all()
+    db.commit()
     _seed_job(db, company)
     return _summary(db, company, created, skipped)
 

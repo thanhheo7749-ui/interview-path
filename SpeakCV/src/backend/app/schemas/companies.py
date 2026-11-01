@@ -2,7 +2,7 @@ from typing import Annotated, Literal, Optional
 
 from pydantic import BaseModel, Field, StringConstraints
 
-from app.auth.security import MIN_PASSWORD_LENGTH
+from app.auth.security import MAX_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH
 
 MemberRole = Literal["hr", "manager", "employee"]
 # Whitespace is stripped first, so a name of only spaces fails the minimum length.
@@ -89,5 +89,5 @@ class MeOut(BaseModel):
 
 
 class PasswordChange(BaseModel):
-    current_password: str
-    new_password: str = Field(min_length=MIN_PASSWORD_LENGTH)
+    current_password: str = Field(max_length=MAX_PASSWORD_LENGTH)
+    new_password: str = Field(min_length=MIN_PASSWORD_LENGTH, max_length=MAX_PASSWORD_LENGTH)

@@ -1,5 +1,6 @@
 """Document ingestion. Every extracted item is verified against its source text and starts as a draft."""
 import logging
+from dataclasses import dataclass, field
 from datetime import date
 
 from sqlalchemy import or_
@@ -7,10 +8,10 @@ from sqlalchemy.orm import Session
 
 from app.ai import gateway
 from app.ai.types import AIError
-from app.brain import contradiction, org_sync, vectors
+from app.brain import contradiction, org_sync, retriever, review, vectors
 from app.brain.chunking import chunk_pages
-from app.brain.extraction import extract_chunk
-from app.brain.text import guess_language, normalise_title, quote_in
+from app.brain.extraction import ExtractedEdge, ExtractedNode, ExtractionResult, extract_chunk
+from app.brain.text import guess_language, normalise_title, quote_in, verified_quote
 from app.core import storage
 from app.core.text_extract import NoExtractableText, extract_pages
 from app.database.database import SessionLocal
@@ -24,6 +25,21 @@ KNOWN_TITLE_CAP = 200
 GENERIC_ERROR = "Processing this document failed. Please retry."
 INTERRUPTED = "Interrupted by a restart. Retry to run it again."
 INACTIVE = ("rejected", "superseded")
+LANGUAGE_SAMPLE_CHARS = 4000
+MAX_TEXT_COLUMN_BYTES = 65535  # MySQL TEXT
+ALWAYS_BOUNDED = ("title",)
+FACT_BOUNDED = ("fact_value", "fact_unit", "scope_text")
+# Spec section 2. Extraction cannot produce part_of.
+RELATION_ENDS = {
+    "has_role": ({"department"}, {"role"}),
+    "requires": ({"role"}, {"requirement", "skill"}),
+    "holds": ({"company", "department"}, {"value"}),
+    "shown_by": ({"value"}, {"behavior"}),
+    "expects": ({"role"}, {"behavior"}),
+    "applies_to": ({"policy", "process"}, {"company", "department", "role"}),
+    "states": ({"policy"}, {"fact"}),
+    "has_note": ({"role"}, {"private_note"}),
+}
 
 
 def create_document(
@@ -34,7 +50,8 @@ def create_document(
     path = storage.save_bytes(company_id, "documents", suffix, data)
     document = KbDocument(
         company_id=company_id, department_id=department_id, title=title,
-        language=language or guess_language(data[:2000].decode("utf-8", errors="ignore")),
+        # Empty until the job has read the text: raw bytes of a PDF or DOCX say nothing about the language.
+        language=language or "",
         source_type=source_type, file_path=path, visibility=visibility, effective_date=effective_date,
         uploaded_by=member_user_id, status="processing",
     )
@@ -57,12 +74,13 @@ def start_job(db: Session, document_id: int) -> KbIngestionJob:
 def fail_interrupted_jobs() -> int:
     db = SessionLocal()
     try:
-        jobs = db.query(KbIngestionJob).filter(KbIngestionJob.status == "running").all()
+        jobs = db.query(KbIngestionJob).filter(KbIngestionJob.status.in_(("queued", "running"))).all()
         for job in jobs:
             job.status = "failed"
             job.error = INTERRUPTED
             document = db.get(KbDocument, job.document_id)
-            if document is not None:
+            # A retry of failed chunks runs on a document that keeps its status and everything it already has.
+            if document is not None and document.status == "processing":
                 document.status = "failed"
         db.commit()
         return len(jobs)
@@ -135,8 +153,254 @@ def run_job(job_id: int) -> None:
         db.close()
 
 
+def start_failed_retry(db: Session, job: KbIngestionJob) -> None:
+    """Queue a job to re-run only what it recorded as failed. Commits."""
+    job.status, job.progress, job.error = "queued", 0, None
+    db.commit()
+
+
+def run_failed_retry(job_id: int) -> None:
+    """Re-extract only the chunks a job recorded as failed, then re-run the contradiction check.
+
+    The AI calls for extraction come first, then writing and embedding are one transaction, so a failure leaves the
+    document as it was and the job can be retried again."""
+    db = SessionLocal()
+    try:
+        job = db.get(KbIngestionJob, job_id)
+        if job is None:
+            return
+        try:
+            _run_failed(db, job, db.get(KbDocument, job.document_id))
+        except Exception as exc:  # noqa: BLE001 - every failure must end the job cleanly
+            db.rollback()
+            if not isinstance(exc, AIError):
+                logger.exception("Retry of ingestion job %s failed", job_id)
+            job = db.get(KbIngestionJob, job_id)
+            job.status = "failed"
+            job.error = GENERIC_ERROR
+            db.commit()
+    finally:
+        db.close()
+
+
 def _set_progress(db: Session, job: KbIngestionJob, value: int) -> None:
     job.progress = value
+    db.commit()
+
+
+@dataclass
+class _Graph:
+    """The company's live nodes by title, plus what this run adds to them."""
+
+    company_id: int
+    document: KbDocument
+    department_node: KbNode | None
+    anchor: KbNode | None
+    by_key: dict[tuple[str, str], list[KbNode]]
+    by_title: dict[str, list[KbNode]]
+    known_titles: list[str]
+    document_chunks: list[tuple[int, str]]
+    sources: set[tuple[int, int, str]]  # (node id, chunk id, quote) already held for this document's chunks
+    new_nodes: list[KbNode] = field(default_factory=list)
+    created_edges: list[int] = field(default_factory=list)
+    dropped: int = 0
+
+
+def _load_graph(db: Session, document: KbDocument, created_edges: list[int]) -> _Graph:
+    company_id = document.company_id
+    org_sync.sync_org_nodes(db, company_id)
+    company_node = org_sync.org_node_for(db, company_id, None)
+    department_node = org_sync.org_node_for(db, company_id, document.department_id) if document.department_id else None
+
+    existing = (
+        db.query(KbNode)
+        .filter(KbNode.company_id == company_id, KbNode.status.notin_(INACTIVE))
+        .order_by(KbNode.id)
+        .all()
+    )
+    by_key: dict[tuple[str, str], list[KbNode]] = {}
+    by_title: dict[str, list[KbNode]] = {}
+    for node in existing:
+        title = normalise_title(node.title)
+        by_key.setdefault((node.type, title), []).append(node)
+        by_title.setdefault(title, []).append(node)
+    known_titles = [
+        n.title for n in existing if n.type in ("company", "department") or n.status == "published"
+    ][:KNOWN_TITLE_CAP]
+    document_chunks = [
+        (row.id, row.text)
+        for row in db.query(KbChunk.id, KbChunk.text).filter(KbChunk.document_id == document.id).order_by(KbChunk.position)
+    ]
+    sources = {
+        (row.node_id, row.chunk_id, row.quote)
+        for row in db.query(KbNodeSource.node_id, KbNodeSource.chunk_id, KbNodeSource.quote)
+        .join(KbChunk, KbNodeSource.chunk_id == KbChunk.id)
+        .filter(KbChunk.document_id == document.id)
+    }
+    return _Graph(
+        company_id=company_id, document=document, department_node=department_node,
+        anchor=department_node or company_node, by_key=by_key, by_title=by_title, known_titles=known_titles,
+        document_chunks=document_chunks, sources=sources, created_edges=created_edges,
+    )
+
+
+def _is_fact(item: ExtractedNode) -> bool:
+    return item.fact_kind != "none"
+
+
+def _node_is_storable(item: ExtractedNode) -> bool:
+    """Whether the item fits its columns. MySQL refuses an over-long value and would fail the whole job."""
+    if not item.title.strip():
+        return False
+    bounded = ALWAYS_BOUNDED + (FACT_BOUNDED if _is_fact(item) else ())
+    for name in bounded:
+        if len(getattr(item, name).strip()) > KbNode.__table__.c[name].type.length:
+            return False
+    return len(item.body.encode("utf-8")) <= MAX_TEXT_COLUMN_BYTES
+
+
+def _node_is_verified(item: ExtractedNode, chunk_text: str) -> bool:
+    if not verified_quote(item.quote, chunk_text):
+        return False
+    return not _is_fact(item) or contradiction.value_in_quote(item.fact_kind, item.fact_value, item.quote)
+
+
+def _same_item(item: ExtractedNode, node: KbNode) -> bool:
+    """Same type and title merge, but a fact only with the same value and unit. Otherwise its quote would be a false
+    source of the other value, and the disagreement would never reach the Radar."""
+    if not _is_fact(item) or node.fact_kind is None:
+        return not _is_fact(item) and node.fact_kind is None
+    return node.fact_kind == item.fact_kind and contradiction.same_value(
+        item.fact_kind, item.fact_value, item.fact_unit, node.fact_value, node.fact_unit
+    )
+
+
+def _new_node(db: Session, graph: _Graph, item: ExtractedNode) -> KbNode:
+    document = graph.document
+    is_fact = _is_fact(item)
+    node = KbNode(
+        company_id=graph.company_id, department_id=document.department_id, type=item.type,
+        title=item.title.strip(), body=item.body, language=document.language,
+        visibility=_stricter(DEFAULT_VISIBILITY_BY_TYPE[item.type], document.visibility),
+        status="draft", effective_date=_parse_date(item.effective_date, document.effective_date),
+        fact_kind=item.fact_kind if is_fact else None, fact_value=item.fact_value.strip() if is_fact else None,
+        fact_unit=item.fact_unit.strip() if is_fact else None, scope_text=item.scope_text.strip() if is_fact else None,
+    )
+    db.add(node)
+    db.flush()
+    title = normalise_title(node.title)
+    graph.by_key.setdefault((node.type, title), []).append(node)
+    graph.by_title.setdefault(title, []).append(node)
+    graph.new_nodes.append(node)
+    return node
+
+
+def _add_sources(db: Session, graph: _Graph, node: KbNode, quote: str) -> None:
+    """Link the node to every chunk of this document that holds the quote. Chunks overlap, so a sentence can be in two
+    of them, and retrieval decides whether a chunk may be read from the nodes linked to it."""
+    for chunk_id, text in graph.document_chunks:
+        key = (node.id, chunk_id, quote)
+        if key not in graph.sources and quote_in(quote, text):
+            graph.sources.add(key)
+            db.add(KbNodeSource(node_id=node.id, chunk_id=chunk_id, quote=quote))
+
+
+def _resolve_edge_end(graph: _Graph, refs: dict[str, KbNode], ref: str, types: set[str]) -> KbNode | None:
+    """The node a ref names: this chunk's own first, then any node with that title, preferring the type allowed here."""
+    name = normalise_title(ref)
+    own = refs.get(name)
+    if own is not None:
+        return own
+    named = graph.by_title.get(name, [])
+    return next((node for node in named if node.type in types), named[0] if named else None)
+
+
+def _edge_is_allowed(relation: str, source: KbNode, target: KbNode) -> bool:
+    sources, targets = RELATION_ENDS[relation]
+    return source.type in sources and target.type in targets
+
+
+def _apply_edge(db: Session, graph: _Graph, refs: dict[str, KbNode], item: ExtractedEdge, chunk_text: str,
+                links: set[tuple[int, str]]) -> None:
+    sources, targets = RELATION_ENDS[item.relation]
+    source = _resolve_edge_end(graph, refs, item.source_ref, sources)
+    target = _resolve_edge_end(graph, refs, item.target_ref, targets)
+    if (
+        not verified_quote(item.quote, chunk_text) or source is None or target is None or source.id == target.id
+        or not _edge_is_allowed(item.relation, source, target)
+    ):
+        graph.dropped += 1
+        return
+    duplicate = db.query(KbEdge.id).filter_by(
+        company_id=graph.company_id, source_node_id=source.id, target_node_id=target.id, relation=item.relation
+    ).first()
+    if duplicate is None:
+        edge = KbEdge(
+            company_id=graph.company_id, source_node_id=source.id, target_node_id=target.id,
+            relation=item.relation, must_have=item.must_have if item.relation == "requires" else None,
+            status="draft",
+        )
+        db.add(edge)
+        db.flush()
+        graph.created_edges.append(edge.id)
+    links.add((source.id, item.relation))
+    links.add((target.id, item.relation))
+
+
+def _apply_extraction(db: Session, graph: _Graph, chunk: KbChunk, result: ExtractionResult) -> None:
+    refs: dict[str, KbNode] = {}
+    chunk_new: list[KbNode] = []
+    for item in result.nodes:
+        if not _node_is_storable(item) or not _node_is_verified(item, chunk.text):
+            graph.dropped += 1
+            continue
+        key = (item.type, normalise_title(item.title))
+        node = next((candidate for candidate in graph.by_key.get(key, []) if _same_item(item, candidate)), None)
+        if node is None:
+            node = _new_node(db, graph, item)
+            chunk_new.append(node)
+        _add_sources(db, graph, node, item.quote)
+        refs[normalise_title(item.ref)] = node
+
+    links: set[tuple[int, str]] = set()  # (node id, relation) for connectivity checks, as source or target
+    for item in result.edges:
+        _apply_edge(db, graph, refs, item, chunk.text, links)
+
+    department_node, anchor = graph.department_node, graph.anchor
+    for node in chunk_new:
+        if node.type == "role" and department_node is not None and (node.id, "has_role") not in links:
+            _link(db, graph, department_node.id, node.id, "has_role")
+        elif node.type == "value" and anchor is not None and (node.id, "holds") not in links:
+            _link(db, graph, anchor.id, node.id, "holds")
+        elif node.type in ("policy", "process") and anchor is not None and (node.id, "applies_to") not in links:
+            _link(db, graph, node.id, anchor.id, "applies_to")
+
+
+def _embed_new_nodes(db: Session, graph: _Graph) -> None:
+    for start in range(0, len(graph.new_nodes), EMBED_BATCH):
+        batch = graph.new_nodes[start:start + EMBED_BATCH]
+        result = gateway.embed([retriever.node_text(n) for n in batch], "document", "kb_embed", graph.company_id)
+        for node, vector in zip(batch, result.vectors):
+            node.embedding = vectors.encode(vector)
+            node.embedding_model = result.model
+            node.embedding_dim = result.dimension
+
+
+def _finish_job(db: Session, job: KbIngestionJob, document: KbDocument, failed_chunk_ids: list[int],
+                check_failed: bool, dropped: int) -> None:
+    """Record the outcome. A document with nothing left to decide is published; what failed stays on the job."""
+    job.dropped_items = dropped
+    job.failed_chunk_ids = failed_chunk_ids
+    job.contradiction_check_failed = check_failed
+    job.failed_chunks = len(failed_chunk_ids) + int(check_failed)
+    job.progress = 100
+    if document.status == "processing":
+        document.status = "review"
+    db.flush()
+    if review.finish_document_if_decided(db, document.id):
+        contradiction.bump_kb_version(db, document.company_id)
+    decided = document.status == "published" and not review.has_drafts(db, document)
+    job.status = "done" if decided and not job.failed_chunks else "review"
     db.commit()
 
 
@@ -147,7 +411,10 @@ def _run(db: Session, job: KbIngestionJob, document: KbDocument, created_edges: 
 
     data = storage.read_bytes(document.file_path)
     suffix = "." + document.file_path.rsplit(".", 1)[-1]
-    chunks = chunk_pages(extract_pages(data, suffix))
+    pages = extract_pages(data, suffix)
+    if not document.language:
+        document.language = guess_language("\n".join(text for _, text in pages)[:LANGUAGE_SAMPLE_CHARS])
+    chunks = chunk_pages(pages)
 
     chunk_rows: list[KbChunk] = []
     embedded = []
@@ -166,116 +433,73 @@ def _run(db: Session, job: KbIngestionJob, document: KbDocument, created_edges: 
     db.commit()
     _set_progress(db, job, 20)
 
-    org_sync.sync_org_nodes(db, company_id)
-    company_node = org_sync.org_node_for(db, company_id, None)
-    department_node = org_sync.org_node_for(db, company_id, document.department_id) if document.department_id else None
-    anchor = department_node or company_node
-
-    existing = db.query(KbNode).filter(KbNode.company_id == company_id, KbNode.status.notin_(INACTIVE)).all()
-    index: dict[tuple[str, str], KbNode] = {(n.type, normalise_title(n.title)): n for n in existing}
-    by_title: dict[str, KbNode] = {}
-    for node in existing:
-        by_title.setdefault(normalise_title(node.title), node)
-    known_titles = [
-        n.title for n in existing if n.type in ("company", "department") or n.status == "published"
-    ][:KNOWN_TITLE_CAP]
-
-    new_nodes: list[KbNode] = []
-    dropped = failed = 0
+    graph = _load_graph(db, document, created_edges)
+    failed: list[int] = []
     total = max(len(chunk_rows), 1)
 
     for position, chunk in enumerate(chunk_rows, 1):
         try:
-            result = extract_chunk(chunk.text, document.language, known_titles, company_id)
+            result = extract_chunk(chunk.text, document.language, graph.known_titles, company_id)
         except AIError:
-            failed += 1
-            job.failed_chunks = failed
-            _set_progress(db, job, 20 + int(70 * position / total))
-            continue
-
-        refs: dict[str, KbNode] = {}
-        chunk_new: list[KbNode] = []
-        for item in result.nodes:
-            if not quote_in(item.quote, chunk.text):
-                dropped += 1
-                continue
-            key = (item.type, normalise_title(item.title))
-            node = index.get(key)
-            if node is None:
-                is_fact = item.fact_kind != "none"
-                node = KbNode(
-                    company_id=company_id, department_id=document.department_id, type=item.type,
-                    title=item.title.strip(), body=item.body, language=document.language,
-                    visibility=_stricter(DEFAULT_VISIBILITY_BY_TYPE[item.type], document.visibility),
-                    status="draft", effective_date=_parse_date(item.effective_date, document.effective_date),
-                    fact_kind=item.fact_kind if is_fact else None, fact_value=item.fact_value if is_fact else None,
-                    fact_unit=item.fact_unit if is_fact else None, scope_text=item.scope_text if is_fact else None,
-                )
-                db.add(node)
-                db.flush()
-                index[key] = node
-                by_title.setdefault(key[1], node)
-                new_nodes.append(node)
-                chunk_new.append(node)
-            db.add(KbNodeSource(node_id=node.id, chunk_id=chunk.id, quote=item.quote))
-            refs[normalise_title(item.ref)] = node
-
-        links: set[tuple[int, str]] = set()  # (node id, relation) for connectivity checks, as source or target
-        for item in result.edges:
-            source = refs.get(normalise_title(item.source_ref)) or by_title.get(normalise_title(item.source_ref))
-            target = refs.get(normalise_title(item.target_ref)) or by_title.get(normalise_title(item.target_ref))
-            if not quote_in(item.quote, chunk.text) or source is None or target is None or source.id == target.id:
-                dropped += 1
-                continue
-            duplicate = db.query(KbEdge.id).filter_by(
-                company_id=company_id, source_node_id=source.id, target_node_id=target.id, relation=item.relation
-            ).first()
-            if duplicate is None:
-                edge = KbEdge(
-                    company_id=company_id, source_node_id=source.id, target_node_id=target.id,
-                    relation=item.relation, must_have=item.must_have if item.relation == "requires" else None,
-                    status="draft",
-                )
-                db.add(edge)
-                db.flush()
-                created_edges.append(edge.id)
-            links.add((source.id, item.relation))
-            links.add((target.id, item.relation))
-
-        for node in chunk_new:
-            if node.type == "role" and department_node is not None and (node.id, "has_role") not in links:
-                _link(db, company_id, department_node.id, node.id, "has_role", created_edges)
-            elif node.type == "value" and anchor is not None and (node.id, "holds") not in links:
-                _link(db, company_id, anchor.id, node.id, "holds", created_edges)
-            elif node.type in ("policy", "process") and anchor is not None and (node.id, "applies_to") not in links:
-                _link(db, company_id, node.id, anchor.id, "applies_to", created_edges)
-
-        job.dropped_items = dropped
-        job.failed_chunks = failed
+            failed.append(chunk.id)
+        else:
+            _apply_extraction(db, graph, chunk, result)
+        job.dropped_items = graph.dropped
+        job.failed_chunks = len(failed)
+        job.failed_chunk_ids = list(failed)
         _set_progress(db, job, 20 + int(70 * position / total))
 
-    for start in range(0, len(new_nodes), EMBED_BATCH):
-        batch = new_nodes[start:start + EMBED_BATCH]
-        result = gateway.embed([f"{n.title}\n{n.body}" for n in batch], "document", "kb_embed", company_id)
-        for node, vector in zip(batch, result.vectors):
-            node.embedding = vectors.encode(vector)
-            node.embedding_model = result.model
-            node.embedding_dim = result.dimension
+    _embed_new_nodes(db, graph)
     db.commit()
     _set_progress(db, job, 95)
 
-    failed += _check_contradictions(db, company_id, [n.id for n in new_nodes])
+    check_failed = bool(_check_contradictions(db, company_id, [n.id for n in graph.new_nodes]))
+    _finish_job(db, job, document, failed, check_failed, graph.dropped)
 
-    job.dropped_items, job.failed_chunks = dropped, failed
-    job.status, job.progress = "review", 100
-    document.status = "review"
+
+def _run_failed(db: Session, job: KbIngestionJob, document: KbDocument) -> None:
+    job_id = job.id
+    company_id = document.company_id
+    retry_ids = list(job.failed_chunk_ids or [])
+    recheck_document = job.contradiction_check_failed
+    job.status, job.progress, job.error = "running", 5, None
     db.commit()
 
+    graph = _load_graph(db, document, [])
+    graph.dropped = job.dropped_items
+    chunks = (
+        db.query(KbChunk)
+        .filter(KbChunk.id.in_(retry_ids or [-1]), KbChunk.document_id == document.id)
+        .order_by(KbChunk.position)
+        .all()
+    )
+    failed: list[int] = []
+    extracted: list[tuple[KbChunk, ExtractionResult]] = []
+    for chunk in chunks:
+        try:
+            extracted.append((chunk, extract_chunk(chunk.text, document.language, graph.known_titles, company_id)))
+        except AIError:
+            failed.append(chunk.id)
+    for chunk, result in extracted:
+        _apply_extraction(db, graph, chunk, result)
+    _embed_new_nodes(db, graph)
+    new_ids = [n.id for n in graph.new_nodes]
+    dropped = graph.dropped
+    db.commit()
 
-def _link(db: Session, company_id: int, source_id: int, target_id: int, relation: str, created: list[int]) -> None:
+    # The earlier check may have stopped at any node of this document, and repeating it costs only unpaired facts.
+    check_ids = sorted(review.document_node_ids(db, company_id, document.id)) if recheck_document else new_ids
+    check_failed = bool(_check_contradictions(db, company_id, check_ids))
+    job = db.get(KbIngestionJob, job_id)
+    document = db.get(KbDocument, job.document_id)
+    _finish_job(db, job, document, failed, check_failed, dropped)
+
+
+def _link(db: Session, graph: _Graph, source_id: int, target_id: int, relation: str) -> None:
     edge = KbEdge(
-        company_id=company_id, source_node_id=source_id, target_node_id=target_id, relation=relation, status="draft"
+        company_id=graph.company_id, source_node_id=source_id, target_node_id=target_id, relation=relation,
+        status="draft",
     )
     db.add(edge)
     db.flush()
-    created.append(edge.id)
+    graph.created_edges.append(edge.id)

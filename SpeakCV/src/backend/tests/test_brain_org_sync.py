@@ -85,3 +85,11 @@ def test_kb_version_increases_only_on_change(client, db, setup):
     assert version() == first
     make_dept(client, company, headers, "A")
     assert version() > first
+
+
+def test_renaming_the_company_renames_its_node(client, db, setup):
+    company, headers = setup
+    org_sync.sync_org_nodes(db, company.id)
+    response = client.patch(f"/api/companies/{company.id}", json={"name": "Acme Vina"}, headers=headers)
+    assert response.status_code == 200
+    assert [n.title for n in nodes(db, company, "company")] == ["Acme Vina"]

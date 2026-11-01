@@ -6,7 +6,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.auth.dependencies import require_member
-from app.brain import contradiction
+from app.brain import contradiction, review
 from app.database.database import get_db
 from app.database.sql_models import CompanyMember, KbConflict, KbNode
 
@@ -19,22 +19,23 @@ class ResolveBody(BaseModel):
     action: Literal["a", "b", "different_scope"]
 
 
-def _node_out(node: KbNode | None) -> dict | None:
+def _node_out(node: KbNode | None, sources: dict[int, list[dict]]) -> dict | None:
     if node is None:
         return None
     return {
         "id": node.id, "title": node.title, "status": node.status, "fact_kind": node.fact_kind,
         "fact_value": node.fact_value, "fact_unit": node.fact_unit, "scope_text": node.scope_text,
-        "visibility": node.visibility,
+        "visibility": node.visibility, "sources": sources.get(node.id, []),
     }
 
 
 def _conflict_out(db: Session, conflict: KbConflict) -> dict:
+    sources = review.node_sources(db, conflict.company_id, [conflict.node_a_id, conflict.node_b_id])
     return {
         "id": conflict.id, "status": conflict.status, "resolution": conflict.resolution,
         "created_at": conflict.created_at.isoformat() if conflict.created_at else None,
-        "node_a": _node_out(db.get(KbNode, conflict.node_a_id)),
-        "node_b": _node_out(db.get(KbNode, conflict.node_b_id)),
+        "node_a": _node_out(db.get(KbNode, conflict.node_a_id), sources),
+        "node_b": _node_out(db.get(KbNode, conflict.node_b_id), sources),
     }
 
 
@@ -57,9 +58,20 @@ def resolve_conflict(
     member: CompanyMember = Depends(require_member("hr")),
     db: Session = Depends(get_db),
 ):
-    conflict = db.query(KbConflict).filter(KbConflict.id == conflict_id, KbConflict.company_id == company_id).first()
+    conflict = (
+        db.query(KbConflict)
+        .filter(KbConflict.id == conflict_id, KbConflict.company_id == company_id)
+        .populate_existing()
+        .with_for_update()
+        .first()
+    )
     if conflict is None:
         raise HTTPException(status_code=404, detail="Conflict not found")
     if conflict.status != "open":
+        db.rollback()
         raise HTTPException(status_code=409, detail="This conflict is already closed")
-    return _conflict_out(db, contradiction.resolve(db, conflict, body.action, member.user_id))
+    try:
+        return _conflict_out(db, contradiction.resolve(db, conflict, body.action, member.user_id))
+    except contradiction.ConflictNotLive as exc:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="One side of this conflict is no longer active") from exc

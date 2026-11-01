@@ -101,7 +101,7 @@ extraction:
      body: "We read learner feedback every week and bring one real quote to planning.",
      quote: "We read learner feedback every week and bring one real quote to planning."}
   - {title: First review time for a pull request in core hours, type: policy,
-     body: "A first review within 4 working hours. First review time for a pull request in core hours: 4 hours.",
+     body: "First review time for a pull request in core hours: 4 hours.",
      quote: "within 4 working hours during core hours", fact_kind: number, fact_value: "4", fact_unit: working hours,
      scope_text: pull requests opened during core hours}
   - {title: Anyone on the team can approve, type: policy,
@@ -120,7 +120,7 @@ extraction:
      quote: "Nhóm Backend làm việc từ xa 2 ngày mỗi tuần", fact_kind: number, fact_value: "2", fact_unit: days per week,
      scope_text: all employees}
   - {title: First review time for a pull request in core hours, type: fact,
-     body: "Review lần đầu trong 1 ngày làm việc. First review time for a pull request in core hours: 1 day.",
+     body: "First review time for a pull request in core hours: 1 day.",
      quote: "được review lần đầu trong vòng 1 ngày làm việc", fact_kind: number, fact_value: "1", fact_unit: working days,
      scope_text: pull requests opened during core hours}
   - {title: Cập nhật bằng văn bản mỗi sáng, type: process,

@@ -6,7 +6,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPExcepti
 from sqlalchemy.orm import Session
 
 from app.auth.dependencies import require_member
-from app.brain import ingestion
+from app.brain import ingestion, review
 from app.core.uploads import DOCUMENT_TYPES, read_upload
 from app.database.database import get_db
 from app.database.models_brain import VISIBILITIES
@@ -16,13 +16,14 @@ router = APIRouter()
 
 KB = "/api/companies/{company_id}/kb"
 SUFFIXES = {".pdf", ".docx", ".txt", ".md"}
+RETRYABLE_STATUSES = ("review", "published")
 
 
 def _document_out(document: KbDocument) -> dict:
     return {
         "id": document.id,
         "title": document.title,
-        "language": document.language,
+        "language": document.language or None,  # None until the job has read the text and guessed it
         "source_type": document.source_type,
         "visibility": document.visibility,
         "department_id": document.department_id,
@@ -43,6 +44,8 @@ def _job_out(job: KbIngestionJob | None) -> dict | None:
         "error": job.error,
         "dropped_items": job.dropped_items,
         "failed_chunks": job.failed_chunks,
+        "failed_chunk_ids": job.failed_chunk_ids or [],
+        "contradiction_check_failed": bool(job.contradiction_check_failed),
     }
 
 
@@ -56,6 +59,24 @@ def _get_job(db: Session, company_id: int, job_id: int) -> KbIngestionJob:
     if job is None:
         raise HTTPException(status_code=404, detail="Job not found")
     return job
+
+
+def _lock_job(db: Session, company_id: int, job_id: int) -> tuple[KbIngestionJob, KbDocument, bool]:
+    """The job, its document and whether it is the document's latest job, read under the document's row lock.
+
+    The locked reads return committed rows, so a second request cannot act on what the first one read. The caller's
+    commit releases the lock."""
+    document_id = _get_job(db, company_id, job_id).document_id
+    document = db.query(KbDocument).filter(KbDocument.id == document_id).populate_existing().with_for_update().one()
+    job = db.query(KbIngestionJob).filter(KbIngestionJob.id == job_id).populate_existing().with_for_update().one()
+    latest = (
+        db.query(KbIngestionJob.id)
+        .filter(KbIngestionJob.document_id == document_id)
+        .order_by(KbIngestionJob.id.desc())
+        .with_for_update()
+        .first()
+    )
+    return job, document, latest[0] == job.id
 
 
 @router.post(f"{KB}/documents", status_code=201)
@@ -106,6 +127,22 @@ def list_documents(company_id: int, _: CompanyMember = Depends(require_member("h
     return result
 
 
+@router.post(f"{KB}/documents/{{document_id}}/unpublish")
+def unpublish_document(
+    company_id: int,
+    document_id: int,
+    _: CompanyMember = Depends(require_member("hr")),
+    db: Session = Depends(get_db),
+):
+    try:
+        counts = review.unpublish_document(db, company_id, document_id)
+        db.commit()
+    except review.ReviewError as exc:
+        db.rollback()
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+    return {"document": _document_out(db.get(KbDocument, document_id)), **counts}
+
+
 @router.get(f"{KB}/jobs/{{job_id}}")
 def get_job(company_id: int, job_id: int, _: CompanyMember = Depends(require_member("hr")), db: Session = Depends(get_db)):
     return _job_out(_get_job(db, company_id, job_id))
@@ -119,11 +156,32 @@ def retry_job(
     _: CompanyMember = Depends(require_member("hr")),
     db: Session = Depends(get_db),
 ):
-    job = _get_job(db, company_id, job_id)
-    if job.status != "failed":
-        raise HTTPException(status_code=409, detail="Only a failed job can be retried")
+    job, document, is_latest = _lock_job(db, company_id, job_id)
+    if job.status != "failed" or document.status != "failed" or not is_latest:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="Only the latest job of a failed document can be retried")
+    # Cleared and restarted in one commit, so a repeat of this request finds the document no longer failed.
     ingestion.clear_document_output(db, job.document_id)
-    db.commit()
     new_job = ingestion.start_job(db, job.document_id)
     background_tasks.add_task(ingestion.run_job, new_job.id)
     return _job_out(new_job)
+
+
+@router.post(f"{KB}/jobs/{{job_id}}/retry-failed")
+def retry_failed_chunks(
+    company_id: int,
+    job_id: int,
+    background_tasks: BackgroundTasks,
+    _: CompanyMember = Depends(require_member("hr")),
+    db: Session = Depends(get_db),
+):
+    job, document, is_latest = _lock_job(db, company_id, job_id)
+    if (
+        not is_latest or document.status not in RETRYABLE_STATUSES or job.status in ("queued", "running")
+        or not (job.failed_chunk_ids or job.contradiction_check_failed)
+    ):
+        db.rollback()
+        raise HTTPException(status_code=409, detail="This job has nothing that can be retried")
+    ingestion.start_failed_retry(db, job)
+    background_tasks.add_task(ingestion.run_failed_retry, job.id)
+    return _job_out(job)
