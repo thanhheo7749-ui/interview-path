@@ -34,7 +34,6 @@ AI_TOKEN_CHAR_BUDGET = int(os.getenv("AI_TOKEN_CHAR_BUDGET", "12000"))
 # Import dynamic prompting modules
 import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../../'))
-from core.knowledge_graph import get_next_topic
 from core.nunchi_analyzer import analyze_candidate_response
 from ..services.turn_evaluator import build_turn_analysis, resolve_turn_target_topic
 from ..services.question_planner import plan_next_question
@@ -149,8 +148,8 @@ async def chat(
         f"Signal: {speaking_signals['speaking_signal']}"
     )
 
-    # === KNOWLEDGE GRAPH / CONTEXT: Determine next topic ===
-    current_topic = request.current_topic or "JavaScript Fundamentals"
+    # === CONTEXT: Determine next topic ===
+    current_topic = request.current_topic or "General"
     candidate_passed = True
     if analysis['intent'] == 'skipping' or analysis['confidence_level'] == 'Low Confidence / Nervous':
         candidate_passed = False
@@ -159,7 +158,7 @@ async def chat(
     if target_topics:
         next_topic = target_topics[0]
     else:
-        next_topic = get_next_topic(current_topic, candidate_passed)
+        next_topic = current_topic
     print(f"[Interview Routing] Current: {current_topic}, Passed: {candidate_passed}, Next: {next_topic}")
 
     if transcript_analysis["low_quality_flag"]:
@@ -255,8 +254,8 @@ async def chat(
 
     turn_target_topic = resolve_turn_target_topic(request.chat_history, next_topic)
     analysis = build_turn_analysis(request.user_text, turn_target_topic, analysis)
-    print(f"[Knowledge Graph] TurnTarget: {turn_target_topic}")
-    print(f"[Knowledge Graph] Current: {current_topic}, Passed: {candidate_passed}, Next: {next_topic}")
+    print(f"[Interview Routing] TurnTarget: {turn_target_topic}")
+    print(f"[Interview Routing] Current: {current_topic}, Passed: {candidate_passed}, Next: {next_topic}")
 
     turn_scores = analysis["turn_evaluation"]
     interview_context = request.interview_context or {}

@@ -17,7 +17,6 @@ import {
 import { reviewCV } from "@/services/api";
 import toast from "react-hot-toast";
 import ReactMarkdown from "react-markdown";
-import JobRecommendations from "../JobRecommendations";
 import { useSubscription } from "@/context/SubscriptionContext";
 
 export default function ReviewCVModal({ show, onClose }: any) {
@@ -285,7 +284,6 @@ export default function ReviewCVModal({ show, onClose }: any) {
                 </div>
 
                 {/* Job Recommendations Feature */}
-                {res && !loading && file && reviewMode === "auto_match" && <JobRecommendations file={file} />}
               </div>
               <div className="pt-4 flex justify-end">
                 <button

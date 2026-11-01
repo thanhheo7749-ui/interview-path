@@ -28,8 +28,6 @@ google-genai
 voyageai
 edge-tts
 
-# 6. Knowledge Graph & Analysis
-networkx
 slowapi
 pyyaml
 anthropic

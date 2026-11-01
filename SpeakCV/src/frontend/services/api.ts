@@ -621,22 +621,6 @@ export const getUserDetail = async (userId: number) => {
   return res.json();
 };
 
-// --- JOB MATCHING ---
-export const matchJobs = async (file: File) => {
-  const formData = new FormData();
-  formData.append("file", file);
-
-  const res = await fetch(`${API_URL}/jobs/match`, {
-    method: "POST",
-    headers: authHeader(),
-    body: formData,
-  });
-
-  if (!res.ok) {
-    throw new Error("Job matching failed");
-  }
-  return res.json();
-};
 
 // --- CV MAKEOVER (FILE UPLOAD) ---
 export const uploadMakeoverCV = async (file: File, industry: string) => {
