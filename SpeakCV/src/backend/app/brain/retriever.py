@@ -119,7 +119,7 @@ def _load_vectors(cached: dict[int, np.ndarray], wanted: list[int], fetch_blobs)
 def _allowed_nodes(db: Session, audience: Audience):
     return (
         db.query(KbNode.id, KbNode.title, KbNode.body, KbNode.type, KbNode.visibility, KbNode.department_id,
-                 KbNode.embedding_model)
+                 KbNode.fact_value, KbNode.fact_unit, KbNode.scope_text, KbNode.embedding_model)
         .filter(aud.node_filter(audience))
         .order_by(KbNode.id)
         .all()
@@ -158,8 +158,10 @@ def _visible_edges(db: Session, audience: Audience) -> list[KbEdge]:
     )
 
 
-def _node_text(row) -> str:
-    return f"{row.title}\n{row.body}" if row.body else row.title
+def node_text(node) -> str:
+    """A node as prompts, keyword scoring and embeddings read it. Takes a KbNode or a row with the same columns."""
+    fact = " ".join(part for part in (node.fact_value, node.fact_unit) if part)
+    return "\n".join(part for part in (node.title, node.body, fact, node.scope_text) if part)
 
 
 def search(db: Session, audience: Audience, query: str, top_k: int = 8, char_budget: int = 6000,
@@ -198,7 +200,7 @@ def search(db: Session, audience: Audience, query: str, top_k: int = 8, char_bud
             raise NoEmbeddingsError(f"No embeddings for model {model}. Run make reembed.")
         return ContextBundle((), 0.0, frozenset())
 
-    texts = {f"n{row.id}": _node_text(row) for row in nodes.values()}
+    texts = {f"n{row.id}": node_text(row) for row in nodes.values()}
     texts.update({f"c{row.id}": row.text for row in chunks.values()})
 
     refs = [ref for ref, _ in comparable]
