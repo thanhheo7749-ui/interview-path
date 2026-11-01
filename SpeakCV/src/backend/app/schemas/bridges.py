@@ -72,3 +72,13 @@ class ScorecardIn(BaseModel):
 
 class OutcomeIn(BaseModel):
     outcome: Literal["hired", "not_hired", "offer_declined"]
+
+
+class HiringRequestIn(BaseModel):
+    title: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=255)]
+    manager_user_id: StrictInt
+    department_id: Optional[StrictInt] = None
+
+
+class IntakeStartIn(BaseModel):
+    language: Language = "ko"
