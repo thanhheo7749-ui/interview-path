@@ -34,7 +34,10 @@ def _fresh_tables():
     from app.ai.config import reset_config
     from app.database.database import Base, engine
 
+    from app.ai.providers import fake
+
     reset_config()
+    fake.reset()
     Base.metadata.drop_all(bind=engine)
     Base.metadata.create_all(bind=engine)
     yield

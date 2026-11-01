@@ -18,7 +18,8 @@ from slowapi.errors import RateLimitExceeded
 
 from .core import settings
 from .core.rate_limit import limiter
-from .routers import profile, auth, cv, admin, companies
+from .routers import profile, auth, cv, admin, companies, kb_documents
+from .brain import fake_demo, ingestion
 from .database import sql_models
 from .database.database import SessionLocal
 from .auth.security import get_password_hash
@@ -53,6 +54,7 @@ def seed_admin():
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     seed_admin()
+    ingestion.fail_interrupted_jobs()
     yield
 
 
@@ -67,6 +69,7 @@ def _include_legacy_routers(app: FastAPI) -> None:
 
 def create_app(legacy_b2c: bool | None = None) -> FastAPI:
     load_config()  # bad AI configuration must fail startup
+    fake_demo.install()
     app = FastAPI(lifespan=lifespan)
     app.state.limiter = limiter
     app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
@@ -98,6 +101,7 @@ def create_app(legacy_b2c: bool | None = None) -> FastAPI:
     app.include_router(cv.router)
     app.include_router(admin.router)
     app.include_router(companies.router)
+    app.include_router(kb_documents.router)
     enabled = settings.flag("LEGACY_B2C_ENABLED") if legacy_b2c is None else legacy_b2c
     if enabled:
         _include_legacy_routers(app)

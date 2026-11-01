@@ -49,6 +49,9 @@ def create_company(args) -> int:
 
         db.add(CompanyMember(company_id=company.id, user_id=user.id, role="hr"))
         db.commit()
+        from app.brain import org_sync
+
+        org_sync.sync_org_nodes(db, company.id)
         print(f"Created company '{args.slug}' with HR member {email}.")
         if temporary_password:
             print(f"Temporary password for {email}: {temporary_password}")

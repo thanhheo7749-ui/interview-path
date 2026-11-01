@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.ai.config import SLOTS, get_config
 from app.auth import security
+from app.brain import org_sync
 from app.auth.dependencies import get_authenticated_user, require_member
 from app.database.database import get_db
 from app.database.sql_models import Company, CompanyMember, Department, User
@@ -183,6 +184,7 @@ def create_department(
     department = Department(company_id=company_id, parent_id=body.parent_id, name=body.name)
     db.add(department)
     _commit_or_conflict(db, "A department with this name already exists here")
+    org_sync.sync_org_nodes(db, company_id)
     return department
 
 
@@ -207,6 +209,7 @@ def patch_department(
     department.parent_id = parent_id
     department.name = name
     _commit_or_conflict(db, "A department with this name already exists here")
+    org_sync.sync_org_nodes(db, company_id)
     return department
 
 
@@ -230,8 +233,10 @@ def delete_department(
     )
     if has_child or has_member:
         raise HTTPException(status_code=409, detail="This department still has child departments or members")
+    org_sync.retire_department_node(db, company_id, department.id)
     db.delete(department)
     _commit_or_conflict(db, "This department still has child departments or members")
+    org_sync.sync_org_nodes(db, company_id)
     return Response(status_code=204)
 
 
