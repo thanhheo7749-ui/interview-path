@@ -118,6 +118,25 @@ def test_decided_application_shows_its_decision(db, world, api):
     assert body["cells"]["priority"][0]["hr_decision"] == "approved"
 
 
+def test_a_candidate_who_declined_recording_through_the_route_is_in_the_refused_lane(db, world, api):
+    from app.database.sql_models import User
+    from tests.helpers import auth_header
+
+    declined = make_application(db, world["job"], "#A2", stage="invited", cv_status="meets", band=None)
+    fast = make_application(db, world["job"], "#A3", stage="ready_for_hr", cv_status="meets", band=None, fast_tracked=True)
+    email = db.get(User, declined.candidate_user_id).email
+    declined_id, fast_id = declined.id, fast.id
+
+    response = api.post(f"/api/applications/{declined_id}/decline-recording", headers=auth_header(email))
+    assert response.status_code == 200, response.text
+    body = api.get(url(world, f"/jobs/{world['job'].id}/board"), headers=hr(world)).json()
+
+    assert _ids(body["lanes"]["refused_recording"]) == [declined_id]
+    assert _ids(body["lanes"]["not_interviewed"]) == [fast_id]
+    # Declining is not a rejection: HR can still decide this application.
+    assert body["lanes"]["refused_recording"][0]["hr_decision"] == "pending"
+
+
 def _detail_setup(db, world):
     application = make_application(db, world["job"], "#A1", cv_status="meets", band="many",
                                    ai_suggestion="Solid.", analysis_status="done")

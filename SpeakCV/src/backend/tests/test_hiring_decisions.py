@@ -183,3 +183,19 @@ def test_fast_track_skips_the_session_without_ai_and_can_be_decided(db, world, a
                       json={"decision": "approved"})
     assert decide.status_code == 200
     assert api.post(url(world, f"/applications/{application.id}/fast-track"), headers=hr(world)).status_code == 409
+
+
+@pytest.mark.parametrize("decision", ["approved", "rejected"])
+def test_the_candidate_sees_the_decision_and_nothing_else_about_the_review(db, world, api, decision):
+    from tests.helpers import auth_header
+
+    application = make_application(db, world["job"], cv_status="not_met", band="many")
+    before = api.get("/api/me/applications", headers=auth_header(CANDIDATE_EMAIL)).json()[0]
+    assert before["status"] == "with_hr" and before["decision"] is None
+
+    api.post(url(world, f"/applications/{application.id}/decision"), headers=hr(world), json={"decision": decision})
+    response = api.get("/api/me/applications", headers=auth_header(CANDIDATE_EMAIL))
+
+    assert response.json()[0]["status"] == "decided" and response.json()[0]["decision"] == decision
+    for word in ("not_met", "cv_status", "interview_band", "many", "hidden"):
+        assert word not in response.text

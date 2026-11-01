@@ -37,6 +37,13 @@ class DecisionError(ValueError):
         self.detail = detail
 
 
+def visible_to_candidate(application) -> str | None:
+    """The decision the candidate may see once HR has made it: approved or rejected, never a reason, label or band."""
+    if application.stage == "ready_for_hr" and application.hr_decision in DECISIONS:
+        return application.hr_decision
+    return None
+
+
 def _notify(db, application, decision: str) -> None:
     """The only place a decision becomes a candidate notification."""
     if application.candidate_user_id is None:

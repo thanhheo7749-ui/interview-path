@@ -17,6 +17,8 @@ from app.database.sql_models import (
 from app.hiring import recordings
 
 SLUG = "board-sample-platform-engineer"
+# A second job that only the full-loop spec reads, so the board spec's corrections and rejections never touch it.
+GEM_SLUG = "board-sample-hidden-gem-engineer"
 
 
 def silent_wav() -> bytes:
@@ -37,10 +39,46 @@ def main(out_path: str) -> None:
         if job is None:
             job = seed(db, company)
         ids = {a.alias: a.id for a in db.query(Application).filter(Application.job_id == job.id)}
+        gem = db.query(Job).filter(Job.slug == GEM_SLUG).first() or seed_gem(db, company)
+        gem_ids = {a.alias: a.id for a in db.query(Application).filter(Application.job_id == gem.id)}
         with open(out_path, "w", encoding="utf-8") as handle:
-            json.dump({"job_id": job.id, "company_id": company.id, "applications": ids}, handle)
+            json.dump({"job_id": job.id, "company_id": company.id, "applications": ids,
+                       "gem_job_id": gem.id, "gem_applications": gem_ids}, handle)
     finally:
         db.close()
+
+
+def seed_gem(db, company):
+    """One candidate whose CV does not meet the must-have but whose interview does: a Hidden Gem only HR sees."""
+    job = Job(company_id=company.id, title="Sample Gem Engineer", slug=GEM_SLUG, status="published", version=1,
+              description="Sample job for tests", interview_languages=["en"])
+    db.add(job)
+    db.flush()
+    req = JobRequirement(company_id=company.id, job_id=job.id, text="Sample must-have the CV lacks", must_have=True, position=0)
+    user = User(email="sample-gem-1@example.test", full_name="Sample Person H1", hashed_password="!",
+                must_change_password=False)
+    db.add_all([req, user])
+    db.flush()
+    row = Application(company_id=company.id, job_id=job.id, job_version=1, alias="#H1", stage="ready_for_hr",
+                      cv_status="not_met", interview_band="many", cv_text_blind="[NAME]\nSample CV text.",
+                      candidate_user_id=user.id)
+    session = VoiceSession(company_id=company.id, purpose="screening", owner_user_id=user.id, language="en",
+                           status="completed")
+    db.add_all([row, session])
+    db.flush()
+    session.application_id = row.id
+    turn = VoiceTurn(session_id=session.id, position=1, question_text="Tell me about a time you learned fast.",
+                     question_source="must_have", transcript="I taught myself the whole stack in a month.",
+                     transcript_status="transcribed")
+    db.add(turn)
+    db.flush()
+    db.add_all([
+        RequirementResult(application_id=row.id, requirement_id=req.id, source="cv", status="not_found"),
+        RequirementResult(application_id=row.id, requirement_id=req.id, source="interview", status="evidence",
+                          quote="I taught myself the whole stack in a month.", voice_turn_id=turn.id),
+    ])
+    db.commit()
+    return job
 
 
 def seed(db, company):
@@ -84,7 +122,7 @@ def seed(db, company):
         for position, question, transcript, audio in turns:
             path = recordings.save_turn_audio(company.id, f"sample-{row.id}", position, silent_wav(), ".wav") if audio else None
             turn = VoiceTurn(session_id=session.id, position=position, question_text=question,
-                             question_source="must_have", transcript=transcript, transcript_status="done",
+                             question_source="must_have", transcript=transcript, transcript_status="transcribed",
                              audio_path=path)
             db.add(turn)
             made.append(turn)

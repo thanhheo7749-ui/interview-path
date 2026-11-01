@@ -10,7 +10,11 @@ rm -f "$E2E_DB"
 export APP_ENV=test
 export SECRET_KEY=e2e-only-secret-key-0123456789abcdef-e2e
 export DATABASE_URL="sqlite:///$E2E_DB"
-export ALLOWED_ORIGINS=http://localhost:${E2E_WEB_PORT:-5199}
+# The HR portal and the candidate app are both browser origins of this API.
+export ALLOWED_ORIGINS=http://localhost:${E2E_WEB_PORT:-5199},http://localhost:${E2E_CANDIDATE_PORT:-3199}
+# CV files and answer audio go into the run's own directory, not the backend folder.
+export STORAGE_DIR="$E2E_TMP/storage"
+export RECORDINGS_DIR="$E2E_TMP/recordings"
 export ADMIN_EMAIL= ADMIN_PASSWORD=
 for slot in REASONING BULK EMBEDDING STT TTS; do export "AI_${slot}_PROVIDER=fake"; done
 PY=.venv/bin/python
@@ -27,7 +31,6 @@ BRAIN_PASSWORD=$($PY -m app.cli create-company --slug brain --name "Brain Compan
 printf '%s' "$BRAIN_PASSWORD" > "$E2E_TMP/portal_e2e_brain_password"
 if [ "${E2E_SEED_BOARD:-}" = "1" ]; then
   # A third company for the board spec: sample jobs, applications, transcripts and recordings, written as real rows.
-  export RECORDINGS_DIR="$E2E_TMP/recordings"
   BOARD_PASSWORD=$($PY -m app.cli create-company --slug board --name "Board Sample Company" --hr-email board-hr@e2e.test --hr-name "Board HR" --sample | awk '/Temporary password/ {print $NF}')
   printf '%s' "$BOARD_PASSWORD" > "$E2E_TMP/portal_e2e_board_password"
   PYTHONPATH=. $PY "$E2E_DIR/seed_board.py" "$E2E_TMP/board_seed.json"
