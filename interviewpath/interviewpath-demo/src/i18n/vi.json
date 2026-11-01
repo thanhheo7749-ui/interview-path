@@ -24,7 +24,8 @@
     "company": "Công ty",
     "signOut": "Đăng xuất",
     "graph": "Đồ thị tri thức",
-    "copilot": "Copilot"
+    "copilot": "Copilot",
+    "jobs": "Việc làm"
   },
   "auth": {
     "loadFailed": "Không thể tải tài khoản của bạn. Hãy kiểm tra kết nối rồi thử lại.",
@@ -352,5 +353,65 @@
       "swapped": "Văn bản ẩn danh (đã hoán đổi tên và giới tính)",
       "limit": "Tên trường và nội dung kinh nghiệm vẫn còn, nên việc này giúp giảm thiên kiến nhưng không loại bỏ hoàn toàn."
     }
+  },
+  "jobs": {
+    "title": "Việc làm",
+    "new": "Tạo việc làm",
+    "newTitle": "Tạo việc làm",
+    "editTitle": "Sửa việc làm",
+    "back": "Quay lại danh sách",
+    "empty": "Chưa có việc làm nào.",
+    "colTitle": "Tiêu đề",
+    "colDepartment": "Phòng ban",
+    "colStatus": "Trạng thái",
+    "colVersion": "Phiên bản",
+    "colPublished": "Ngày đăng",
+    "status": {
+      "draft": "Bản nháp",
+      "published": "Đã đăng",
+      "closed": "Đã đóng"
+    },
+    "versionLabel": "(phiên bản {{version}})",
+    "department": "Phòng ban",
+    "anyDepartment": "Không có phòng ban",
+    "role": "Vai trò",
+    "noRole": "Không chọn vai trò (bắt đầu trống)",
+    "roleHint": "Chọn vai trò sẽ điền sẵn tiêu đề, mô tả và yêu cầu từ tri thức công ty. Bạn có thể sửa mọi thứ.",
+    "jobTitle": "Tiêu đề việc làm",
+    "description": "Mô tả",
+    "descriptionHint": "JD Studio, công cụ hỗ trợ viết mô tả công việc, sẽ có sau. Hiện tại hãy tự viết hoặc sửa mô tả tại đây.",
+    "languages": "Ngôn ngữ phỏng vấn",
+    "language": {
+      "vi": "Tiếng Việt",
+      "en": "Tiếng Anh",
+      "ko": "Tiếng Hàn"
+    },
+    "requirements": "Yêu cầu",
+    "noRequirements": "Chưa có yêu cầu nào.",
+    "requirementText": "Yêu cầu",
+    "mustHave": "Bắt buộc",
+    "visibility": "Mức hiển thị",
+    "visibilityHint": "Chỉ các yêu cầu công khai được hiển thị cho ứng viên trên trang việc làm công khai.",
+    "addRequirement": "Thêm yêu cầu",
+    "versionNotice": "Thay đổi yêu cầu sẽ tạo phiên bản mới. Các đơn ứng tuyển hiện có giữ nguyên phiên bản mà ứng viên đã nộp.",
+    "saveDraft": "Lưu bản nháp",
+    "publish": "Đăng tuyển",
+    "saveChanges": "Lưu thay đổi",
+    "close": "Đóng việc làm",
+    "confirmClose": "Đóng việc làm này? Việc làm sẽ không nhận thêm đơn ứng tuyển.",
+    "closedNotice": "Việc làm này đã đóng và không thể chỉnh sửa.",
+    "saved": "Đã lưu.",
+    "titleRequired": "Hãy nhập tiêu đề việc làm.",
+    "languageRequired": "Hãy chọn ít nhất một ngôn ngữ phỏng vấn.",
+    "channelsTitle": "Liên kết theo kênh",
+    "channelsHint": "Chia sẻ mỗi liên kết trên kênh tương ứng. Lượt nhấp được đếm theo từng liên kết.",
+    "noChannels": "Chưa có liên kết kênh nào.",
+    "clicks": "{{count}} lượt nhấp",
+    "copy": "Sao chép",
+    "copied": "Đã sao chép",
+    "copyFailed": "Không thể sao chép liên kết. Hãy chọn và sao chép thủ công.",
+    "newChannel": "Kênh mới (chữ thường, số, gạch dưới)",
+    "addChannel": "Thêm kênh",
+    "channelInvalid": "Dùng 1 đến 50 chữ thường, chữ số hoặc dấu gạch dưới."
   }
 }
