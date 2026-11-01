@@ -59,6 +59,7 @@ function JobsPage() {
                 <th className="py-2 pr-3">{t('jobs.colStatus')}</th>
                 <th className="py-2 pr-3">{t('jobs.colVersion')}</th>
                 <th className="py-2">{t('jobs.colPublished')}</th>
+                <th className="py-2 pl-3">{t('jobs.colBoard')}</th>
               </tr>
             </thead>
             <tbody>
@@ -73,6 +74,13 @@ function JobsPage() {
                   <td className="py-3 pr-3 text-slate-600">{t(`jobs.status.${job.status}`, { defaultValue: job.status })}</td>
                   <td className="py-3 pr-3 text-slate-600">{job.version}</td>
                   <td className="py-3 text-slate-600">{job.published_at ? new Date(job.published_at).toLocaleDateString() : ''}</td>
+                  <td className="py-3 pl-3">
+                    {job.status !== 'draft' && (
+                      <Link to={`/jobs/${job.id}/board`} className="font-semibold text-blue-600 underline-offset-2 hover:underline">
+                        {t('jobs.openBoard')}
+                      </Link>
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>

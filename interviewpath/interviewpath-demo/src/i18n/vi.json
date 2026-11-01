@@ -412,6 +412,162 @@
     "copyFailed": "Không thể sao chép liên kết. Hãy chọn và sao chép thủ công.",
     "newChannel": "Kênh mới (chữ thường, số, gạch dưới)",
     "addChannel": "Thêm kênh",
-    "channelInvalid": "Dùng 1 đến 50 chữ thường, chữ số hoặc dấu gạch dưới."
+    "channelInvalid": "Dùng 1 đến 50 chữ thường, chữ số hoặc dấu gạch dưới.",
+    "colBoard": "Ứng viên",
+    "openBoard": "Mở bảng"
+  },
+  "board": {
+    "eyebrow": "Bảng ứng viên",
+    "title": "Bảng ứng viên",
+    "intro": "Ứng viên hiển thị bằng mã ẩn danh. Hãy đọc câu trả lời trước; danh tính được ẩn cho đến khi bạn chọn tiết lộ. AI chỉ gợi ý. Duyệt hay loại là quyết định của bạn.",
+    "axes": {
+      "much": "Nhiều bằng chứng phỏng vấn",
+      "little": "Ít bằng chứng phỏng vấn",
+      "meets": "CV đáp ứng yêu cầu",
+      "notMet": "CV chưa đáp ứng yêu cầu"
+    },
+    "cells": {
+      "priority": {
+        "title": "Ưu tiên",
+        "axes": "CV đáp ứng, nhiều bằng chứng",
+        "hint": "CV phù hợp và buổi phỏng vấn đã xác nhận điều đó."
+      },
+      "strong_cv_unclear": {
+        "title": "CV mạnh, câu trả lời chưa rõ",
+        "axes": "CV đáp ứng, ít bằng chứng",
+        "hint": "CV phù hợp, nhưng câu trả lời chưa làm rõ được."
+      },
+      "hidden_gem": {
+        "title": "Viên ngọc ẩn",
+        "axes": "CV chưa đáp ứng, nhiều bằng chứng",
+        "hint": "CV còn thiếu, nhưng phỏng vấn cho thấy bằng chứng thực sự.",
+        "callout": "Bộ lọc CV sẽ bỏ sót những ứng viên này."
+      },
+      "not_enough_evidence": {
+        "title": "Chưa đủ bằng chứng",
+        "axes": "CV chưa đáp ứng, ít bằng chứng",
+        "hint": "Cả CV lẫn phỏng vấn đều chưa đủ cơ sở để đánh giá."
+      }
+    },
+    "emptyCell": "Hiện chưa có ứng viên nào ở đây.",
+    "toDecide": "{{count}} chờ quyết định",
+    "undecidedOf": "{{undecided}} chưa quyết định trên {{total}}",
+    "selectCard": "Chọn {{alias}}",
+    "cvStatus": {
+      "meets": "CV đáp ứng",
+      "not_met": "CV chưa đáp ứng"
+    },
+    "band": {
+      "many": "Nhiều bằng chứng",
+      "few": "Ít bằng chứng"
+    },
+    "decision": {
+      "pending": "Chưa quyết định",
+      "approved": "Đã duyệt",
+      "rejected": "Đã loại"
+    },
+    "fastTracked": "Đi tắt",
+    "fastTrackedNote": "Ứng viên này được đi tắt, không qua phỏng vấn, nên không có bằng chứng phỏng vấn.",
+    "analysisFailed": "Phân tích buổi phỏng vấn này không thành công. Bạn có thể thử lại.",
+    "hiddenText": "Lưu ý: tệp CV có chứa văn bản ẩn và phần này đã bị bỏ qua.",
+    "stage": {
+      "submitted": "Đã nộp",
+      "cv_processing": "Đang đọc CV",
+      "cv_failed": "Không đọc được CV",
+      "invited": "Đã mời, chưa phỏng vấn",
+      "withdrawn": "Đã rút hồ sơ",
+      "declined_recording": "Từ chối ghi âm",
+      "session_in_progress": "Đang phỏng vấn",
+      "session_completed": "Đã phỏng vấn xong",
+      "analyzing": "Đang phân tích",
+      "ready_for_hr": "Sẵn sàng để xem xét"
+    },
+    "lanes": {
+      "title": "Chưa vào bảng",
+      "analyzing": "Đang phân tích",
+      "analysis_failed": "Phân tích thất bại",
+      "not_interviewed": "Chưa phỏng vấn",
+      "refused_recording": "Từ chối ghi âm",
+      "withdrawn": "Đã rút hồ sơ"
+    },
+    "bulk": {
+      "button": "Loại {{count}} đã chọn",
+      "confirmTitle": "Xác nhận loại hàng loạt",
+      "confirm": "Bạn sắp loại {{count}} ứng viên. Không thể hoàn tác.",
+      "confirmButton": "Đồng ý, loại {{count}}"
+    },
+    "detail": {
+      "title": "Chi tiết ứng viên",
+      "close": "Đóng"
+    },
+    "transcript": {
+      "title": "Bản ghi phỏng vấn",
+      "empty": "Ứng viên này chưa có bản ghi phỏng vấn.",
+      "question": "Câu hỏi",
+      "followup": "Câu hỏi thêm",
+      "unavailable": "Chưa có bản ghi cho câu trả lời này."
+    },
+    "evidence": {
+      "title": "Yêu cầu: CV và phỏng vấn cạnh nhau",
+      "requirement": "Yêu cầu",
+      "cv": "Bằng chứng từ CV",
+      "interview": "Bằng chứng từ phỏng vấn",
+      "mustHave": "Bắt buộc",
+      "confidential": "Yêu cầu bảo mật",
+      "noResult": "Chưa có kết quả",
+      "status": {
+        "evidence": "Có bằng chứng",
+        "partial": "Bằng chứng một phần",
+        "none": "Không có bằng chứng"
+      }
+    },
+    "claims": {
+      "title": "Điều CV nêu",
+      "empty": "Không trích được điều gì từ CV.",
+      "status": {
+        "explained": "Đã giải thích",
+        "partly": "Giải thích một phần",
+        "not_explained": "Chưa được giải thích"
+      }
+    },
+    "culture": {
+      "title": "Ghi chú văn hóa",
+      "hint": "Ghi chú theo từng giá trị của công ty, kèm lời trích dẫn. Không chấm điểm.",
+      "empty": "Chưa có ghi chú văn hóa cho ứng viên này."
+    },
+    "suggestion": {
+      "title": "Gợi ý của AI, để bạn xem xét",
+      "none": "Chưa có gợi ý của AI cho ứng viên này."
+    },
+    "audio": {
+      "play": "Phát từ đoạn này",
+      "player": "Bản ghi câu trả lời {{position}}",
+      "failed": "Không phát được bản ghi."
+    },
+    "actions": {
+      "title": "Quyết định của bạn",
+      "approve": "Duyệt",
+      "reject": "Loại",
+      "correctCv": "Sửa nhãn CV",
+      "restart": "Cho phỏng vấn lại",
+      "fastTrack": "Đi tắt",
+      "retry": "Phân tích lại",
+      "reveal": "Tiết lộ danh tính"
+    },
+    "reveal": {
+      "title": "Tiết lộ danh tính",
+      "confirm": "Tiết lộ tên và email của ứng viên này? Việc này được ghi vào nhật ký kiểm tra.",
+      "confirmButton": "Tiết lộ",
+      "logged": "Lần tiết lộ này đã được ghi nhận."
+    },
+    "cvCorrection": {
+      "title": "Sửa nhãn CV",
+      "change": "Đổi nhãn từ \"{{from}}\" sang \"{{to}}\".",
+      "reason": "Lý do (bắt buộc)",
+      "required": "Vui lòng nhập lý do.",
+      "submit": "Lưu chỉnh sửa",
+      "corrected": "Nhãn CV đã được HR chỉnh sửa",
+      "reasonShown": "Lý do chỉnh sửa: {{reason}}"
+    }
   }
 }

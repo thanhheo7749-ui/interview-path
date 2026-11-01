@@ -413,6 +413,162 @@
     "copyFailed": "The link could not be copied. Select it and copy it by hand.",
     "newChannel": "New channel (letters, digits, underscore)",
     "addChannel": "Add channel",
-    "channelInvalid": "Use 1 to 50 lowercase letters, digits or underscores."
+    "channelInvalid": "Use 1 to 50 lowercase letters, digits or underscores.",
+    "colBoard": "Candidates",
+    "openBoard": "Open board"
+  },
+  "board": {
+    "eyebrow": "Candidate board",
+    "title": "Candidate board",
+    "intro": "Candidates appear under an alias. Read the answers first; identity stays hidden until you choose to reveal it. AI only suggests. Approval and rejection are your decisions.",
+    "axes": {
+      "much": "Much interview evidence",
+      "little": "Little interview evidence",
+      "meets": "CV meets the requirements",
+      "notMet": "CV does not meet the requirements"
+    },
+    "cells": {
+      "priority": {
+        "title": "Priority",
+        "axes": "CV meets, much evidence",
+        "hint": "The CV fits and the interview backed it up."
+      },
+      "strong_cv_unclear": {
+        "title": "Strong CV, unclear answers",
+        "axes": "CV meets, little evidence",
+        "hint": "The CV fits, but the answers did not make it clear."
+      },
+      "hidden_gem": {
+        "title": "Hidden Gem",
+        "axes": "CV does not meet, much evidence",
+        "hint": "The CV falls short, but the interview showed real evidence.",
+        "callout": "A CV filter would have missed these."
+      },
+      "not_enough_evidence": {
+        "title": "Not enough evidence",
+        "axes": "CV does not meet, little evidence",
+        "hint": "Neither the CV nor the interview gave enough to go on."
+      }
+    },
+    "emptyCell": "No candidates here right now.",
+    "toDecide": "{{count}} to decide",
+    "undecidedOf": "{{undecided}} undecided of {{total}}",
+    "selectCard": "Select {{alias}}",
+    "cvStatus": {
+      "meets": "CV meets",
+      "not_met": "CV does not meet"
+    },
+    "band": {
+      "many": "Much evidence",
+      "few": "Little evidence"
+    },
+    "decision": {
+      "pending": "Undecided",
+      "approved": "Approved",
+      "rejected": "Rejected"
+    },
+    "fastTracked": "Fast-tracked",
+    "fastTrackedNote": "This candidate was fast-tracked without an interview, so there is no interview evidence.",
+    "analysisFailed": "The analysis of this interview failed. You can retry it.",
+    "hiddenText": "Note: the CV file contained hidden text, which was ignored.",
+    "stage": {
+      "submitted": "Submitted",
+      "cv_processing": "Reading the CV",
+      "cv_failed": "CV could not be read",
+      "invited": "Invited, not interviewed yet",
+      "withdrawn": "Withdrawn",
+      "declined_recording": "Declined the recording",
+      "session_in_progress": "Interview in progress",
+      "session_completed": "Interview finished",
+      "analyzing": "Analyzing",
+      "ready_for_hr": "Ready for review"
+    },
+    "lanes": {
+      "title": "Not on the board yet",
+      "analyzing": "Analyzing",
+      "analysis_failed": "Analysis failed",
+      "not_interviewed": "Not interviewed",
+      "refused_recording": "Refused recording",
+      "withdrawn": "Withdrawn"
+    },
+    "bulk": {
+      "button": "Reject {{count}} selected",
+      "confirmTitle": "Confirm bulk rejection",
+      "confirm": "You are about to reject {{count}} candidates. This cannot be undone.",
+      "confirmButton": "Yes, reject {{count}}"
+    },
+    "detail": {
+      "title": "Candidate detail",
+      "close": "Close"
+    },
+    "transcript": {
+      "title": "Interview transcript",
+      "empty": "There is no interview transcript for this candidate.",
+      "question": "Question",
+      "followup": "Follow-up",
+      "unavailable": "No transcript is available for this answer."
+    },
+    "evidence": {
+      "title": "Requirements: CV and interview side by side",
+      "requirement": "Requirement",
+      "cv": "CV evidence",
+      "interview": "Interview evidence",
+      "mustHave": "Must-have",
+      "confidential": "Confidential requirement",
+      "noResult": "No result",
+      "status": {
+        "evidence": "Evidence found",
+        "partial": "Partial evidence",
+        "none": "No evidence"
+      }
+    },
+    "claims": {
+      "title": "CV claims",
+      "empty": "No claims were extracted from the CV.",
+      "status": {
+        "explained": "Explained",
+        "partly": "Partly explained",
+        "not_explained": "Not explained"
+      }
+    },
+    "culture": {
+      "title": "Culture notes",
+      "hint": "Notes per company value, with the words that support them. These are not scored.",
+      "empty": "No culture notes for this candidate."
+    },
+    "suggestion": {
+      "title": "AI suggestion, for your review",
+      "none": "There is no AI suggestion for this candidate."
+    },
+    "audio": {
+      "play": "Play from this moment",
+      "player": "Recording of answer {{position}}",
+      "failed": "The recording could not be played."
+    },
+    "actions": {
+      "title": "Your decision",
+      "approve": "Approve",
+      "reject": "Reject",
+      "correctCv": "Correct CV label",
+      "restart": "Grant a restart",
+      "fastTrack": "Fast-track",
+      "retry": "Retry analysis",
+      "reveal": "Reveal identity"
+    },
+    "reveal": {
+      "title": "Reveal identity",
+      "confirm": "Reveal this candidate's name and email? The reveal is recorded in the audit log.",
+      "confirmButton": "Reveal",
+      "logged": "This reveal was logged."
+    },
+    "cvCorrection": {
+      "title": "Correct CV label",
+      "change": "Change the label from \"{{from}}\" to \"{{to}}\".",
+      "reason": "Reason (required)",
+      "required": "Please give a reason.",
+      "submit": "Save correction",
+      "corrected": "CV label corrected by HR",
+      "reasonShown": "Correction reason: {{reason}}"
+    }
   }
 }
