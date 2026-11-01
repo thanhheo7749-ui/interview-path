@@ -10,6 +10,7 @@ CV_TYPES = {
     "application/pdf",
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
 }
+CV_UPLOAD_TYPES = set(CV_TYPES)
 DOCUMENT_TYPES = CV_TYPES | {"text/plain", "text/markdown"}
 AUDIO_TYPES = {"audio/webm", "audio/ogg", "audio/mpeg", "audio/mp4", "audio/wav", "audio/x-wav"}
 # mimetypes maps some audio containers to video types, so name the ones we accept explicitly.
