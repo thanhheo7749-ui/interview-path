@@ -113,6 +113,15 @@ def _jd_assistant(_system, messages, _schema) -> str:
                        "proposals": proposals}, ensure_ascii=False)
 
 
+_CHANNEL_DRAFT = re.compile(r"<draft>\n(.*?)\n</draft>", re.DOTALL)
+
+
+def _channel_content(_system, messages, _schema) -> str:
+    draft = _CHANNEL_DRAFT.search(messages[-1]["content"])
+    lines = [row[2:].strip() for row in (draft.group(1) if draft else "").splitlines() if row.startswith("- ")]
+    return json.dumps({"body": "[Demo AI] " + " ".join(lines) + "\n\n{link}"}, ensure_ascii=False)
+
+
 def _same_topic_no(_system, _messages, _schema) -> str:
     return json.dumps({"same_topic": False})
 
@@ -124,6 +133,7 @@ def install() -> None:
         fake.register("kb_conflict_check", _conflict)
         fake.register("discrimination_check", _not_discriminating)
         fake.register("lint_conflict_check", _same_topic_no)
+        fake.register("channel_content", _channel_content)
     if config.slot("reasoning").provider == "fake":
         fake.register("copilot_answer", _copilot)
         fake.register("candidate_brief", _candidate_brief)

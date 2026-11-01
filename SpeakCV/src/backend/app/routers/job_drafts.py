@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from app.auth.dependencies import require_member
 from app.brain import audience as aud
 from app.brain import retriever
-from app.bridges import jd_studio, lint
+from app.bridges import channels, jd_studio, lint, publishing
 from app.database.database import get_db
 from app.database.sql_models import CompanyMember, HiringRequest, JobDraft, JobDraftMessage
 from app.schemas.bridges import AcknowledgeIn, AssistantIn, DraftFromRequestIn, DraftFromRoleIn, DraftPatchIn
@@ -20,22 +20,12 @@ def _translate(error: jd_studio.JdStudioError) -> HTTPException:
     return HTTPException(status_code=error.status_code, detail=error.detail)
 
 
-def _department_id(db: Session, draft: JobDraft) -> int | None:
-    if draft.hiring_request_id:
-        request = db.query(HiringRequest).filter(HiringRequest.id == draft.hiring_request_id,
-                                                 HiringRequest.company_id == draft.company_id).first()
-        return request.department_id if request else None
-    cited = {i for item in draft.lines or [] for i in item.get("source_node_ids") or []}
-    nodes = retriever.visible_graph(db, aud.Audience(draft.company_id, "hr"))[0]
-    return next((n.department_id for n in nodes if n.id in cited and n.type == "role"), None)
-
-
 def _get_draft(db: Session, member: CompanyMember, draft_id: int) -> JobDraft:
     draft = db.query(JobDraft).filter(JobDraft.id == draft_id, JobDraft.company_id == member.company_id).first()
     if draft is None:
         raise HTTPException(status_code=404, detail="Draft not found")
     if member.role == "manager":
-        department = _department_id(db, draft)
+        department = publishing.department_id(db, draft)
         if department is None or department not in aud.department_subtree(db, member.company_id, member.department_id):
             raise HTTPException(status_code=404, detail="Draft not found")
     return draft
@@ -151,3 +141,72 @@ def acknowledge_unchecked(company_id: int, draft_id: int, body: AcknowledgeIn | 
     lint.acknowledge_unchecked(db, draft, member.user_id, body.line_id if body else None)
     lint.run(db, draft)
     return _draft_out(db, draft)
+
+
+def _publish_error(error: publishing.PublishError) -> HTTPException:
+    return HTTPException(status_code=error.status_code, detail=error.detail)
+
+
+def _company_draft(db: Session, company_id: int, draft_id: int) -> JobDraft:
+    draft = db.query(JobDraft).filter(JobDraft.id == draft_id, JobDraft.company_id == company_id).first()
+    if draft is None:
+        raise HTTPException(status_code=404, detail="Draft not found")
+    return draft
+
+
+@router.post(BASE + "/job-drafts/{draft_id}/submit")
+def submit_draft(company_id: int, draft_id: int, member: CompanyMember = Depends(require_member("hr")),
+                 db: Session = Depends(get_db)):
+    draft = _get_draft(db, member, draft_id)
+    try:
+        publishing.submit(db, draft, member.user_id)
+    except publishing.PublishError as error:
+        db.rollback()
+        raise _publish_error(error) from error
+    return _draft_out(db, draft)
+
+
+@router.post(BASE + "/job-drafts/{draft_id}/approve")
+def approve_draft(company_id: int, draft_id: int, member: CompanyMember = Depends(require_member("manager")),
+                  db: Session = Depends(get_db)):
+    draft = _company_draft(db, company_id, draft_id)
+    try:
+        publishing.approve(db, draft, member)
+    except publishing.PublishError as error:
+        db.rollback()
+        raise _publish_error(error) from error
+    return _draft_out(db, draft)
+
+
+@router.post(BASE + "/job-drafts/{draft_id}/publish")
+def publish_draft(company_id: int, draft_id: int, member: CompanyMember = Depends(require_member("hr")),
+                  db: Session = Depends(get_db)):
+    draft = _get_draft(db, member, draft_id)
+    try:
+        job, warnings = publishing.publish(db, draft, member.user_id)
+    except publishing.PublishError as error:
+        db.rollback()
+        raise _publish_error(error) from error
+    return {**_draft_out(db, draft), "job": {"id": job.id, "slug": job.slug, "version": job.version,
+                                              "status": job.status}, "warnings": warnings}
+
+
+@router.get(BASE + "/job-drafts/{draft_id}/channels")
+def read_channels(company_id: int, draft_id: int, member: CompanyMember = Depends(require_member("hr")),
+                  db: Session = Depends(get_db)):
+    draft = _get_draft(db, member, draft_id)
+    try:
+        return {"channels": channels.read(db, draft)}
+    except publishing.PublishError as error:
+        raise _publish_error(error) from error
+
+
+@router.post(BASE + "/job-drafts/{draft_id}/channels/generate")
+def generate_channels(company_id: int, draft_id: int, member: CompanyMember = Depends(require_member("hr")),
+                      db: Session = Depends(get_db)):
+    draft = _get_draft(db, member, draft_id)
+    try:
+        return {"channels": channels.generate(db, draft, member.user_id)}
+    except publishing.PublishError as error:
+        db.rollback()
+        raise _publish_error(error) from error
