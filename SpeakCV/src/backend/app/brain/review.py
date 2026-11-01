@@ -1,12 +1,13 @@
 """HR review of extracted knowledge. Only HR actions (or the sample-only auto approve) publish a node.
 
 Every function here works inside the caller's transaction and does not commit, except `auto_approve_document`
-which has no request around it."""
+which has no request around it, and `recheck_edited_facts` which runs after the caller's commit."""
 import numpy as np
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from app.ai import gateway
+from app.ai.types import AIError
 from app.brain import contradiction, vectors
 from app.brain.text import normalise_title
 from app.database.models_brain import VISIBILITIES
@@ -15,6 +16,7 @@ from app.database.sql_models import Company, KbChunk, KbDocument, KbEdge, KbNode
 MERGE_COSINE = 0.90
 ORG_TYPES = ("company", "department")
 EDITABLE = ("title", "body", "visibility", "fact_value", "fact_unit", "scope_text")
+FACT_CHECKED = ("title", "body", "fact_value", "fact_unit")
 LIVE = ("draft", "published")
 DEAD = ("rejected", "superseded")
 
@@ -197,7 +199,7 @@ def _embed_nodes(db: Session, company_id: int, nodes: list[KbNode]) -> None:
         node.embedding_dim = result.dimension
 
 
-def _apply_fields(item, node: KbNode, reembed: dict[int, KbNode]) -> None:
+def _apply_fields(item, node: KbNode, reembed: dict[int, KbNode], edited_facts: dict[int, KbNode]) -> None:
     for name in EDITABLE:
         value = getattr(item, name)
         if value is None:
@@ -206,6 +208,8 @@ def _apply_fields(item, node: KbNode, reembed: dict[int, KbNode]) -> None:
             raise ReviewError(422, f"Unknown visibility: {value}")
         if name in ("title", "body") and value != getattr(node, name):
             reembed[node.id] = node
+        if name in FACT_CHECKED and node.fact_kind and value != getattr(node, name):
+            edited_facts[node.id] = node
         setattr(node, name, value)
 
 
@@ -254,12 +258,15 @@ def _merge(db: Session, company_id: int, node: KbNode, into_id: int, user_id: in
     contradiction.on_node_rejected(db, node.id)
 
 
-def apply_decisions(db: Session, company_id: int, user_id: int, items) -> None:
-    """Apply review items in order. Raises ReviewError; the caller rolls back so a bad item changes nothing."""
+def apply_decisions(db: Session, company_id: int, user_id: int, items) -> list[int]:
+    """Apply review items in order. Raises ReviewError; the caller rolls back so a bad item changes nothing.
+
+    Returns the published facts this request edited. The caller commits, then passes them to recheck_edited_facts."""
     start = _version(db, company_id)
     touched: set[int] = set()
     documents: set[int] = set()
     reembed: dict[int, KbNode] = {}
+    edited_facts: dict[int, KbNode] = {}
     explicit_documents: list[int] = []
     changed = False
 
@@ -271,9 +278,9 @@ def apply_decisions(db: Session, company_id: int, user_id: int, items) -> None:
         documents |= _documents_of_nodes(db, company_id, {node.id})
         touched.add(node.id)
         if item.action == "edit":
-            _apply_fields(item, node, reembed)
+            _apply_fields(item, node, reembed, edited_facts)
         elif item.action == "accept":
-            _apply_fields(item, node, reembed)
+            _apply_fields(item, node, reembed, edited_facts)
             publish_node(db, node, user_id)
             changed = True
         elif item.action == "reject":
@@ -286,6 +293,10 @@ def apply_decisions(db: Session, company_id: int, user_id: int, items) -> None:
             changed = True
         db.flush()
 
+    # After every item, so an edit of both sides in one request is compared on the final values.
+    for node in edited_facts.values():
+        if node.status in LIVE and contradiction.close_conflicts_settled_by_edit(db, node, user_id):
+            changed = True
     _embed_nodes(db, company_id, list(reembed.values()))
     db.flush()
     settle_edges(db, company_id, touched)
@@ -305,3 +316,18 @@ def apply_decisions(db: Session, company_id: int, user_id: int, items) -> None:
         changed = True
     if changed or reembed:
         _bump_to(db, company_id, start + 1)
+    return [node.id for node in edited_facts.values() if node.status == "published"]
+
+
+def recheck_edited_facts(db: Session, company_id: int, node_ids: list[int]) -> list[str]:
+    """Look for new contradictions after an edit is committed, so a failed check cannot undo it. Returns warnings.
+
+    A request with a published edit has already moved kb_version, so opening a conflict here does not move it again."""
+    warnings = []
+    for node_id in node_ids:
+        try:
+            contradiction.check_new_facts(db, company_id, [node_id], bump_version=False)
+        except AIError:
+            db.rollback()
+            warnings.append(f"The edit to node {node_id} was saved, but its contradiction check did not finish.")
+    return warnings

@@ -95,7 +95,7 @@ def decide(
     db: Session = Depends(get_db),
 ):
     try:
-        review.apply_decisions(db, company_id, member.user_id, body.items)
+        edited = review.apply_decisions(db, company_id, member.user_id, body.items)
         db.commit()
     except review.ReviewError as exc:
         db.rollback()
@@ -103,7 +103,8 @@ def decide(
     except Exception:
         db.rollback()
         raise
-    return {"ok": True, "applied": len(body.items)}
+    warnings = review.recheck_edited_facts(db, company_id, edited)
+    return {"ok": True, "applied": len(body.items), "warnings": warnings}
 
 
 @router.get(f"{KB}/graph")

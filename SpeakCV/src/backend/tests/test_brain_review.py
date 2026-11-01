@@ -1,5 +1,9 @@
+import json
+
 import pytest
 
+from app.ai.providers import fake
+from app.ai.types import AIError
 from app.brain import review, vectors
 from app.database.sql_models import (
     Company, CompanyMember, Department, KbChunk, KbConflict, KbDocument, KbEdge, KbNode, KbNodeSource,
@@ -392,3 +396,238 @@ def test_finish_document_if_decided_only_acts_on_review_documents(db, w):
     failed = w.document("Failed", status="failed")
     assert review.finish_document_if_decided(db, failed.id) is False
     assert w.reload(failed).status == "failed"
+
+
+# Editing a fact and contradictions
+
+AGREE = json.dumps({"same_topic": True, "same_scope": True})
+
+
+def fact(w, title, value, status="draft"):
+    row = w.node(title, status=status)
+    row.fact_kind, row.fact_value, row.fact_unit = "number", value, "days"
+    w.db.commit()
+    return row
+
+
+def conflict_between(w, a, b, status="open", resolution=None):
+    row = KbConflict(company_id=w.company.id, node_a_id=a.id, node_b_id=b.id, status=status, resolution=resolution)
+    w.db.add(row)
+    w.db.commit()
+    return row
+
+
+def set_version(w, value=5):
+    w.company.kb_version = value
+    w.db.commit()
+    return value
+
+
+def version(w):
+    return w.reload(w.company).kb_version
+
+
+def decide_ok(client, w, *items):
+    response = client.post(w.url("review/decide"), json={"items": list(items)}, headers=w.hr)
+    assert response.status_code == 200, response.text
+    return response.json()
+
+
+@pytest.fixture
+def spy_check(monkeypatch):
+    calls = []
+    monkeypatch.setattr(review.contradiction, "check_new_facts", lambda *a, **k: calls.append(a[2]) or 0)
+    return calls
+
+
+def test_an_edit_that_creates_a_disagreement_opens_a_conflict(client, w):
+    old, new = fact(w, "Leave", "12", "published"), fact(w, "Leave policy", "12")
+    start = set_version(w)
+    fake.enqueue("kb_conflict_check", AGREE)
+    body = decide_ok(client, w, {"action": "accept", "node_id": new.id, "fact_value": "15"})
+    assert body["warnings"] == []
+    row = w.db.query(KbConflict).one()
+    assert (row.status, row.node_a_id, row.node_b_id) == ("open", old.id, new.id)
+    assert w.reload(new).status == "published"
+    assert version(w) == start + 1
+
+
+def test_opening_several_conflicts_still_moves_the_version_once(client, w):
+    fact(w, "Leave", "12", "published")
+    fact(w, "Leave two", "13", "published")
+    new = fact(w, "Leave policy", "12")
+    start = set_version(w)
+    fake.enqueue("kb_conflict_check", AGREE)
+    fake.enqueue("kb_conflict_check", AGREE)
+    decide_ok(client, w, {"action": "accept", "node_id": new.id, "fact_value": "15"})
+    assert w.db.query(KbConflict).filter_by(status="open").count() == 2
+    assert version(w) == start + 1
+
+
+def test_an_edit_that_resolves_a_conflict_closes_it_with_a_note(client, w):
+    old, new = fact(w, "Leave", "12", "published"), fact(w, "Leave policy", "15")
+    row = conflict_between(w, old, new)
+    start = set_version(w)
+    body = decide_ok(client, w, {"action": "edit", "node_id": new.id, "fact_value": "12.0"})
+    row = w.reload(row)
+    assert (row.status, row.resolution, row.resolved_by) == ("dismissed", "edit_resolved", w.hr_user.id)
+    assert row.resolved_at is not None
+    assert body["warnings"] == []
+    assert fake.last_messages() == []
+    assert version(w) == start + 1
+
+
+def test_a_resolving_edit_on_either_side_closes_it(client, w):
+    new, old = fact(w, "Leave policy", "15"), fact(w, "Leave", "12", "published")
+    row = conflict_between(w, old, new)
+    decide_ok(client, w, {"action": "edit", "node_id": new.id, "fact_value": "12"})
+    assert w.reload(row).status == "dismissed"
+    other = conflict_between(w, new, fact(w, "Leave two", "15"))
+    decide_ok(client, w, {"action": "edit", "node_id": new.id, "fact_value": "15"})
+    assert w.reload(other).status == "dismissed"
+
+
+def test_an_edit_that_still_disagrees_keeps_the_one_conflict_and_asks_nothing(client, w):
+    old, new = fact(w, "Leave", "12", "published"), fact(w, "Leave policy", "15")
+    row = conflict_between(w, old, new)
+    decide_ok(client, w, {"action": "accept", "node_id": new.id, "fact_value": "20"})
+    assert w.reload(row).status == "open"
+    assert w.db.query(KbConflict).count() == 1
+    assert fake.last_messages() == []
+
+
+def test_unparseable_values_are_not_treated_as_equal(client, w):
+    old, new = fact(w, "Leave", "many", "published"), fact(w, "Leave policy", "15")
+    row = conflict_between(w, old, new)
+    decide_ok(client, w, {"action": "edit", "node_id": new.id, "fact_value": "several"})
+    assert w.reload(row).status == "open"
+
+
+def test_a_conflict_the_edit_settled_can_open_again_when_values_part(client, w):
+    old, new = fact(w, "Leave", "12", "published"), fact(w, "Leave policy", "15")
+    first = conflict_between(w, old, new)
+    decide_ok(client, w, {"action": "edit", "node_id": new.id, "fact_value": "12"})
+    assert w.reload(first).status == "dismissed"
+    fake.enqueue("kb_conflict_check", AGREE)
+    decide_ok(client, w, {"action": "accept", "node_id": new.id, "fact_value": "20"})
+    assert w.db.query(KbConflict).filter_by(status="open").count() == 1
+
+
+def test_a_pair_hr_dismissed_as_different_scope_stays_closed(client, w):
+    old, new = fact(w, "Leave", "12", "published"), fact(w, "Leave policy", "15")
+    conflict_between(w, old, new, status="dismissed", resolution="different_scope")
+    decide_ok(client, w, {"action": "accept", "node_id": new.id, "fact_value": "20"})
+    assert w.db.query(KbConflict).count() == 1
+    assert fake.last_messages() == []
+
+
+def test_ai_failure_keeps_the_edit_and_returns_a_warning(client, w):
+    fact(w, "Leave", "12", "published")
+    new = fact(w, "Leave policy", "12")
+    start = set_version(w)
+    fake.enqueue("kb_conflict_check", "not json")
+    fake.enqueue("kb_conflict_check", "still not json")
+    body = decide_ok(client, w, {"action": "accept", "node_id": new.id, "fact_value": "15"})
+    assert body["ok"] is True
+    assert len(body["warnings"]) == 1
+    node = w.reload(new)
+    assert (node.status, node.fact_value) == ("published", "15")
+    assert w.db.query(KbConflict).count() == 0
+    assert version(w) == start + 1
+
+
+def test_ai_failure_on_one_node_still_checks_the_next(client, w, monkeypatch):
+    first, second = fact(w, "One", "1"), fact(w, "Two", "2")
+    checked = []
+
+    def check(_db, _company_id, node_ids, **_):
+        checked.extend(node_ids)
+        if node_ids == [first.id]:
+            raise AIError("no answer")
+        return 0
+
+    monkeypatch.setattr(review.contradiction, "check_new_facts", check)
+    body = decide_ok(
+        client, w, {"action": "accept", "node_id": first.id, "fact_value": "5"},
+        {"action": "accept", "node_id": second.id, "fact_value": "6"},
+    )
+    assert checked == [first.id, second.id]
+    assert len(body["warnings"]) == 1
+    assert w.reload(second).status == "published"
+
+
+def test_an_edit_that_changes_nothing_does_not_call_the_ai(client, w, spy_check):
+    fact(w, "Leave", "12", "published")
+    new = fact(w, "Leave policy", "15")
+    decide_ok(client, w, {
+        "action": "accept", "node_id": new.id, "fact_value": "15", "fact_unit": "days",
+        "title": "Leave policy", "body": "Leave policy body",
+    })
+    assert spy_check == []
+
+
+def test_a_plain_accept_does_not_call_the_ai(client, w, spy_check):
+    new = fact(w, "Leave policy", "15")
+    decide_ok(client, w, {"action": "accept", "node_id": new.id})
+    assert spy_check == []
+
+
+@pytest.mark.parametrize("field,value", [
+    ("fact_value", "20"), ("fact_unit", "weeks"), ("title", "New title"), ("body", "New body"),
+])
+def test_each_fact_field_triggers_the_check(client, w, spy_check, field, value):
+    new = fact(w, "Leave policy", "15")
+    decide_ok(client, w, {"action": "accept", "node_id": new.id, field: value})
+    assert spy_check == [[new.id]]
+
+
+@pytest.mark.parametrize("field,value", [("visibility", "public"), ("scope_text", "Hanoi office")])
+def test_other_fields_do_not_trigger_the_check(client, w, spy_check, field, value):
+    new = fact(w, "Leave policy", "15")
+    decide_ok(client, w, {"action": "accept", "node_id": new.id, field: value})
+    assert spy_check == []
+
+
+def test_a_node_without_a_fact_kind_is_not_checked(client, w, spy_check):
+    new = w.node("Plain")
+    decide_ok(client, w, {"action": "accept", "node_id": new.id, "title": "Plainer"})
+    assert spy_check == []
+
+
+def test_a_draft_edit_closes_conflicts_but_is_not_rechecked(client, w, spy_check):
+    new = fact(w, "Leave policy", "15")
+    decide_ok(client, w, {"action": "edit", "node_id": new.id, "fact_value": "20"})
+    assert spy_check == []
+
+
+def test_edit_then_accept_in_one_request_is_rechecked_once(client, w, spy_check):
+    new = fact(w, "Leave policy", "15")
+    start = set_version(w)
+    decide_ok(
+        client, w, {"action": "edit", "node_id": new.id, "fact_value": "20"},
+        {"action": "accept", "node_id": new.id, "fact_unit": "weeks"},
+    )
+    assert spy_check == [[new.id]]
+    assert version(w) == start + 1
+
+
+def test_edit_then_reject_in_one_request_is_not_rechecked(client, w, spy_check):
+    new = fact(w, "Leave policy", "15")
+    decide_ok(
+        client, w, {"action": "edit", "node_id": new.id, "fact_value": "20"},
+        {"action": "reject", "node_id": new.id},
+    )
+    assert spy_check == []
+
+
+def test_a_bad_item_undoes_the_closing_and_runs_no_check(client, w, spy_check):
+    old, new = fact(w, "Leave", "12", "published"), fact(w, "Leave policy", "15")
+    row = conflict_between(w, old, new)
+    response = client.post(w.url("review/decide"), headers=w.hr, json={"items": [
+        {"action": "accept", "node_id": new.id, "fact_value": "12"},
+        {"action": "reject", "node_id": 999999},
+    ]})
+    assert response.status_code == 404
+    assert w.reload(row).status == "open"
+    assert w.reload(new).fact_value == "15"
+    assert spy_check == []
