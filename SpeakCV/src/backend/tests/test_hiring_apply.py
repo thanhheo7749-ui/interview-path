@@ -3,6 +3,7 @@ import json
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from types import SimpleNamespace
+import zipfile
 
 import docx
 import pytest
@@ -15,9 +16,10 @@ from app.ai.providers import fake
 from app.ai.types import AIProviderError
 from app.database.sql_models import (
     AIUsageLog, Application, AuditLog, Company, Consent, CvClaim, Job, JobChannelLink, JobRequirement, KbEdge, KbNode,
-    Notification, RequirementResult,
+    Notification, RequirementResult, User,
 )
 from app.core import uploads
+from app.core.rate_limit import limiter
 from app.hiring import applications, consents, cv_processing, screening, state
 from tests.helpers import auth_header, iter_routes, make_user, route_path
 
@@ -219,6 +221,89 @@ def test_a_reupload_over_the_limit_is_refused_and_keeps_the_stage(client, world,
     assert response.status_code == 422
     assert fresh(db, application_id).stage == "cv_failed"
     assert sorted(p for p in _storage.rglob("*") if p.is_file()) == before
+
+
+# Hostile or oversized files
+
+
+def _pdf_of_pages(count) -> bytes:
+    buffer = io.BytesIO()
+    pdf = canvas.Canvas(buffer)
+    for number in range(count):
+        pdf.drawString(50, 780, f"Page {number}")
+        pdf.showPage()
+    pdf.save()
+    return buffer.getvalue()
+
+
+def _docx_bomb() -> bytes:
+    buffer = io.BytesIO(make_docx())
+    with zipfile.ZipFile(buffer, "a", zipfile.ZIP_DEFLATED) as archive:
+        archive.writestr("word/padding.bin", b"\0" * (50 * 1024 * 1024 + 1))
+    return buffer.getvalue()
+
+
+def test_a_pdf_over_30_pages_gets_a_clear_422_and_nothing_is_stored(client, world, db, _storage):
+    response = apply(client, data=_pdf_of_pages(31), name="cv.pdf", content_type="application/pdf")
+    assert response.status_code == 422
+    assert "30 pages" in response.json()["detail"]
+    assert db.query(Application).count() == 0
+    assert [p for p in _storage.rglob("*") if p.is_file()] == []
+
+
+def test_a_pdf_of_30_pages_is_accepted(client, world):
+    assert apply(client, data=_pdf_of_pages(30), name="cv.pdf", content_type="application/pdf").status_code == 201
+
+
+def test_a_docx_over_the_uncompressed_limit_gets_a_clear_422_and_nothing_is_stored(client, world, db, _storage):
+    data = _docx_bomb()
+    assert len(data) < 1024 * 1024, "the upload limit must not be what refuses it"
+    response = apply(client, data=data)
+    assert response.status_code == 422
+    assert "50 MB" in response.json()["detail"]
+    assert db.query(Application).count() == 0
+    assert [p for p in _storage.rglob("*") if p.is_file()] == []
+
+
+def test_a_reupload_of_a_docx_bomb_gets_422_and_keeps_the_stage(client, world, db):
+    application_id = apply(client, data=make_pdf([]), name="cv.pdf", content_type="application/pdf").json()["id"]
+    response = client.post(f"/api/applications/{application_id}/reupload",
+                           files={"file": ("cv.docx", _docx_bomb(), DOCX)}, headers=auth_header(CANDIDATE))
+    assert response.status_code == 422
+    assert fresh(db, application_id).stage == "cv_failed"
+
+
+# Rate limits
+
+
+@pytest.fixture
+def rate_limited():
+    limiter.enabled = True
+    limiter.reset()
+    try:
+        yield
+    finally:
+        limiter.enabled = False
+        limiter.reset()
+
+
+def test_apply_returns_429_on_the_11th_request_per_user(client, world, rate_limited):
+    codes = [apply(client).status_code for _ in range(11)]
+    assert codes[:10] == [201] + [409] * 9
+    assert codes[10] == 429
+    assert apply(client, email=OTHER).status_code == 201
+
+
+def test_reupload_returns_429_on_the_11th_request_per_user(client, world, rate_limited):
+    application_id = apply(client).json()["id"]
+
+    def reupload(email):
+        return client.post(f"/api/applications/{application_id}/reupload",
+                           files={"file": ("cv.docx", make_docx(), DOCX)}, headers=auth_header(email)).status_code
+
+    codes = [reupload(CANDIDATE) for _ in range(11)]
+    assert codes == [409] * 10 + [429]
+    assert reupload(OTHER) == 404
 
 
 # 3. Success
@@ -556,6 +641,40 @@ def test_cv_assess_prompt_after_processing_has_no_name_or_email_by_last_messages
         assert secret not in prompt
 
 
+def test_the_registered_name_is_gone_from_cv_assess_when_the_model_lists_no_names(client, world, db, monkeypatch):
+    """The CV told the model to list nothing, and it obeyed. The account's own details still go."""
+    user = db.get(User, world.user.id)
+    user.full_name = "Canaryname Q Zebrawski"
+    user.email = "canary.handle@example.test"
+    db.commit()
+    prompts = {}
+    real = gateway.generate_structured
+
+    def spy(slot, system, messages, schema, max_output_tokens, feature, company_id=None):
+        prompts[feature] = json.dumps(messages, ensure_ascii=False)
+        return real(slot, system, messages, schema, max_output_tokens, feature, company_id)
+
+    monkeypatch.setattr(gateway, "generate_structured", spy)
+    fake.enqueue("cv_mask", json.dumps({"names": [], "gender_terms": [], "ages": [], "addresses": []}))
+    lines = ["Canaryname Zebrawski", "Handle canary.handle on forums", "Q built a FastAPI service used by 3 teams."]
+    application_id = apply(client, data=make_docx(lines), email="canary.handle@example.test").json()["id"]
+    assert "Canaryname" in prompts["cv_mask"]
+    for secret in ("Canaryname", "Zebrawski", "canary.handle"):
+        assert secret not in prompts["cv_assess"]
+    assert "Q built a FastAPI" in prompts["cv_assess"], "a single-character token is not a term"
+    assert fresh(db, application_id).cv_text_blind.startswith("[NAME] [NAME]")
+
+
+def test_a_registered_name_that_is_a_common_word_does_not_change_the_blind_text(client, world, db):
+    user = db.get(User, world.user.id)
+    user.full_name = "Trần Long"
+    user.email = "long@example.test"
+    db.commit()
+    fake.enqueue("cv_mask", json.dumps({"names": [], "gender_terms": [], "ages": [], "addresses": []}))
+    application_id = apply(client, data=make_docx(["Long ran a long-running job"]), email="long@example.test").json()["id"]
+    assert fresh(db, application_id).cv_text_blind == "[NAME] ran a long-running job"
+
+
 def test_identity_only_differences_give_exactly_the_same_result_end_to_end(client, world, db):
     """Same CV, different person: the second application is answered from the cache."""
     second_lines = ["Otherperson Quillfeather", "Email: quill@example.test  Phone: 0987 654 321", *CV_LINES[2:]]
@@ -883,8 +1002,8 @@ def test_a_stage_changed_during_processing_does_not_crash_the_job(client, world,
     application_id = apply(client, data=make_pdf([]), name="cv.pdf", content_type="application/pdf").json()["id"]
     real = cv_processing.identity.mask
 
-    def mask(raw_text, *, company_id):
-        result = real(raw_text, company_id=company_id)
+    def mask(raw_text, **kwargs):
+        result = real(raw_text, **kwargs)
         cv_processing.fail_interrupted()
         return result
 

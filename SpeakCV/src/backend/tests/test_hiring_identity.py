@@ -86,9 +86,82 @@ def test_bare_profile_links_are_masked():
         assert link not in identity.regex_mask(f"See {link} for more")
 
 
-def test_terms_match_across_case_and_broken_whitespace():
-    out = identity.apply_terms("NGUYỄN  VĂN AN and nguyễn văn\nan", {"[NAME]": ["Nguyễn Văn An"]})
-    assert out == "[NAME] and [NAME]"
+def test_name_terms_match_exact_case_or_whole_capitals_across_broken_whitespace():
+    out = identity.apply_terms("NGUYỄN  VĂN AN, Nguyễn Văn\nAn, nguyễn văn an", {"[NAME]": ["Nguyễn Văn An"]})
+    assert out == "[NAME], [NAME], nguyễn văn an"
+
+
+def test_a_name_that_is_also_a_common_word_leaves_the_common_word():
+    assert identity.apply_terms("An and AN built an API", {"[NAME]": ["An"]}) == "[NAME] and [NAME] built an API"
+    assert identity.apply_terms("Long wrote a long-running job", {"[NAME]": ["Long"]}) == "[NAME] wrote a long-running job"
+
+
+def test_a_name_in_mixed_case_is_not_the_whole_term_in_capitals():
+    assert identity.apply_terms("aN An", {"[NAME]": ["An"]}) == "aN [NAME]"
+
+
+def test_gender_age_and_address_terms_still_match_any_case():
+    out = identity.apply_terms("he HE He", {"[GENDER]": ["He"]})
+    assert out == "[GENDER] [GENDER] [GENDER]"
+
+
+def test_the_same_word_can_be_a_name_in_exact_case_and_a_gender_term_in_any_case():
+    out = identity.apply_terms("Anh and anh", {"[NAME]": ["Anh"], "[GENDER]": ["anh"]})
+    assert out == "[NAME] and [GENDER]"
+
+
+def test_identity_swap_with_a_name_that_is_a_common_word_gives_the_same_blind_text_and_hash():
+    fake.enqueue("cv_mask", terms(["An"], ["He"]))
+    fake.enqueue("cv_mask", terms(["Bình"], ["She"]))
+    a = identity.mask("An\nHe built an API and an ETL job.", company_id=1)
+    b = identity.mask("Bình\nShe built an API and an ETL job.", company_id=1)
+    assert a.blind_text == b.blind_text == "[NAME]\n[GENDER] built an API and an ETL job."
+    assert a.blind_hash == b.blind_hash
+
+
+def test_known_terms_are_masked_when_the_model_lists_nothing():
+    fake.enqueue("cv_mask", terms([], []))
+    result = identity.mask("Zebrawski Canaryname\nHandle zebra.w built it", company_id=1, known_terms=["Zebrawski", "Canaryname", "zebra.w"])
+    assert result.blind_text == "[NAME] [NAME]\nHandle [NAME] built it"
+
+
+def test_known_terms_default_to_none():
+    fake.enqueue("cv_mask", terms([], []))
+    assert identity.mask("Zebrawski built it", company_id=1).blind_text == "Zebrawski built it"
+
+
+def test_registered_terms_ignore_single_characters_and_are_capitalised():
+    assert identity.registered_terms("Nguyễn V An", "an.nguyen@example.test") == ["Nguyễn", "An", "an.nguyen"]
+    assert identity.registered_terms("nguyen van an", None) == ["Nguyen", "Van", "An"]
+    assert identity.registered_terms("NGUYEN VAN", "") == ["Nguyen", "Van"]
+    assert identity.registered_terms("McAdams", "x@example.test") == ["McAdams"]
+    assert identity.registered_terms(None, None) == []
+
+
+def test_a_plain_word_as_email_local_part_cannot_mask_that_word():
+    registered = identity.registered_terms("Trần Long", "long@example.test")
+    assert identity.apply_terms("Long wrote a long-running job", {"[NAME]": registered}) == "[NAME] wrote a long-running job"
+
+
+def test_a_distinctive_email_local_part_is_masked_as_written():
+    registered = identity.registered_terms("Trần Bình", "binh.tran99@example.test")
+    assert identity.apply_terms("Find binh.tran99 online", {"[NAME]": registered}) == "Find [NAME] online"
+
+
+def test_a_personal_domain_with_no_path_is_masked():
+    for domain in ("an-nguyen.dev", "annguyen.me", "an.nguyen.io", "my-site.com", "foo.net", "tran.vn", "foo.com.vn"):
+        assert identity.regex_mask(f"Visit {domain} today") == "Visit [URL] today"
+    assert identity.regex_mask("See an-nguyen.dev.") == "See [URL]."
+
+
+def test_technology_names_are_not_personal_domains():
+    for name in ("node.js", "vue.js", "asp.net", "socket.io", "ado.net", "vb.net", "next.js", "asp.net/mvc"):
+        assert name in identity.regex_mask(f"Built with {name} daily")
+
+
+def test_capitalised_technology_names_and_versions_and_files_are_kept():
+    for text in ("ASP.NET Core", "Node.js", "Socket.IO", "version 1.2.3", "README.md", "e.g. this"):
+        assert text in identity.regex_mask(f"Used {text} here")
 
 
 def test_longest_term_wins():

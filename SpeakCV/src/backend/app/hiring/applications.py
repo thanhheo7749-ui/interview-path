@@ -8,7 +8,7 @@ from app.core import storage
 from app.core.text_extract import NoExtractableText
 from app.database.sql_models import Application, Job, JobChannelLink, User
 from app.hiring import consents
-from app.hiring.hidden_text import extract_cv
+from app.hiring.hidden_text import CvTooLarge, extract_cv
 
 MAX_CV_CHARS = 20_000
 # A Text column on MySQL holds 64 KB. 20,000 characters of up to 3 bytes fit; 4-byte characters might not.
@@ -39,6 +39,8 @@ def ensure_cv_fits(file_bytes: bytes, suffix: str) -> None:
         text = extract_cv(file_bytes, suffix).text
     except NoExtractableText:
         return
+    except CvTooLarge as exc:
+        raise CvTooLong(str(exc)) from exc
     if len(text) > MAX_CV_CHARS or len(text.encode("utf-8")) > MAX_CV_BYTES:
         raise CvTooLong(f"Your CV has too much text. Please shorten it to {MAX_CV_CHARS:,} characters or fewer.")
 

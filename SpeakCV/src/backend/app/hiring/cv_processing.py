@@ -5,9 +5,9 @@ from app.ai.types import AIError
 from app.core import storage
 from app.core.text_extract import NoExtractableText
 from app.database.database import SessionLocal
-from app.database.sql_models import Application, Company, Job
+from app.database.sql_models import Application, Company, Job, User
 from app.hiring import identity, notify, screening
-from app.hiring.hidden_text import extract_cv
+from app.hiring.hidden_text import CvTooLarge, extract_cv
 from app.hiring.state import InvalidTransition, advance
 
 logger = logging.getLogger(__name__)
@@ -64,10 +64,12 @@ def _claim(db, application_id: int) -> bool:
 def _process(db, application_id: int) -> None:
     application = db.get(Application, application_id)
     path, suffix, company_id = application.cv_file_path, application.cv_suffix, application.company_id
+    user = db.get(User, application.candidate_user_id) if application.candidate_user_id is not None else None
+    known_terms = identity.registered_terms(user.full_name, user.email) if user is not None else []
     db.commit()  # hold no snapshot or lock while reading the file or calling AI
 
     cv = extract_cv(storage.read_bytes(path), suffix)
-    masked = identity.mask(cv.text, company_id=company_id)
+    masked = identity.mask(cv.text, company_id=company_id, known_terms=known_terms)
 
     application = _locked_processing(db, application_id)
     application.cv_text_raw = cv.text
@@ -113,7 +115,7 @@ def run(application_id: int) -> None:
             _process(db, application_id)
         except _NoLongerProcessing:
             db.rollback()
-        except NoExtractableText as exc:
+        except (NoExtractableText, CvTooLarge) as exc:
             db.rollback()
             _fail(db, application_id, str(exc))  # only fixed messages from text_extract and hidden_text
         except Exception as exc:
