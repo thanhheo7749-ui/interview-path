@@ -1,4 +1,4 @@
-.PHONY: eval-brain eval-sttseed-samples docker-build docker-up docker-down docker-logs docker-ps docker-build-speakcv docker-up-speakcv docker-restart test test-mysql reembed
+.PHONY: eval-brain eval-discrimination eval-stt seed-samples docker-build docker-up docker-down docker-logs docker-ps docker-build-speakcv docker-up-speakcv docker-restart test test-mysql reembed
 
 BACKEND_DIR = SpeakCV/src/backend
 BACKEND_PY = $(if $(wildcard $(BACKEND_DIR)/.venv/bin/python),.venv/bin/python,python3)
@@ -73,6 +73,11 @@ seed-samples:
 # Pass ARGS=--dry-run, ARGS=--yes or ARGS="--profile fake".
 eval-brain:
 	cd $(BACKEND_DIR) && $(BACKEND_PY) -m eval.brain.run $(ARGS)
+
+# Measures the discrimination guard (rules, then rules plus classifier) on labelled statements in Vietnamese, English and Korean.
+# Prints an estimated cost first and asks before spending. Pass ARGS=--dry-run, ARGS=--yes or ARGS="--profile fake".
+eval-discrimination:
+	cd $(BACKEND_DIR) && $(BACKEND_PY) -m eval.discrimination.run $(ARGS)
 
 # Benchmarks speech-to-text on the clips in eval/stt/clips. Prints an estimated cost first and asks before spending.
 # Pass ARGS=--dry-run, ARGS=--yes or ARGS="--profile fake" (the fake profile measures nothing).
