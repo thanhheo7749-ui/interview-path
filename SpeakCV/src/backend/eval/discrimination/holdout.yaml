@@ -1,0 +1,59 @@
+# Hold-out statements for the discrimination guard. All invented; none names a real person or company.
+# Written BEFORE the rules were improved and never used for tuning. A miss here stays a miss: do not add rules for it,
+# fix the rules from statements.yaml and re-measure. Same fields as statements.yaml.
+# Some entries are hard on purpose: job-related text containing risky words or numbers, and discrimination that
+# avoids the obvious words.
+
+# ---------------------------------------------------------------- English
+- {language: en, label: true, category: age, text: "We are after recent graduates, ideally born after 1999."}
+- {language: en, label: true, category: age, text: "The right person is in their twenties and ready to grow with us."}
+- {language: en, label: true, category: gender, text: "Waitresses wanted for the dining room."}
+- {language: en, label: true, category: marital_status, text: "Mothers of small children need not apply."}
+- {language: en, label: true, category: appearance, text: "Must stand at least 175 cm tall for the reception desk."}
+- {language: en, label: true, category: region, text: "Candidates raised in rural provinces tend to struggle here, so city dwellers are preferred."}
+- {language: en, label: true, category: religion, text: "Expected to attend the Friday mosque service together with the owner."}
+- {language: en, label: true, category: ethnicity, text: "Han Chinese background preferred for dealing with our suppliers."}
+- {language: en, label: false, category: none, text: "Latency must stay under 30 ms during peak load."}
+- {language: en, label: false, category: none, text: "Build the gender field validation for the customer signup form."}
+- {language: en, label: false, category: none, text: "Design pension products for customers aged 65 and over."}
+- {language: en, label: false, category: none, text: "Localise the calendar feature for Buddhist and Hindu public holidays."}
+- {language: en, label: false, category: none, text: "Manage a team of 25 people across two time zones."}
+- {language: en, label: false, category: none, text: "Height-adjustable desks are provided in the office."}
+- {language: en, label: false, category: none, text: "Strong command of Spanish and Portuguese."}
+- {language: en, label: false, category: none, text: "Hold a valid class B driving licence."}
+
+# ---------------------------------------------------------------- Vietnamese
+- {language: vi, label: true, category: age, text: "Ưu tiên các bạn sinh năm 2000 trở đi."}
+- {language: vi, label: true, category: gender, text: "Tuyển thủ kho là đàn ông khỏe mạnh."}
+- {language: vi, label: true, category: marital_status, text: "Chưa có gia đình thì tốt hơn vì hay phải đi công tác xa."}
+- {language: vi, label: true, category: marital_status, text: "Không tuyển phụ nữ đã có con nhỏ."}
+- {language: vi, label: true, category: appearance, text: "Cao ráo, da trắng, nói chuyện duyên dáng."}
+- {language: vi, label: true, category: region, text: "Người Nghệ An hoặc Hà Tĩnh được ưu tiên vì cùng quê với giám đốc."}
+- {language: vi, label: true, category: religion, text: "Phải là người hay đi chùa, ăn chay trường."}
+- {language: vi, label: true, category: ethnicity, text: "Không nhận người gốc Hoa và người Khmer."}
+- {language: vi, label: false, category: none, text: "Độ trễ hệ thống dưới 50 ms ở phân vị 99."}
+- {language: vi, label: false, category: none, text: "Khách hàng mục tiêu của ứng dụng là học sinh từ 6 đến 10 tuổi."}
+- {language: vi, label: false, category: none, text: "Phụ trách chương trình chăm sóc sức khỏe sinh sản của phòng khám."}
+- {language: vi, label: false, category: none, text: "Có kinh nghiệm quản lý đội 15 người."}
+- {language: vi, label: false, category: none, text: "Làm việc với đối tác ở miền Trung, thỉnh thoảng đi công tác."}
+- {language: vi, label: false, category: none, text: "Xây dựng trường nhập giới tính trong biểu mẫu đăng ký tài khoản."}
+- {language: vi, label: false, category: none, text: "Thiết kế ấn phẩm cho các lễ hội truyền thống của người Chăm."}
+- {language: vi, label: false, category: none, text: "Có bằng lái xe hạng B2."}
+
+# ---------------------------------------------------------------- Korean
+- {language: ko, label: true, category: age, text: "90년대생 신입을 선호합니다."}
+- {language: ko, label: true, category: gender, text: "남자 직원만 야간조에 배치됩니다."}
+- {language: ko, label: true, category: marital_status, text: "아직 결혼 안 하신 분을 찾습니다."}
+- {language: ko, label: true, category: marital_status, text: "출산 후 복직 예정인 분은 제외합니다."}
+- {language: ko, label: true, category: appearance, text: "170cm 넘는 훤칠한 분 환영."}
+- {language: ko, label: true, category: region, text: "부산 사투리를 쓰는 분은 고객 응대에서 제외합니다."}
+- {language: ko, label: true, category: religion, text: "일요일마다 예배에 참석할 수 있는 분."}
+- {language: ko, label: true, category: ethnicity, text: "화교 출신은 받지 않습니다."}
+- {language: ko, label: false, category: none, text: "응답 지연 시간 50ms 미만."}
+- {language: ko, label: false, category: none, text: "고객 연령대에 맞춘 추천 알고리즘 개발 경험."}
+- {language: ko, label: false, category: none, text: "성별 입력 필드 검증 로직 구현."}
+- {language: ko, label: false, category: none, text: "임신부 건강관리 앱 백엔드 개발 경험."}
+- {language: ko, label: false, category: none, text: "팀원 25명 규모의 프로젝트 관리 경험."}
+- {language: ko, label: false, category: none, text: "영어 회화 가능자."}
+- {language: ko, label: false, category: none, text: "부산 지사 근무, 주 3일 출근."}
+- {language: ko, label: false, category: none, text: "신장 투석 장비 관련 소프트웨어 QA 경험."}

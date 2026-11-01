@@ -87,16 +87,16 @@ def test_estimate_counts_only_statements_that_reach_the_classifier(tmp_path):
 def test_precision_and_recall_on_a_tiny_injected_list(tmp_path):
     fake.reset()
     # Rules catch "Must be male" (true positive) and "Preferably under 30" (true positive) and, wrongly,
-    # "Built software for Catholic schools" (false positive). They miss "Young dynamic team member" (false negative).
+    # "Build the Gender: dropdown for the signup form" (false positive: the label is a form field). They miss "Someone with their whole career still ahead of them" (false negative).
     # "Knows Kubernetes" is a true negative. The Vietnamese pair is one true positive and one false negative.
     statements = [
         {"text": "Must be male", "language": "en", "label": True, "category": "gender"},
         {"text": "Preferably under 30", "language": "en", "label": True, "category": "age"},
-        {"text": "Built software for Catholic schools", "language": "en", "label": False, "category": "none"},
-        {"text": "Young dynamic team member", "language": "en", "label": True, "category": "age"},
+        {"text": "Build the Gender: dropdown for the signup form", "language": "en", "label": False, "category": "none"},
+        {"text": "Someone with their whole career still ahead of them", "language": "en", "label": True, "category": "age"},
         {"text": "Knows Kubernetes", "language": "en", "label": False, "category": "none"},
         {"text": "Dưới 30 tuổi", "language": "vi", "label": True, "category": "age"},
-        {"text": "Cần một bạn trẻ năng động", "language": "vi", "label": True, "category": "age"},
+        {"text": "Cần bạn có sức bật của tuổi đôi mươi", "language": "vi", "label": True, "category": "age"},
     ]
 
     report = _evaluate(tmp_path, statements=statements)
@@ -113,7 +113,7 @@ def test_precision_and_recall_on_a_tiny_injected_list(tmp_path):
 def test_classifier_hits_lift_combined_recall_but_not_rules_recall(tmp_path):
     fake.reset()
     fake.enqueue("discrimination_check", json.dumps({"flagged": True, "category": "age", "reason": "Implies youth."}))
-    statements = [{"text": "Young dynamic team member", "language": "en", "label": True, "category": "age"}]
+    statements = [{"text": "Someone with their whole career still ahead of them", "language": "en", "label": True, "category": "age"}]
 
     report = _evaluate(tmp_path, statements=statements)
 
@@ -128,7 +128,7 @@ def test_unchecked_results_are_counted_apart_and_not_as_positives(tmp_path, monk
         raise AIProviderError("down")
 
     monkeypatch.setattr(discrimination.gateway, "generate_structured", down)
-    statements = [{"text": "Young dynamic team member", "language": "en", "label": True, "category": "age"}]
+    statements = [{"text": "Someone with their whole career still ahead of them", "language": "en", "label": True, "category": "age"}]
 
     report = _evaluate(tmp_path, statements=statements)
 
@@ -141,3 +141,46 @@ def test_every_language_has_hard_cases_on_both_sides():
     counts = Counter((s["language"], s["label"]) for s in statements)
 
     assert all(counts[(language, label)] >= 10 for language in LANGUAGES for label in (True, False))
+
+
+def test_holdout_set_meets_the_counts_and_shares_nothing_with_the_tuning_set():
+    holdout = run.load_statements(run.SETS["holdout"])
+    tuning = {s["text"] for s in run.load_statements(run.SETS["statements"])}
+
+    assert len(holdout) >= 45
+    for language in LANGUAGES:
+        mine = [s for s in holdout if s["language"] == language]
+        assert len(mine) >= 15, language
+        positives = sum(1 for s in mine if s["label"])
+        assert positives == len(mine) - positives, language
+    assert {s["category"] for s in holdout if s["label"]} == set(discrimination.CATEGORIES)
+    assert all(s["category"] == "none" for s in holdout if not s["label"])
+    assert not tuning & {s["text"] for s in holdout}
+    assert len({s["text"] for s in holdout}) == len(holdout)
+
+
+def test_the_report_names_the_set_used(tmp_path):
+    default = _evaluate(tmp_path)
+    holdout = _evaluate(tmp_path, set_name="holdout")
+
+    assert default["set"] == "statements" and holdout["set"] == "holdout"
+    assert holdout["statements"] == len(run.load_statements(run.SETS["holdout"]))
+    assert "set: holdout" in run.render_markdown(holdout)
+    assert "holdout" in holdout["report_files"][0]
+
+
+def test_an_unknown_set_is_refused(tmp_path):
+    with pytest.raises(run.EvalError):
+        _evaluate(tmp_path, set_name="nope")
+
+
+def test_main_passes_the_set_option_and_defaults_to_the_existing_set(monkeypatch):
+    seen = {}
+    monkeypatch.setattr(run, "_prepare_environment", lambda *a: None)
+    monkeypatch.setattr(run, "evaluate", lambda *a, **k: seen.update(k))
+    monkeypatch.setattr("app.database.migrate.run_migrations", lambda: None)
+
+    run.main(["--profile", "fake", "--dry-run", "--set", "holdout"])
+    assert seen["set_name"] == "holdout"
+    run.main(["--profile", "fake", "--dry-run"])
+    assert seen["set_name"] == "statements"

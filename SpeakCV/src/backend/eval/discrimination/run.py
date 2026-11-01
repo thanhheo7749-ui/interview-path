@@ -3,7 +3,10 @@
 Runs every labelled statement in statements.yaml through the guard and reports precision and recall per language and
 overall, twice: for the rules alone, and for the rules plus the AI classifier (the guard as the product runs it).
 
-    python -m eval.discrimination.run [--yes] [--dry-run] [--profile fake|env]
+    python -m eval.discrimination.run [--yes] [--dry-run] [--profile fake|env] [--set statements|holdout]
+
+The default set is statements.yaml, the one the rules are tuned on. The holdout set is never tuned on, so its figures
+are the honest ones.
 
 The run always uses a throwaway SQLite file, never the app's configured database. It prints an estimated cost before
 any AI call and needs --yes or a typed confirmation when it could spend money.
@@ -26,6 +29,8 @@ import yaml
 EVAL_DIR = Path(__file__).resolve().parent
 BACKEND_ROOT = EVAL_DIR.parents[1]
 STATEMENTS_PATH = EVAL_DIR / "statements.yaml"
+SETS = {"statements": STATEMENTS_PATH, "holdout": EVAL_DIR / "holdout.yaml"}
+DEFAULT_SET = "statements"
 REPORTS_DIR = BACKEND_ROOT / "eval" / "reports"
 
 SLOTS = ("reasoning", "bulk", "embedding", "stt", "tts")
@@ -172,13 +177,16 @@ def _require_sqlite() -> None:
 
 
 def evaluate(profile: str = "env", confirm: Callable[[str, dict], bool] | None = None, dry_run: bool = False,
-             reports_dir: Path | None = REPORTS_DIR, statements: list[dict] | None = None) -> dict | None:
+             reports_dir: Path | None = REPORTS_DIR, statements: list[dict] | None = None,
+             set_name: str = DEFAULT_SET) -> dict | None:
     """Run the evaluation. Returns the report dictionary, or None when it stopped before spending (dry run or declined)."""
+    if set_name not in SETS:
+        raise EvalError(f"Unknown set '{set_name}'. Use one of: {', '.join(SETS)}.")
     _require_sqlite()
     _apply_profile(profile)
     from app.ai.config import get_config
 
-    statements = load_statements() if statements is None else statements
+    statements = load_statements(SETS[set_name]) if statements is None else statements
     est = estimate(statements)
     print(format_estimate(est))
     if dry_run:
@@ -195,7 +203,7 @@ def evaluate(profile: str = "env", confirm: Callable[[str, dict], bool] | None =
     fixture = provider == "fake"
     overall = summary["combined"]["overall"]
     report = {
-        "provider": provider, "model": config.slot("bulk").model, "fixture_run": fixture,
+        "set": set_name, "provider": provider, "model": config.slot("bulk").model, "fixture_run": fixture,
         "note": FIXTURE_NOTE if fixture else "",
         "statements": len(rows), "rule_hits": sum(1 for r in rows if r["rules_flagged"]),
         "classifier_calls": est["classifier_calls"], "estimated_cost_usd": est["total_usd"],
@@ -238,7 +246,7 @@ def _table(block: dict) -> list[str]:
 
 
 def render_markdown(report: dict) -> str:
-    lines = [f"# Discrimination guard evaluation: {report['provider']}", ""]
+    lines = [f"# Discrimination guard evaluation: {report['provider']}, set: {report.get('set', DEFAULT_SET)}", ""]
     if report["fixture_run"]:
         lines += [f"> **Rules only.** {report['note']}", ""]
     lines += [
@@ -265,7 +273,7 @@ def render_markdown(report: dict) -> str:
 def write_reports(report: dict, directory: Path) -> list[Path]:
     directory.mkdir(parents=True, exist_ok=True)
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-    base = directory / f"discrimination-{report['provider']}-{stamp}"
+    base = directory / f"discrimination-{report.get('set', DEFAULT_SET)}-{report['provider']}-{stamp}"
     markdown, data = base.with_suffix(".md"), base.with_suffix(".json")
     markdown.write_text(render_markdown(report), encoding="utf-8")
     data.write_text(json.dumps(report, ensure_ascii=False, indent=2, default=str), encoding="utf-8")
@@ -304,6 +312,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--yes", action="store_true", help="Accept the printed cost estimate without asking.")
     parser.add_argument("--dry-run", action="store_true", help="Print the estimate and stop. No AI call is made.")
     parser.add_argument("--profile", default="env", help="'env' uses the providers set in the environment. 'fake' forces the fake provider.")
+    parser.add_argument("--set", dest="set_name", choices=sorted(SETS), default=DEFAULT_SET,
+                        help="Which labelled set to run. 'holdout' is never tuned on.")
     args = parser.parse_args(argv)
 
     workdir = Path(tempfile.mkdtemp(prefix="eval-discrimination-"))
@@ -314,7 +324,7 @@ def main(argv: list[str] | None = None) -> int:
 
         try:
             run_migrations()
-            report = evaluate(args.profile, make_confirm(args.yes), args.dry_run)
+            report = evaluate(args.profile, make_confirm(args.yes), args.dry_run, set_name=args.set_name)
         except Exception as exc:
             if type(exc).__name__ in {"AIConfigError", "EvalError"}:
                 print(f"Cannot run: {exc}", file=sys.stderr)

@@ -28,6 +28,52 @@ def test_rules_catch_common_phrases(text, category):
     assert discrimination.check_rules(text).category == category
 
 
+@pytest.mark.parametrize("text,category", [
+    ("Males only for the night shift crew.", "gender"), ("Females only", "gender"),
+    ("Looking for a guy who will get along with the lads on the floor.", "gender"),
+    ("Between 25 and 32 years of age.", "age"), ("Young dynamic team member wanted.", "age"),
+    ("Candidates should be single and free of family commitments.", "marital_status"),
+    ("You must not be planning to have a baby in the next two years.", "marital_status"),
+    ("Tall, athletic build preferred for the front desk.", "appearance"),
+    ("Born and raised in the capital, with no provincial accent.", "region"),
+    ("Join the whole team at our Sunday worship.", "religion"),
+    ("Applicants of pure Kinh heritage preferred.", "ethnicity"),
+    ("Chiều cao từ 1m65 trở lên, thân hình cân đối.", "appearance"), ("Cao 1.65m", None),
+    ("Không nhận chị em đang mang bầu hoặc sắp sinh con.", "marital_status"),
+    ("Sinh năm 1998 trở lại đây.", "age"), ("Cần một bạn trẻ năng động, mới ra trường.", "age"),
+    ("Quê ở Hà Nội hoặc các tỉnh lân cận thì tốt.", "region"),
+    ("Tuyển nhân viên, tuổi từ 20 đến 30.", "age"), ("Cần tuyển người, độ tuổi từ 22.", "age"),
+    ("Anh em trong team toàn trai trẻ.", "gender"),
+    ("젊고 활기찬 팀원을 찾습니다.", "age"), ("여성분을 원합니다.", "gender"), ("결혼 계획이 없는 분.", "marital_status"),
+    ("아이 키우는 엄마는 제외합니다.", "marital_status"), ("서울 출신이면 우대합니다.", "region"),
+    ("교회 다니시는 분이면 좋습니다.", "religion"), ("임신 계획이 있으면 곤란합니다.", "marital_status"),
+    ("성별: 남", "gender"), ("연령 제한 있음", "age"), ("1998년생 이후", "age"),
+])
+def test_rules_catch_person_requirements_with_less_obvious_wording(text, category):
+    result = discrimination.check_rules(text)
+    assert (result.category if result else None) == category
+
+
+@pytest.mark.parametrize("text", [
+    "Built admissions software for Catholic schools.", "Built software for a Catholic school.",
+    "Advised employees on pregnancy benefits and leave policy.", "Write about religion and culture for a travel magazine.",
+    "Hệ thống kế toán legacy 15 tuổi cần người bảo trì.", "Viết nội dung về tôn giáo và văn hóa cho tạp chí du lịch.",
+    "Phân tích dữ liệu theo độ tuổi của khách hàng.", "Nắm quy trình chế độ thai sản cho nhân viên.",
+    "Tòa nhà có chiều cao 30 tầng.", "Phụ trách trang Dân tộc học của tạp chí.",
+    "연령별 사용자 분석 대시보드 개발 경험.", "종교 시설 관리 소프트웨어 개발 경험.", "성별 데이터 처리 파이프라인 설계 경험.",
+    "임신부 건강관리 앱 개발 경험.", "고객 연령대에 맞춘 추천 알고리즘 개발 경험.", "성별 불문 지원 가능.",
+    "Single-page application in React.", "Single sign-on integration.",
+])
+def test_rules_do_not_flag_a_term_used_about_a_product_or_a_data_field(text):
+    assert discrimination.check_rules(text) is None
+
+
+def test_classifier_still_sees_text_the_rules_miss():
+    fake.reset()
+    fake.enqueue("discrimination_check", json.dumps({"flagged": True, "category": "age", "reason": "Implies youth."}))
+    assert discrimination.check("Someone with their whole career still ahead of them", 1).category == "age"
+
+
 def test_rules_see_decomposed_vietnamese():
     assert discrimination.check_rules(unicodedata.normalize("NFD", "Dưới 30 tuổi")).category == "age"
 
