@@ -1,0 +1,4 @@
+# Minimum combined retrieval score to attempt an answer, per embedding model.
+# Tuned by make eval-brain. Score scales differ between models, so each model needs its own value.
+default: 0.30
+fake: 0.15
