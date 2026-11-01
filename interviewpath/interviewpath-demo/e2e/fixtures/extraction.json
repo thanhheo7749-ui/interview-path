@@ -1,0 +1,17 @@
+{
+  "nodes": [
+    {
+      "ref": "Annual leave days", "type": "policy", "title": "Annual leave days",
+      "body": "Full-time employees receive paid annual leave per calendar year. Annual leave days.",
+      "quote": "Full-time employees receive 12 days of paid annual leave per calendar year.",
+      "fact_kind": "number", "fact_value": "12", "fact_unit": "days", "scope_text": "Full-time employees", "effective_date": ""
+    },
+    {
+      "ref": "Annual leave days policy", "type": "policy", "title": "Annual leave days policy",
+      "body": "Full-time employees receive paid annual leave per calendar year. Annual leave days.",
+      "quote": "Full-time employees receive 15 days of paid annual leave per calendar year.",
+      "fact_kind": "number", "fact_value": "15", "fact_unit": "days", "scope_text": "Full-time employees", "effective_date": ""
+    }
+  ],
+  "edges": []
+}

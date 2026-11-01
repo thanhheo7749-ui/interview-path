@@ -83,5 +83,102 @@
       "manager": "Quản lý",
       "employee": "Nhân viên"
     }
+  },
+  "navKb": {
+    "documents": "Tài liệu",
+    "review": "Duyệt",
+    "conflicts": "Mâu thuẫn",
+    "gaps": "Khoảng trống kiến thức"
+  },
+  "layers": {
+    "public": "Công khai",
+    "internal": "Nội bộ",
+    "confidential": "Bảo mật"
+  },
+  "kb": {
+    "warningsTitle": "Hoàn tất kèm cảnh báo"
+  },
+  "demoAi": {
+    "notice": "Demo AI: câu trả lời là mô phỏng"
+  },
+  "documents": {
+    "title": "Tài liệu",
+    "uploadTitle": "Tải tài liệu lên",
+    "file": "Tệp",
+    "docTitle": "Tiêu đề",
+    "visibility": "Mức hiển thị",
+    "department": "Phòng ban (tùy chọn)",
+    "noDepartment": "Toàn công ty",
+    "effectiveDate": "Ngày hiệu lực (tùy chọn)",
+    "upload": "Tải lên",
+    "uploading": "Đang tải lên...",
+    "formats": "PDF, DOCX, TXT hoặc Markdown. Các mục trích xuất sẽ chờ ở mục Duyệt cho đến khi HR chấp nhận.",
+    "empty": "Chưa có tài liệu. Hãy tải lên chính sách, sổ tay hoặc mô tả công việc ở trên để bắt đầu xây dựng kiến thức công ty.",
+    "colTitle": "Tiêu đề",
+    "colLayer": "Mức hiển thị",
+    "colDepartment": "Phòng ban",
+    "colStatus": "Trạng thái",
+    "progress": "Tiến độ",
+    "retry": "Thử lại",
+    "partial": "Xử lý một phần: bỏ {{dropped}} mục và lỗi {{failed}} đoạn. Hãy kiểm tra kết quả trích xuất trước khi dùng.",
+    "status": {
+      "processing": "Đang xử lý",
+      "review": "Sẵn sàng để duyệt",
+      "published": "Đã xuất bản",
+      "failed": "Thất bại"
+    },
+    "job": {
+      "queued": "Đang chờ",
+      "running": "Đang xử lý",
+      "review": "Sẵn sàng để duyệt",
+      "failed": "Thất bại",
+      "done": "Hoàn tất"
+    }
+  },
+  "review": {
+    "title": "Duyệt",
+    "empty": "Không có gì cần duyệt. Hãy tải tài liệu lên, các mục được trích xuất sẽ xuất hiện ở đây.",
+    "unknownDocument": "Tài liệu không rõ",
+    "acceptAll": "Chấp nhận tất cả",
+    "accept": "Chấp nhận",
+    "reject": "Từ chối",
+    "merge": "Gộp",
+    "mergeHint": "Giống mục hiện có \"{{title}}\" (giống {{percent}}%).",
+    "itemTitle": "Tiêu đề",
+    "body": "Nội dung",
+    "layer": "Lớp",
+    "fact": "Dữ kiện",
+    "page": "trang {{page}}",
+    "types": {
+      "policy": "Chính sách",
+      "process": "Quy trình",
+      "role": "Vai trò",
+      "skill": "Kỹ năng",
+      "value": "Giá trị",
+      "benefit": "Phúc lợi",
+      "tool": "Công cụ",
+      "term": "Thuật ngữ"
+    }
+  },
+  "conflicts": {
+    "title": "Mâu thuẫn",
+    "intro": "Hai tài liệu không khớp nhau. Hãy giữ một giá trị, hoặc đánh dấu là áp dụng cho phạm vi khác nhau.",
+    "empty": "Không có mâu thuẫn nào. Mâu thuẫn mới sẽ xuất hiện ở đây khi tài liệu tải lên mâu thuẫn với kiến thức hiện có.",
+    "source": "Nguồn {{label}}",
+    "value": "Giá trị",
+    "unit": "Đơn vị",
+    "scope": "Phạm vi",
+    "layer": "Lớp",
+    "keepA": "Giữ A",
+    "keepB": "Giữ B",
+    "differentScope": "Phạm vi khác nhau"
+  },
+  "gaps": {
+    "title": "Khoảng trống kiến thức",
+    "intro": "Những câu hỏi Copilot chưa trả lời được, nhóm theo chủ đề.",
+    "heading": "Tài liệu cần viết",
+    "empty": "Không có câu hỏi nào chưa được trả lời. Khi ai đó hỏi điều kiến thức chưa có, câu hỏi sẽ được liệt kê ở đây để bạn viết tài liệu còn thiếu.",
+    "count_other": "Đã hỏi {{count}} lần",
+    "resolve": "Đánh dấu đã xử lý"
   }
 }

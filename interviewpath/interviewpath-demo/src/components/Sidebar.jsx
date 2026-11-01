@@ -1,9 +1,18 @@
-import { BrainCircuit, KeyRound, LogOut, Settings } from "lucide-react";
+import { AlertTriangle, BrainCircuit, ClipboardCheck, FileText, HelpCircle, KeyRound, LogOut, Settings } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { NavLink } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext.jsx";
 import { useCompany } from "../company/CompanyContext.jsx";
+import { useKbCounts } from "../lib/useKbCounts.js";
 import LanguageSwitch from "./LanguageSwitch.jsx";
+
+// Knowledge base pages for HR; `badge` names a key of the counts from useKbCounts.
+const kbNavItems = [
+  { labelKey: "navKb.documents", to: "/documents", icon: FileText },
+  { labelKey: "navKb.review", to: "/review", icon: ClipboardCheck, badge: "review" },
+  { labelKey: "navKb.conflicts", to: "/conflicts", icon: AlertTriangle, badge: "conflicts" },
+  { labelKey: "navKb.gaps", to: "/gaps", icon: HelpCircle },
+];
 
 const navItems = [
   { labelKey: "nav.settings", to: "/settings", icon: Settings },
@@ -14,6 +23,9 @@ function Sidebar() {
   const { t } = useTranslation();
   const { logout } = useAuth();
   const { memberships, membership, selectCompany } = useCompany();
+  const isHr = membership?.role === "hr";
+  const kbCounts = useKbCounts(membership?.company_id ?? null, isHr);
+  const items = isHr ? [...navItems, ...kbNavItems] : navItems;
 
   return (
     <aside className="fixed inset-y-0 left-0 z-30 flex w-64 flex-col border-r border-slate-200 bg-white px-4 py-5 shadow-panel">
@@ -32,7 +44,7 @@ function Sidebar() {
       </div>
 
       <nav className="mt-8 space-y-2">
-        {navItems.map((item) => {
+        {items.map((item) => {
           const Icon = item.icon;
           return (
             <NavLink
@@ -49,6 +61,11 @@ function Sidebar() {
             >
               <Icon size={18} />
               {t(item.labelKey)}
+              {item.badge && kbCounts[item.badge] > 0 && (
+                <span className="ml-auto rounded-full bg-blue-600 px-2 py-0.5 text-xs font-bold text-white">
+                  {kbCounts[item.badge]}
+                </span>
+              )}
             </NavLink>
           );
         })}
