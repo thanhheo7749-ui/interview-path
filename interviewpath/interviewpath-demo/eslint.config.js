@@ -8,13 +8,9 @@ export default [
       'dist',
       'playwright-report',
       'test-results',
-      // Kept on disk until Blocks 2 and 3 connect them; not in any route.
-      'src/routes/WorkflowPage.jsx',
-      'src/components/CandidateCard.jsx',
-      'src/components/CandidateDetailPanel.jsx',
+      // Kept on disk until Block 5 decides; not used by any route.
       'src/components/MetricCard.jsx',
       'src/components/Toast.jsx',
-      'src/data/**',
     ],
   },
   js.configs.recommended,

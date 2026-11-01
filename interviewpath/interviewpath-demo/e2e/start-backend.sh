@@ -25,4 +25,11 @@ printf '%s' "$HR_PASSWORD" > "$E2E_TMP/portal_e2e_password"
 # A second company for the knowledge specs, so they do not disturb the password flow tested in login.spec.js.
 BRAIN_PASSWORD=$($PY -m app.cli create-company --slug brain --name "Brain Company" --hr-email brain-hr@e2e.test --hr-name "Brain HR" | awk '/Temporary password/ {print $NF}')
 printf '%s' "$BRAIN_PASSWORD" > "$E2E_TMP/portal_e2e_brain_password"
+if [ "${E2E_SEED_BOARD:-}" = "1" ]; then
+  # A third company for the board spec: sample jobs, applications, transcripts and recordings, written as real rows.
+  export RECORDINGS_DIR="$E2E_TMP/recordings"
+  BOARD_PASSWORD=$($PY -m app.cli create-company --slug board --name "Board Sample Company" --hr-email board-hr@e2e.test --hr-name "Board HR" --sample | awk '/Temporary password/ {print $NF}')
+  printf '%s' "$BOARD_PASSWORD" > "$E2E_TMP/portal_e2e_board_password"
+  PYTHONPATH=. $PY "$E2E_DIR/seed_board.py" "$E2E_TMP/board_seed.json"
+fi
 exec env PYTHONPATH=. $PY "$E2E_DIR/serve-backend.py" "${E2E_API_PORT:-8099}"

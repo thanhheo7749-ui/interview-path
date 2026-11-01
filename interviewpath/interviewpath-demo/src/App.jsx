@@ -12,6 +12,7 @@ import ConflictsPage from './routes/ConflictsPage.jsx';
 import DocumentsPage from './routes/DocumentsPage.jsx';
 import GapsPage from './routes/GapsPage.jsx';
 import ReviewPage from './routes/ReviewPage.jsx';
+import BoardPage from './routes/BoardPage.jsx';
 import DemoAiNotice from './components/DemoAiNotice.jsx';
 import { useCompany } from './company/CompanyContext.jsx';
 
@@ -55,6 +56,7 @@ function App() {
           <Route path="/conflicts" element={<ConflictsPage />} />
           <Route path="/gaps" element={<GapsPage />} />
           <Route path="/graph" element={<GraphPage />} />
+          <Route path="/jobs/:jobId/board" element={<BoardPage />} />
         </Route>
         <Route path="/copilot" element={<CopilotPage />} />
         <Route path="*" element={<Navigate to="/settings" replace />} />
