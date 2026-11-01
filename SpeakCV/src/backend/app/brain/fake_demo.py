@@ -64,11 +64,48 @@ def _copilot(_system, messages, _schema) -> str:
     )
 
 
+_JD_CONTEXT_ITEM = re.compile(r"^\[(\d+)\] (.*)$", re.MULTILINE)
+_JD_DRAFT = re.compile(r"<draft>\n(.*?)\n</draft>", re.DOTALL)
+_JD_REQUEST = re.compile(r"<request>\n(.*?)\n</request>", re.DOTALL)
+_SALARY_WORDS = ("salary", "lương", "luong", "연봉")
+
+
+def _jd_generate(_system, messages, _schema) -> str:
+    context = messages[-1]["content"].split("</context>")[0]
+    lines = []
+    for index, match in enumerate(_JD_CONTEXT_ITEM.finditer(context), 1):
+        text = match.group(2)
+        lines.append({"id": f"l{index}", "en": f"[Demo AI] {text}", "vi": f"[Demo AI] {text}",
+                      "ko": f"[Demo AI] {text}", "source_node_ids": [int(match.group(1))],
+                      "is_requirement": False, "must_have": False})
+    return json.dumps({"lines": lines}, ensure_ascii=False)
+
+
+def _jd_assistant(_system, messages, _schema) -> str:
+    prompt = messages[-1]["content"]
+    draft = _JD_DRAFT.search(prompt)
+    request = _JD_REQUEST.search(prompt)
+    asked = (request.group(1) if request else "").casefold()
+    proposals = []
+    if any(word in asked for word in _SALARY_WORDS):
+        text = "[Demo AI] Salary to be confirmed by HR"
+        proposals.append({"en": text, "vi": text, "ko": text, "reason": "No salary in the knowledge graph."})
+    return json.dumps({"lines": json.loads(draft.group(1)) if draft else [], "summary": "Demo AI revision",
+                       "proposals": proposals}, ensure_ascii=False)
+
+
+def _same_topic_no(_system, _messages, _schema) -> str:
+    return json.dumps({"same_topic": False})
+
+
 def install() -> None:
     config = get_config()
     if config.slot("bulk").provider == "fake":
         fake.register("kb_extract", _extract)
         fake.register("kb_conflict_check", _conflict)
         fake.register("discrimination_check", _not_discriminating)
+        fake.register("lint_conflict_check", _same_topic_no)
     if config.slot("reasoning").provider == "fake":
         fake.register("copilot_answer", _copilot)
+        fake.register("jd_generate", _jd_generate)
+        fake.register("jd_assistant", _jd_assistant)
