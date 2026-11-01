@@ -528,12 +528,20 @@ function LandingPage() {
       </p>
       <div className="flex flex-col sm:flex-row items-center gap-4">
         {user ? (
+          <>
           <Link
             href="/profile"
             className="px-8 py-3 rounded-full bg-gradient-to-r from-blue-600 to-cyan-500 text-theme-text font-bold hover:opacity-90 transition-all"
           >
             Hồ sơ của {user}
           </Link>
+          <Link
+            href="/applications"
+            className="px-8 py-3 rounded-full border border-theme-border text-theme-text font-bold hover:opacity-90 transition-all"
+          >
+            My applications
+          </Link>
+          </>
         ) : (
           <>
             <Link

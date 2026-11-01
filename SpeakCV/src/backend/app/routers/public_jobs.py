@@ -29,7 +29,7 @@ def public_job(slug: str, src: Optional[str] = None, db: Session = Depends(get_d
         )
         db.commit()
     return {
-        "slug": job.slug, "title": job.title, "description": job.description, "company_name": company.name,
+        "slug": job.slug, "title": job.title, "description": job.description, "company_name": company.name, "company_slug": company.slug,
         "is_sample": company.is_sample, "interview_languages": job.interview_languages or [],
         "status": job.status, "can_apply": is_open,
         "requirements": [

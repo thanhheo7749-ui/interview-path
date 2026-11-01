@@ -46,7 +46,9 @@ class ApplicationOut(BaseModel):
     status: str
     job_title: str
     company_name: str
+    company_slug: str
     is_sample: bool
+    interview_languages: list[str]
     created_at: str | None
     withdraw_reason: str | None
     processing_error: str | None  # holds only the fixed messages written by cv_processing
@@ -88,6 +90,8 @@ def _out(db: Session, application: Application, **overrides) -> ApplicationOut:
         "status": FRIENDLY_STATUS[application.stage],
         "job_title": job.title,
         "company_name": company.name,
+        "company_slug": company.slug,
+        "interview_languages": list(job.interview_languages or []),
         "is_sample": bool(company.is_sample),
         "created_at": application.created_at.isoformat() if application.created_at else None,
         "withdraw_reason": application.withdraw_reason,
