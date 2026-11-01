@@ -204,6 +204,7 @@ def test_rejecting_a_node_dismisses_its_open_conflicts(db, company):
     db.add(other)
     db.commit()
     contradiction.on_node_rejected(db, b.id)
+    db.commit()
     db.expire_all()
     row = db.get(KbConflict, open_row.id)
     assert (row.status, row.resolution) == ("dismissed", "node_rejected")
