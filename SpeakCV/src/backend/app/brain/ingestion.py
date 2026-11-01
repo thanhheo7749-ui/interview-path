@@ -12,6 +12,7 @@ from app.brain import contradiction, org_sync, retriever, review, vectors
 from app.brain.chunking import chunk_pages
 from app.brain.extraction import ExtractedEdge, ExtractedNode, ExtractionResult, extract_chunk
 from app.brain.text import guess_language, normalise_title, quote_in, verified_quote
+from app.bridges import discrimination
 from app.core import storage
 from app.core.text_extract import NoExtractableText, extract_pages
 from app.database.database import SessionLocal
@@ -376,6 +377,17 @@ def _apply_extraction(db: Session, graph: _Graph, chunk: KbChunk, result: Extrac
             _link(db, graph, node.id, anchor.id, "applies_to")
 
 
+def _guard_new_nodes(graph: _Graph) -> None:
+    """Flag new requirement, skill and behavior nodes that ask for a protected trait. A flagged node stays a draft that
+    HR can only reject or rewrite. A failed check is recorded as "unchecked" and never fails the job."""
+    for node in graph.new_nodes:
+        if node.type not in discrimination.GUARDED_TYPES:
+            continue
+        result = discrimination.check(f"{node.title}\n{node.body}", graph.company_id)
+        if result is not None:
+            node.guard_category, node.guard_reason = result.category, result.reason
+
+
 def _embed_new_nodes(db: Session, graph: _Graph) -> None:
     for start in range(0, len(graph.new_nodes), EMBED_BATCH):
         batch = graph.new_nodes[start:start + EMBED_BATCH]
@@ -449,6 +461,7 @@ def _run(db: Session, job: KbIngestionJob, document: KbDocument, created_edges: 
         job.failed_chunk_ids = list(failed)
         _set_progress(db, job, 20 + int(70 * position / total))
 
+    _guard_new_nodes(graph)
     _embed_new_nodes(db, graph)
     db.commit()
     _set_progress(db, job, 95)
@@ -482,6 +495,7 @@ def _run_failed(db: Session, job: KbIngestionJob, document: KbDocument) -> None:
             failed.append(chunk.id)
     for chunk, result in extracted:
         _apply_extraction(db, graph, chunk, result)
+    _guard_new_nodes(graph)
     _embed_new_nodes(db, graph)
     new_ids = [n.id for n in graph.new_nodes]
     dropped = graph.dropped

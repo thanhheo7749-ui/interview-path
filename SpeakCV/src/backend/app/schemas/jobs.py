@@ -69,6 +69,7 @@ class JobOut(JobSummary):
     interview_languages: list[str]
     requirements: list[RequirementOut]
     channels: list[ChannelOut]
+    warnings: list[str] = []
 
 
 class RoleOption(BaseModel):

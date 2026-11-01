@@ -10,6 +10,7 @@ from app.ai import gateway
 from app.ai.types import AIError
 from app.brain import contradiction, retriever, vectors
 from app.brain.text import normalise_title
+from app.bridges import discrimination
 from app.database.models_brain import VISIBILITIES
 from app.database.sql_models import Company, KbChunk, KbDocument, KbEdge, KbIngestionJob, KbNode, KbNodeSource
 
@@ -179,7 +180,8 @@ def auto_approve_document(db: Session, document_id: int, user_id: int) -> None:
     company = db.get(Company, document.company_id)
     if company is None or not company.is_sample:
         raise PermissionError("Auto approve is only allowed for the sample company")
-    nodes = draft_nodes(db, company.id, document_id)
+    # A node held by the discrimination guard (flagged, or not checked) waits for HR.
+    nodes = [n for n in draft_nodes(db, company.id, document_id) if n.guard_category is None]
     for node in nodes:
         publish_node(db, node, user_id)
     db.flush()
@@ -264,6 +266,30 @@ def _apply_fields(item, node: KbNode, reembed: dict[int, KbNode], edited_facts: 
         setattr(node, name, value)
 
 
+def _guard(node: KbNode, item, before: tuple[str, str], publishing: bool) -> None:
+    """The discrimination guard for a node that is edited or published. Raises ReviewError(409) when the node would
+    become, or stay, a published requirement that asks for a protected trait. Edits are re-checked; unchanged text keeps
+    its flag, so asking again cannot draw a different answer from the classifier."""
+    if node.type not in discrimination.GUARDED_TYPES:
+        return
+    held = node.guard_category
+    if (node.title, node.body) == before:
+        if held is None or not publishing or node.status == "published":
+            return
+        if held == discrimination.UNCHECKED:
+            if not getattr(item, "confirm_unchecked", False):
+                raise ReviewError(409, "The automatic discrimination check did not run for this item. "
+                                       "Edit it or confirm that it was reviewed.")
+            node.guard_category = node.guard_reason = None
+            return
+        raise ReviewError(409, f"Blocked ({held}): {node.guard_reason}")
+    result = discrimination.check(f"{node.title}\n{node.body}", node.company_id)
+    node.guard_category = result.category if result else None
+    node.guard_reason = result.reason if result else None
+    if result is not None and not result.unchecked and publishing:
+        raise ReviewError(409, f"Blocked ({result.category}): {result.reason}")
+
+
 def _load_for(db: Session, company_id: int, node_id: int, action: str) -> KbNode:
     node = db.query(KbNode).filter(KbNode.id == node_id, KbNode.company_id == company_id).first()
     if node is None or node.type in ORG_TYPES:
@@ -330,10 +356,14 @@ def apply_decisions(db: Session, company_id: int, user_id: int, items) -> dict[i
         documents |= documents_of_nodes(db, company_id, {node.id})
         touched.add(node.id)
         if item.action == "edit":
+            before = (node.title, node.body)
             _apply_fields(item, node, reembed, edited_facts, changed_claims)
+            _guard(node, item, before, publishing=node.status == "published")
             changed = changed or node.status == "published"
         elif item.action == "accept":
+            before = (node.title, node.body)
             _apply_fields(item, node, reembed, edited_facts, changed_claims)
+            _guard(node, item, before, publishing=True)
             publish_node(db, node, user_id)
             changed = True
         elif item.action == "reject":
