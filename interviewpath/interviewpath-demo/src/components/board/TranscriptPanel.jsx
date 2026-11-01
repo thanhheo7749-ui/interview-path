@@ -57,7 +57,7 @@ function TranscriptPanel({ companyId, appId, turns }) {
               {turn.is_followup ? t('board.transcript.followup') : t('board.transcript.question')} {turn.position}
             </p>
             <p className="mt-1 text-sm font-semibold text-slate-800">{turn.question}</p>
-            {turn.transcript_status === 'done' && turn.transcript ? (
+            {turn.transcript_status === 'transcribed' && turn.transcript ? (
               <p className="mt-2 text-sm text-slate-700">{turn.transcript}</p>
             ) : (
               <p className="mt-2 text-sm italic text-slate-500">{t('board.transcript.unavailable')}</p>

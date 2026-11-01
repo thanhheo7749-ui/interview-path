@@ -9,13 +9,14 @@ import { LangToggle } from "@/components/Hiring/SampleNotice";
 
 const POLL_MS = 3000;
 
-function statusText(status: Application["status"], t: Strings): string {
-  switch (status) {
+function statusText(a: Application, t: Strings): string {
+  switch (a.status) {
     case "reading_cv": return t.statusReading;
     case "cv_unreadable": return t.statusUnreadable;
     case "invited": return t.statusInvited;
     case "interview_in_progress": return t.statusInterview;
     case "with_hr": return t.statusWithHr;
+    case "decided": return a.decision === "approved" ? t.statusApproved : t.statusRejected;
     case "withdrawn": return t.statusWithdrawn;
     default: return "";
   }
@@ -116,7 +117,7 @@ export default function ApplicationsPage() {
                 {a.company_name}
                 {a.is_sample ? ` (${t.sampleTag})` : ""}
               </p>
-              <p className="mt-2 text-sm text-theme-text">{statusText(a.status, t)}</p>
+              <p className="mt-2 text-sm text-theme-text">{statusText(a, t)}</p>
               {a.status === "cv_unreadable" && <Reupload id={a.id} onDone={load} />}
               {a.status === "invited" && (
                 <Link href={`/applications/${a.id}/fit`} className="mt-2 inline-block text-sm text-blue-400 underline">

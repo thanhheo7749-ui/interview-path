@@ -1,6 +1,6 @@
 """Read models for the HR board. Nothing here returns identity or the raw CV: HR reads blind text first."""
 from app.database.sql_models import (
-    Application, CultureNote, CvClaim, Job, KbNode, RequirementResult, VoiceSession, VoiceTurn,
+    Application, AuditLog, CultureNote, CvClaim, Job, KbNode, RequirementResult, VoiceSession, VoiceTurn,
 )
 from app.hiring import jobs
 from app.hiring.state import NOT_TAKEN
@@ -30,11 +30,13 @@ def interview_note(application) -> str | None:
     return NOT_TAKEN_NOTE if application.analysis_status == NOT_TAKEN else None
 
 
-def _lane_for(application) -> str | None:
+def _lane_for(application, refused_ids=frozenset()) -> str | None:
+    """`refused_ids` holds the applications whose candidate declined recording. The decline moves them straight to
+    ready_for_hr so HR can decide, which leaves the stage alone unable to tell them from a fast-tracked candidate."""
     stage = application.stage
     if stage == "withdrawn":
         return "withdrawn"
-    if stage == "declined_recording":
+    if stage == "declined_recording" or (stage == "ready_for_hr" and application.id in refused_ids):
         return "refused_recording"
     if stage in NOT_INTERVIEWED:
         return "not_interviewed"
@@ -71,12 +73,16 @@ def job_board(db, company_id: int, job_id: int) -> dict:
         query = query.filter(Application.is_simulated.is_(False))
     cells = {name: [] for name in CELLS.values()}
     lanes = {name: [] for name in LANES}
+    refused_ids = {
+        row[0] for row in db.query(AuditLog.target_id).filter(
+            AuditLog.company_id == company_id, AuditLog.action == "recording_declined", AuditLog.target_type == "application")
+    }
     for application in query.order_by(Application.id).all():
         name = cell_for(application)
         if name is not None:
             cells[name].append(card(application))
             continue
-        lane = _lane_for(application)
+        lane = _lane_for(application, refused_ids)
         if lane is not None:
             lanes[lane].append(card(application))
     return {"cells": cells, "lanes": lanes}

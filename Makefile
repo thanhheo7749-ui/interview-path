@@ -83,3 +83,15 @@ eval-discrimination:
 # Pass ARGS=--dry-run, ARGS=--yes or ARGS="--profile fake" (the fake profile measures nothing).
 eval-stt:
 	cd $(BACKEND_DIR) && $(BACKEND_PY) -m eval.stt.run $(ARGS)
+
+.PHONY: e2e eval-plan-overlap
+
+# Compares the question plans for the same CV at both sample companies. Prints an estimated cost first and asks before spending.
+# Pass ARGS=--dry-run, ARGS=--yes or ARGS="--profile fake" (the fake profile shows templates only).
+eval-plan-overlap:
+	cd $(BACKEND_DIR) && $(BACKEND_PY) -m eval.plans.run $(ARGS)
+
+# The full hiring loop in a real browser: candidate app, HR portal and backend on the fake AI provider.
+# Needs the backend venv, `npm ci` in interviewpath/interviewpath-demo and SpeakCV/src/frontend, and `npx playwright install chromium`.
+e2e:
+	cd interviewpath/interviewpath-demo && npx playwright test --reporter=line

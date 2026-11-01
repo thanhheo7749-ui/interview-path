@@ -14,7 +14,7 @@ from app.core.rate_limit import limiter, user_key
 from app.core.uploads import CV_UPLOAD_TYPES, read_upload
 from app.database.database import get_db
 from app.database.sql_models import Application, Company, Job, RequirementResult, User
-from app.hiring import applications, audit, consents, cv_processing, jobs
+from app.hiring import applications, audit, consents, cv_processing, decisions, jobs
 from app.hiring import retention
 from app.hiring.state import InvalidTransition, advance
 
@@ -52,6 +52,7 @@ class ApplicationOut(BaseModel):
     created_at: str | None
     withdraw_reason: str | None
     processing_error: str | None  # holds only the fixed messages written by cv_processing
+    decision: str | None = None  # approved or rejected once HR has decided; never a reason, label or band
 
 
 class FitItem(BaseModel):
@@ -97,6 +98,10 @@ def _out(db: Session, application: Application, **overrides) -> ApplicationOut:
         "withdraw_reason": application.withdraw_reason,
         "processing_error": application.processing_error,
     }
+    decision = decisions.visible_to_candidate(application)
+    if decision is not None:
+        fields["status"] = "decided"
+        fields["decision"] = decision
     return ApplicationOut(**{**fields, **overrides})
 
 

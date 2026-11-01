@@ -26,7 +26,7 @@ export interface PublicJob {
 }
 
 export type ApplicationStatus =
-  | "reading_cv" | "cv_unreadable" | "invited" | "interview_in_progress" | "with_hr" | "withdrawn";
+  | "reading_cv" | "cv_unreadable" | "invited" | "interview_in_progress" | "with_hr" | "decided" | "withdrawn";
 
 export interface Application {
   id: number;
@@ -40,6 +40,7 @@ export interface Application {
   created_at: string | null;
   withdraw_reason: string | null;
   processing_error: string | null;
+  decision: "approved" | "rejected" | null;
 }
 
 export interface FitItem { requirement_id: number; text: string; fit: "matches" | "partly" | "not_seen" }
