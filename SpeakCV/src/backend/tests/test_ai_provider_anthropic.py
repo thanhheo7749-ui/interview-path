@@ -3,8 +3,10 @@ from types import SimpleNamespace
 import anthropic as sdk
 import httpx
 import pytest
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
+from app.ai import gateway
+from app.ai.schema import to_strict_schema
 from app.ai.providers.anthropic import AnthropicProvider
 from app.ai.types import AIOutputError, AIProviderError, Usage
 
@@ -37,7 +39,7 @@ class Namespace:
         return self._run("create", kw)
 
     def parse(self, **kw):
-        return self._run("parse", kw)
+        raise AssertionError("parse must not be called")
 
 
 class Client:
@@ -89,14 +91,25 @@ def test_effort_not_sent_to_models_without_it():
     assert "output_config" not in provider._client.messages.calls[0][1]
 
 
-def test_structured_uses_parse_and_returns_raw_json():
+def test_structured_uses_create_with_json_schema_and_never_parse():
     provider = make(_text('{"answer": "x"}'))
     result = provider.generate_structured(
         model="claude-haiku-5-5", system="sys", messages=USER, schema=Answer, max_output_tokens=500
     )
     kind, kw = provider._client.messages.calls[0]
-    assert kind == "parse" and kw["output_format"] is Answer
+    assert kind == "create" and "output_format" not in kw
+    assert kw["output_config"]["format"] == {"type": "json_schema", "schema": to_strict_schema(Answer)}
+    assert kw["output_config"]["effort"] == "high"
+    assert all(k != "parse" for k, _ in provider._client.messages.calls + provider._client.beta.messages.calls)
     assert result.text == '{"answer": "x"}'
+
+
+def test_empty_structured_response_raises():
+    empty = _text("")
+    with pytest.raises(AIOutputError):
+        make(empty).generate_structured(
+            model="claude-haiku-5-5", system="s", messages=USER, schema=Answer, max_output_tokens=100
+        )
 
 
 def test_refusal_raises_before_reading_content():
@@ -165,19 +178,26 @@ def test_fallbacks_can_be_disabled(monkeypatch):
     assert "fallbacks" not in kw and "betas" not in kw
 
 
-def test_schema_validation_error_becomes_output_error():
-    class Bad(BaseModel):
-        n: int
+class Strict(BaseModel):
+    n: int = Field(ge=5)
 
-    try:
-        Bad.model_validate_json('{"n": "x"}')
-    except ValueError as exc:
-        error = exc
-    provider = make(error)
-    with pytest.raises(AIOutputError):
-        provider.generate_structured(
-            model="claude-haiku-5-5", system="s", messages=USER, schema=Bad, max_output_tokens=100
-        )
+
+def test_pydantic_only_failure_is_returned_raw_and_gateway_retries(monkeypatch):
+    first, second = _text('{"n": 1}'), _text('{"n": 9}')
+    provider = make(first)
+    results = iter([first, second])
+    provider._client.messages.create = lambda **kw: next(results)
+    slot = SimpleNamespace(provider="anthropic", model="claude-haiku-5-5")
+    monkeypatch.setattr(gateway, "get_config", lambda: SimpleNamespace(slot=lambda name: slot))
+    monkeypatch.setattr(gateway, "get_provider", lambda name: provider)
+    monkeypatch.setattr(gateway, "log_usage", lambda **kw: None)
+    raw = provider.generate_structured(
+        model="claude-haiku-5-5", system="s", messages=USER, schema=Strict, max_output_tokens=100
+    )
+    assert raw.text == '{"n": 1}'
+    results = iter([first, second])
+    out = gateway.generate_structured("reasoning", "s", USER, Strict, 100, "unit_test")
+    assert out.value.n == 9
 
 
 def test_large_max_tokens_streams_and_reads_final_message():
