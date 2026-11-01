@@ -227,3 +227,23 @@ class AIBrainIngestionFile(Base):
     raw_text = Column(Text)
     created_by = Column(Integer, ForeignKey("users.id"), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class AIUsageLog(Base):
+    __tablename__ = "ai_usage_logs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    company_id = Column(Integer, nullable=True, index=True)
+    feature = Column(String(100), nullable=False, index=True)
+    slot = Column(String(20), nullable=False)
+    provider = Column(String(50), nullable=False)
+    model = Column(String(100), nullable=False)
+    input_tokens = Column(Integer, nullable=False, default=0)
+    output_tokens = Column(Integer, nullable=False, default=0)
+    audio_seconds = Column(Float, nullable=False, default=0.0)
+    characters = Column(Integer, nullable=False, default=0)
+    latency_ms = Column(Integer, nullable=False, default=0)
+    estimated_cost_usd = Column(Float, nullable=True)
+    success = Column(Boolean, nullable=False)
+    error_type = Column(String(100), nullable=True)

@@ -11,6 +11,7 @@ if sys.stdout.encoding.lower() != 'utf-8':
 
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
@@ -19,8 +20,10 @@ from .core import settings
 from .core.rate_limit import limiter
 from .routers import profile, auth, cv, admin, interview, support, payment, jobs, stats, questions
 from .database import sql_models
-from .database.database import engine, SessionLocal
+from .database.database import SessionLocal
 from .auth.security import get_password_hash
+from .ai.config import load_config
+from .ai.types import AIOutputError, AIProviderError
 
 def seed_admin():
     """Create the admin account if configured and absent. Never modifies an existing user."""
@@ -54,9 +57,18 @@ async def lifespan(app: FastAPI):
 
 
 def create_app() -> FastAPI:
+    load_config()  # bad AI configuration must fail startup
     app = FastAPI(lifespan=lifespan)
     app.state.limiter = limiter
     app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+    @app.exception_handler(AIProviderError)
+    async def _ai_provider_error(_request, _exc):
+        return JSONResponse(status_code=503, content={"detail": "The AI service is temporarily unavailable. Please try again."})
+
+    @app.exception_handler(AIOutputError)
+    async def _ai_output_error(_request, _exc):
+        return JSONResponse(status_code=502, content={"detail": "The AI service returned an unusable response. Please try again."})
 
     app.add_middleware(
         CORSMiddleware,

@@ -1,0 +1,15 @@
+# USD per 1M tokens, read from vendor pricing pages. Recheck before relying on these.
+# A model missing from this list logs a NULL estimated cost.
+as_of: "2026-11-01"
+models:
+  claude-opus-5-5: {input_per_1m: 4.0, output_per_1m: 20.0}
+  claude-sonnet-5-5: {input_per_1m: 2.0, output_per_1m: 10.0}
+  claude-haiku-5-5: {input_per_1m: 0.10, output_per_1m: 0.50}
+  gpt-6-astra: {input_per_1m: 10.0, output_per_1m: 50.0}
+  gpt-6-luna: {input_per_1m: 0.10, output_per_1m: 0.50}
+  gemini-3.8-flash: {input_per_1m: 0.75, output_per_1m: 3.75}
+  gemini-3.5-flash-lite: {input_per_1m: 0.30, output_per_1m: 2.50}
+  text-embedding-3-small: {input_per_1m: 0.02, output_per_1m: 0.0}
+  text-embedding-3-large: {input_per_1m: 0.13, output_per_1m: 0.0}
+  gemini-embedding-2: {input_per_1m: 0.20, output_per_1m: 0.0}
+  fake: {input_per_1m: 0.0, output_per_1m: 0.0}

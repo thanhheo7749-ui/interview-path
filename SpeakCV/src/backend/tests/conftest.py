@@ -31,11 +31,14 @@ from fastapi.testclient import TestClient  # noqa: E402
 @pytest.fixture(autouse=True)
 def _fresh_tables():
     from app.database import sql_models  # noqa: F401
+    from app.ai.config import reset_config
     from app.database.database import Base, engine
 
+    reset_config()
     Base.metadata.drop_all(bind=engine)
     Base.metadata.create_all(bind=engine)
     yield
+    reset_config()
 
 
 @pytest.fixture
