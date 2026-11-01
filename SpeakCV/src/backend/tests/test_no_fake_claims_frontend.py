@@ -7,6 +7,8 @@ FRONTEND = Path(__file__).resolve().parents[2] / "frontend"
 FORBIDDEN = re.compile(
     r"ENTERPRISE_DEMO_PRESETS|DEMO_SAMPLE_ANSWERS|Instant HR|PII Masked|pii_anonymized|evidence_grounded"
     r"|minutes_saved|mins saved|parse-master-cv|parseMasterCv|presetPassword|presetEmail"
+    # The demo admin credentials, split so this file does not carry them either.
+    r"|admin" r"@gmail\.com|admin" r"123"
 )
 
 
