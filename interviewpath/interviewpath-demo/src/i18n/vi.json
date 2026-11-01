@@ -1,0 +1,67 @@
+{
+  "common": {
+    "loading": "Đang tải...",
+    "save": "Lưu",
+    "cancel": "Hủy",
+    "dismiss": "Đóng",
+    "remove": "Xóa",
+    "rename": "Đổi tên",
+    "none": "Không có",
+    "genericError": "Đã xảy ra lỗi. Vui lòng thử lại."
+  },
+  "login": {
+    "title": "Đăng nhập InterviewPath",
+    "subtitle": "Cổng HR",
+    "email": "Email",
+    "password": "Mật khẩu",
+    "submit": "Đăng nhập",
+    "submitting": "Đang đăng nhập...",
+    "failed": "Email hoặc mật khẩu không đúng."
+  },
+  "nav": {
+    "settings": "Cài đặt công ty",
+    "company": "Công ty",
+    "signOut": "Đăng xuất"
+  },
+  "banner": {
+    "sample": "Dữ liệu mẫu",
+    "sampleHint": "Công ty này chỉ chứa dữ liệu mẫu để minh họa."
+  },
+  "settings": {
+    "title": "Cài đặt công ty",
+    "noCompany": "Tài khoản này chưa thuộc công ty nào.",
+    "companyName": "Tên công ty",
+    "readOnlyNote": "Chỉ thành viên HR mới có thể thay đổi cài đặt công ty."
+  },
+  "departments": {
+    "title": "Phòng ban",
+    "empty": "Chưa có phòng ban nào.",
+    "newName": "Tên phòng ban mới",
+    "parent": "Phòng ban cha",
+    "noParent": "Không có (cấp cao nhất)",
+    "add": "Thêm phòng ban",
+    "delete": "Xóa phòng ban",
+    "confirmDelete": "Xóa phòng ban này?"
+  },
+  "members": {
+    "title": "Thành viên",
+    "email": "Email thành viên",
+    "name": "Tên thành viên (không bắt buộc)",
+    "role": "Vai trò thành viên",
+    "department": "Phòng ban",
+    "noDepartment": "Không có phòng ban",
+    "add": "Thêm thành viên",
+    "colEmail": "Email",
+    "colName": "Tên",
+    "colRole": "Vai trò",
+    "colDepartment": "Phòng ban",
+    "temporaryPassword": "Mật khẩu tạm thời, chỉ hiển thị một lần",
+    "existingAccount": "Email này đã có tài khoản. Hãy xác nhận với người này rằng tài khoản là của họ trước khi dựa vào tư cách thành viên này.",
+    "confirmRemove": "Xóa thành viên này?",
+    "roles": {
+      "hr": "HR",
+      "manager": "Quản lý",
+      "employee": "Nhân viên"
+    }
+  }
+}
