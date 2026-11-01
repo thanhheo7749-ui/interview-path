@@ -318,6 +318,37 @@ def _conflicted_refs(db: Session, audience: Audience, node_ids: list[int]) -> fr
     return frozenset(f"n{node_id}" for node_id in node_ids if node_id in in_conflict)
 
 
+def visible_conflicts(db: Session, audience: Audience, refs) -> dict[str, tuple[Citation, ...]]:
+    """For each ref in an open conflict whose two sides this audience may both read, the citations of both sides.
+
+    conflicted_refs also flags a node whose other side is hidden. Such a conflict is left out here, so that
+    neither its existence nor its source can reach this audience.
+    """
+    node_ids = {int(ref[1:]) for ref in refs if ref.startswith("n")}
+    if not node_ids:
+        return {}
+    visible = aud.visible_node_ids_query(db, audience)
+    rows = (
+        db.query(KbConflict.node_a_id, KbConflict.node_b_id)
+        .filter(
+            KbConflict.company_id == audience.company_id,
+            KbConflict.status == "open",
+            KbConflict.node_a_id.in_(visible),
+            KbConflict.node_b_id.in_(visible),
+            or_(KbConflict.node_a_id.in_(node_ids), KbConflict.node_b_id.in_(node_ids)),
+        )
+        .order_by(KbConflict.id)
+        .all()
+    )
+    citations = _node_citations(db, audience, list({node_id for row in rows for node_id in row}))
+    found: dict[str, dict[Citation, None]] = {}
+    for node_a, node_b in rows:
+        both = dict.fromkeys((*citations.get(node_a, ()), *citations.get(node_b, ())))
+        for node_id in {node_a, node_b} & node_ids:
+            found.setdefault(f"n{node_id}", {}).update(both)
+    return {ref: tuple(sources) for ref, sources in found.items()}
+
+
 def role_profile(db: Session, audience: Audience, role_node_id: int) -> RoleProfile | None:
     nodes = {row.id: row for row in _allowed_nodes(db, audience)}
     role = nodes.get(role_node_id)
