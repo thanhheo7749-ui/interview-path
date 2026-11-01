@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { expect, test } from '@playwright/test';
 
-const API_URL = 'http://localhost:8099';
+const API_URL = `http://localhost:${process.env.E2E_API_PORT || '8099'}`;
 const HR_EMAIL = 'hr@e2e.test';
 const NEW_PASSWORD = 'e2e-hr-own-password';
 const CORS = { 'access-control-allow-origin': '*' };
