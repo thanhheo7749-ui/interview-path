@@ -1,4 +1,4 @@
-import { AlertTriangle, BrainCircuit, ClipboardCheck, FileText, HelpCircle, KeyRound, LogOut, MessageSquare, Network, Settings } from "lucide-react";
+import { AlertTriangle, BrainCircuit, Briefcase, ClipboardCheck, FileText, HelpCircle, KeyRound, LogOut, MessageSquare, Network, Settings } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { NavLink } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext.jsx";
@@ -17,6 +17,7 @@ const kbNavItems = [
 const navItems = [
   { labelKey: "nav.settings", to: "/settings", icon: Settings },
   { labelKey: "nav.graph", to: "/graph", icon: Network, hrOnly: true },
+  { labelKey: "nav.jobs", to: "/jobs", icon: Briefcase, hrOnly: true },
   { labelKey: "nav.copilot", to: "/copilot", icon: MessageSquare },
   { labelKey: "nav.password", to: "/account/password", icon: KeyRound },
 ];

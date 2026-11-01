@@ -24,7 +24,8 @@
     "company": "Company",
     "signOut": "Sign out",
     "graph": "Knowledge graph",
-    "copilot": "Copilot"
+    "copilot": "Copilot",
+    "jobs": "Jobs"
   },
   "auth": {
     "loadFailed": "We could not load your account. Check your connection and try again.",
@@ -257,5 +258,65 @@
       "provider": "The AI service did not respond. Please try again later.",
       "generic": "Copilot could not answer this question. Please try again."
     }
+  },
+  "jobs": {
+    "title": "Jobs",
+    "new": "New job",
+    "newTitle": "New job",
+    "editTitle": "Edit job",
+    "back": "Back to jobs",
+    "empty": "No jobs yet.",
+    "colTitle": "Title",
+    "colDepartment": "Department",
+    "colStatus": "Status",
+    "colVersion": "Version",
+    "colPublished": "Published",
+    "status": {
+      "draft": "Draft",
+      "published": "Published",
+      "closed": "Closed"
+    },
+    "versionLabel": "(version {{version}})",
+    "department": "Department",
+    "anyDepartment": "No department",
+    "role": "Role",
+    "noRole": "No role (start blank)",
+    "roleHint": "Choosing a role fills in the title, description and requirements from the company knowledge. You can edit everything.",
+    "jobTitle": "Job title",
+    "description": "Description",
+    "descriptionHint": "JD Studio, which will help write job descriptions, arrives later. For now, write or edit the description here.",
+    "languages": "Interview languages",
+    "language": {
+      "vi": "Vietnamese",
+      "en": "English",
+      "ko": "Korean"
+    },
+    "requirements": "Requirements",
+    "noRequirements": "No requirements yet.",
+    "requirementText": "Requirement",
+    "mustHave": "Must-have",
+    "visibility": "Visibility",
+    "visibilityHint": "Only public requirements are shown to candidates on the public job page.",
+    "addRequirement": "Add requirement",
+    "versionNotice": "Changing requirements creates a new version. Existing applications keep the version they applied to.",
+    "saveDraft": "Save draft",
+    "publish": "Publish",
+    "saveChanges": "Save changes",
+    "close": "Close job",
+    "confirmClose": "Close this job? It will no longer accept applications.",
+    "closedNotice": "This job is closed and can no longer be edited.",
+    "saved": "Saved.",
+    "titleRequired": "Enter a job title.",
+    "languageRequired": "Choose at least one interview language.",
+    "channelsTitle": "Channel links",
+    "channelsHint": "Share each link on its channel. Clicks are counted per link.",
+    "noChannels": "No channel links yet.",
+    "clicks": "Clicks: {{count}}",
+    "copy": "Copy",
+    "copied": "Copied",
+    "copyFailed": "The link could not be copied. Select it and copy it by hand.",
+    "newChannel": "New channel (letters, digits, underscore)",
+    "addChannel": "Add channel",
+    "channelInvalid": "Use 1 to 50 lowercase letters, digits or underscores."
   }
 }
