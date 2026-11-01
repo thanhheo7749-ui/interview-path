@@ -22,8 +22,15 @@ _EXISTING_TOKEN = r"\[(?:" + "|".join(_TOKENS) + r")\]"
 
 _EMAIL = re.compile(r"[\w.+-]+@[\w-]+(?:\.[\w-]+)+")
 _SCHEME_URL = re.compile(r"(?:https?://|www\.)\S+", re.IGNORECASE)
-# A path on a bare domain counts only with these lower-case endings, so "ASP.NET/C#" and "Node.js/Express" stay.
-_BARE_URL = re.compile(r"(?<![\w@.])(?:[A-Za-z0-9-]+\.)+(?:com|org|io|dev|vn|me)/\S*")
+# A domain counts only with these lower-case endings, so "ASP.NET/C#" and "Node.js/Express" stay. With no path the
+# whole host must be lower case too, so "Socket.IO" and "Vue.Net" stay.
+_TLDS = r"(?:com|net|org|io|dev|me|vn|co|app|info)"
+_BARE_URL = re.compile(rf"(?<![\w@.\-])((?:[A-Za-z0-9-]+\.)+{_TLDS})/\S*")
+_BARE_DOMAIN = re.compile(rf"(?<![\w@.\-/])((?:[a-z0-9-]+\.)+{_TLDS}(?:\.[a-z]{{2}})?)(?![\w-]|\.\w)")
+_TECHNOLOGY_NAMES = frozenset({
+    "asp.net", "ado.net", "vb.net", "ml.net", "socket.io", "pm2.io", "node.js", "vue.js", "next.js", "nuxt.js",
+    "react.js", "express.js", "nest.js", "d3.js", "three.js", "chart.js",
+})
 _DATE = re.compile(r"(?<!\d)(?:\d{1,2}/\d{1,2}/\d{4}|\d{4}-\d{1,2}-\d{1,2}|\d{1,2}-\d{1,2}-\d{4})(?!\d)")
 _ID_NUMBER = re.compile(r"(?<![\w+])\d{9,12}(?!\w)")
 # Employment years ("2019 - 2021") and round grouped numbers ("1.000.000") are work facts, not phone numbers.
@@ -48,6 +55,7 @@ _LABELLED = tuple(
 )
 _SECTION_TAG = re.compile(r"<\s*/?\s*(?:cv|requirements)\b[^>]*>", re.IGNORECASE)
 _MIN_TERM_LENGTH = 2
+_NAME = "[NAME]"
 
 
 class IdentityTerms(BaseModel):
@@ -68,11 +76,16 @@ def cv_section(text: str) -> str:
     return f"<cv>\n{_SECTION_TAG.sub('[tag]', text)}\n</cv>"
 
 
+def _url_unless_technology(match: re.Match) -> str:
+    return match[0] if match[1].lower() in _TECHNOLOGY_NAMES else "[URL]"
+
+
 def regex_mask(text: str) -> str:
     masked = unicodedata.normalize("NFC", text).replace("\r\n", "\n").replace("\r", "\n")
     masked = _EMAIL.sub("[EMAIL]", masked)
     masked = _SCHEME_URL.sub("[URL]", masked)
-    masked = _BARE_URL.sub("[URL]", masked)
+    masked = _BARE_URL.sub(_url_unless_technology, masked)
+    masked = _BARE_DOMAIN.sub(_url_unless_technology, masked)
     for pattern, token in _LABELLED:
         masked = pattern.sub(lambda m, t=token: f"{m[1]}{m[2]}{t}" if m[3].strip() else m[0], masked)
     masked = _DATE.sub("[DATE]", masked)
@@ -80,20 +93,39 @@ def regex_mask(text: str) -> str:
     return _PHONE.sub("[PHONE]", masked)
 
 
+def _term_pattern(term: str) -> str:
+    return r"\s+".join(re.escape(word) for word in term.split())
+
+
+def _name_pattern(term: str) -> str:
+    """Exact case, or the whole term in capitals, never any case.
+
+    A name is often a common word too. Name "An" must leave "built an API", and name "Long" must leave
+    "long-running", or two CVs differing only in identity would mask to different text. One limit remains: a word
+    equal to the name at the start of a sentence ("Long hours") has the same case as the name, so it is still masked.
+    """
+    return f"(?-i:{_term_pattern(term)}|{_term_pattern(term.upper())})"
+
+
 def apply_terms(text: str, terms: dict[str, list[str]]) -> str:
-    """Replace each term with its token: longest first, whole words, any case, in one pass so tokens stay intact."""
-    token_for: dict[str, tuple[str, str]] = {}
+    """Replace each term with its token: longest first, whole words, in one pass so tokens stay intact.
+
+    Names follow `_name_pattern`. Every other kind of term matches in any case."""
+    entries: dict[tuple, tuple[str, str]] = {}
     for token, values in terms.items():
         for value in values:
-            cleaned = unicodedata.normalize("NFC", value or "").strip()
+            cleaned = " ".join(unicodedata.normalize("NFC", value or "").split())
             if len(cleaned) >= _MIN_TERM_LENGTH:
-                token_for.setdefault(" ".join(cleaned.casefold().split()), (cleaned, token))
+                key = (_NAME, cleaned) if token == _NAME else (None, cleaned.casefold())
+                entries.setdefault(key, (cleaned, token))
     normalised = unicodedata.normalize("NFC", text)
-    if not token_for:
+    if not entries:
         return normalised
-    ordered = sorted(token_for.values(), key=lambda item: len(item[0]), reverse=True)
-    words = [r"\s+".join(re.escape(word) for word in term.split()) for term, _ in ordered]
-    alternatives = "|".join(f"({pattern})" for pattern in words)
+    # At equal length a name goes first, so a word that is both takes [NAME] when its case fits a name.
+    ordered = sorted(entries.values(), key=lambda item: (len(item[0]), item[1] == _NAME), reverse=True)
+    alternatives = "|".join(
+        f"({_name_pattern(term) if token == _NAME else _term_pattern(term)})" for term, token in ordered
+    )
     # Trailing punctuation such as "Mr." has no \b after it, so the boundaries are written as lookarounds.
     pattern = re.compile(rf"{_EXISTING_TOKEN}|(?<!\w)(?:{alternatives})(?!\w)", re.IGNORECASE)
     return pattern.sub(lambda m: ordered[m.lastindex - 1][1] if m.lastindex else m[0], normalised)
@@ -103,7 +135,23 @@ def _collapse(text: str) -> str:
     return "\n".join(" ".join(line.split()) for line in text.splitlines()).strip()
 
 
-def mask(raw_text: str, *, company_id: int) -> MaskResult:
+def registered_terms(full_name: str | None, email: str | None) -> list[str]:
+    """Name terms from the candidate's account, for use whatever the model returns. Single characters are ignored.
+
+    Names match by exact case, so a name registered all in one case is put in the form a CV uses. A plain-word email
+    local part gets the same form: kept as "long", it would mask the word in "long-running" (see `_name_pattern`).
+    A local part with a digit or separator, such as "an.nguyen99", is distinctive and is kept as written.
+    """
+    def name_form(word: str) -> str:
+        return word.capitalize() if word.islower() or word.isupper() else word
+
+    found = [name_form(word) for word in unicodedata.normalize("NFC", full_name or "").split()]
+    local_part = unicodedata.normalize("NFC", email or "").partition("@")[0].strip()
+    found.append(name_form(local_part) if local_part.isalpha() else local_part)
+    return list(dict.fromkeys(term for term in found if len(term) >= _MIN_TERM_LENGTH))
+
+
+def mask(raw_text: str, *, company_id: int, known_terms: list[str] = ()) -> MaskResult:
     masked = regex_mask(raw_text)
     prompt = f"List the identifying details in this CV.\n\n{cv_section(masked)}"
     result = gateway.generate_structured(
@@ -111,6 +159,6 @@ def mask(raw_text: str, *, company_id: int) -> MaskResult:
     )
     found = result.value
     blind = _collapse(apply_terms(masked, {
-        "[NAME]": found.names, "[GENDER]": found.gender_terms, "[AGE]": found.ages, "[ADDRESS]": found.addresses,
+        _NAME: [*found.names, *known_terms], "[GENDER]": found.gender_terms, "[AGE]": found.ages, "[ADDRESS]": found.addresses,
     }))
     return MaskResult(blind_text=blind, blind_hash=hashlib.sha256(blind.encode("utf-8")).hexdigest())

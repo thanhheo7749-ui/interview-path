@@ -1,7 +1,7 @@
 """Candidate routes. Every lookup filters on the signed-in user. No response schema here holds the CV label or text."""
 import os
 
-from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, Query, UploadFile
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, Query, Request, UploadFile
 from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel, Field
 from sqlalchemy.exc import IntegrityError
@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from app.auth.dependencies import get_authenticated_user
 from app.brain import audience, retriever
 from app.core import storage
+from app.core.rate_limit import limiter, user_key
 from app.core.uploads import CV_UPLOAD_TYPES, read_upload
 from app.database.database import get_db
 from app.database.sql_models import Application, Company, Job, RequirementResult, User
@@ -19,6 +20,7 @@ from app.hiring.state import InvalidTransition, advance
 router = APIRouter()
 
 CV_SUFFIXES = {".pdf", ".docx"}
+CV_UPLOAD_LIMIT = "10/hour"  # each upload can cost AI calls
 FRIENDLY_STATUS = {
     "submitted": "reading_cv",
     "cv_processing": "reading_cv",
@@ -140,7 +142,9 @@ def _apply(db: Session, user: User, slug: str, data: bytes, suffix: str, src: st
 
 
 @router.post("/api/public/jobs/{slug}/apply", response_model=ApplicationOut, status_code=201)
+@limiter.limit(CV_UPLOAD_LIMIT, key_func=user_key)
 async def apply_to_job(
+    request: Request,
     slug: str,
     background_tasks: BackgroundTasks,
     consent_version: str = Form(..., max_length=30),
@@ -243,7 +247,9 @@ def _replace_cv(db: Session, user: User, application_id: int, data: bytes, suffi
 
 
 @router.post("/api/applications/{application_id}/reupload", response_model=ApplicationOut)
+@limiter.limit(CV_UPLOAD_LIMIT, key_func=user_key)
 async def reupload(
+    request: Request,
     application_id: int,
     background_tasks: BackgroundTasks,
     file: UploadFile = File(...),

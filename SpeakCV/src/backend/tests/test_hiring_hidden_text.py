@@ -1,4 +1,5 @@
 import io
+import zipfile
 
 import docx
 import pytest
@@ -9,7 +10,7 @@ from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
 
 from app.core.text_extract import NoExtractableText
-from app.hiring.hidden_text import CvText, extract_cv
+from app.hiring.hidden_text import MAX_DOCX_UNCOMPRESSED_BYTES, MAX_PDF_PAGES, CvText, CvTooLarge, extract_cv
 
 BLACK = (0, 0, 0)
 
@@ -163,3 +164,195 @@ def test_a_corrupt_file_raises_no_extractable_text_with_a_fixed_message(suffix):
 def test_other_suffixes_are_refused():
     with pytest.raises(ValueError):
         extract_cv(b"text", ".txt")
+
+
+def _pdf_over_background(draw_background) -> bytes:
+    buffer = io.BytesIO()
+    pdf = canvas.Canvas(buffer, pagesize=A4)
+    draw_background(pdf)
+    pdf.setFillColorRGB(0, 0, 0)
+    pdf.drawString(50, 780, "Black line")
+    pdf.setFillColorRGB(1, 1, 1)
+    pdf.drawString(50, 500, "White words")
+    pdf.showPage()
+    pdf.save()
+    return buffer.getvalue()
+
+
+def _blue_rect(pdf):
+    pdf.setFillColorRGB(0.1, 0.2, 0.7)
+    pdf.rect(40, 480, 300, 50, stroke=0, fill=1)
+
+
+def test_white_pdf_text_on_a_blue_rectangle_stays_with_no_flag():
+    result = extract_cv(_pdf_over_background(_blue_rect), ".pdf")
+    assert "White words" in result.text and result.hidden_detected is False
+
+
+def test_white_pdf_text_on_a_filled_curve_stays_with_no_flag():
+    def blob(pdf):
+        pdf.setFillColorRGB(0.1, 0.2, 0.7)
+        pdf.circle(150, 505, 150, stroke=0, fill=1)
+
+    result = extract_cv(_pdf_over_background(blob), ".pdf")
+    assert "White words" in result.text and result.hidden_detected is False
+
+
+def test_white_pdf_text_on_an_image_stays_with_no_flag():
+    from PIL import Image
+    from reportlab.lib.utils import ImageReader
+
+    image = io.BytesIO()
+    Image.new("RGB", (4, 4), (10, 40, 160)).save(image, "PNG")
+
+    def picture(pdf):
+        image.seek(0)
+        pdf.drawImage(ImageReader(image), 40, 480, 300, 50)
+
+    result = extract_cv(_pdf_over_background(picture), ".pdf")
+    assert "White words" in result.text and result.hidden_detected is False
+
+
+def test_white_pdf_text_on_the_bare_page_is_removed_and_flagged():
+    result = extract_cv(_pdf_over_background(lambda pdf: None), ".pdf")
+    assert "White words" not in result.text and "Black line" in result.text and result.hidden_detected is True
+
+
+@pytest.mark.parametrize("name,draw", [
+    ("elsewhere", lambda pdf: (pdf.setFillColorRGB(0.1, 0.2, 0.7), pdf.rect(40, 100, 300, 50, stroke=0, fill=1))),
+    ("a white rectangle", lambda pdf: (pdf.setFillColorRGB(1, 1, 1), pdf.rect(40, 480, 300, 50, stroke=0, fill=1))),
+    ("outline only", lambda pdf: (pdf.setStrokeColorRGB(0.1, 0.2, 0.7), pdf.rect(40, 480, 300, 50, stroke=1, fill=0))),
+])
+def test_white_pdf_text_without_a_filled_non_white_shape_beneath_is_removed(name, draw):
+    result = extract_cv(_pdf_over_background(draw), ".pdf")
+    assert "White words" not in result.text and result.hidden_detected is True, name
+
+
+def test_tiny_pdf_text_on_a_coloured_rectangle_is_still_removed():
+    buffer = io.BytesIO()
+    pdf = canvas.Canvas(buffer, pagesize=A4)
+    _blue_rect(pdf)
+    pdf.setFillColorRGB(0, 0, 0)
+    pdf.drawString(50, 780, "Black line")
+    pdf.setFont("Helvetica", 1)
+    pdf.setFillColorRGB(1, 1, 1)
+    pdf.drawString(50, 500, "Tiny words")
+    pdf.showPage()
+    pdf.save()
+    result = extract_cv(buffer.getvalue(), ".pdf")
+    assert "Tiny" not in result.text and result.hidden_detected is True
+
+
+def _shade(properties, fill):
+    shading = OxmlElement("w:shd")
+    shading.set(qn("w:val"), "clear")
+    shading.set(qn("w:color"), "auto")
+    shading.set(qn("w:fill"), fill)
+    properties.append(shading)
+
+
+def _white_run(paragraph, text="White words"):
+    run = paragraph.add_run(text)
+    run.font.color.rgb = RGBColor(0xFF, 0xFF, 0xFF)
+    return run
+
+
+def _white_in_shaded_cell(fill):
+    def configure(document):
+        cell = document.add_table(rows=1, cols=1).cell(0, 0)
+        _shade(cell._tc.get_or_add_tcPr(), fill)
+        _white_run(cell.paragraphs[0])
+        document.add_paragraph("Black line")
+
+    return make_docx(configure)
+
+
+def _white_in_shaded_paragraph(fill):
+    def configure(document):
+        paragraph = document.add_paragraph()
+        _shade(paragraph._p.get_or_add_pPr(), fill)
+        _white_run(paragraph)
+        document.add_paragraph("Black line")
+
+    return make_docx(configure)
+
+
+@pytest.mark.parametrize("build", [_white_in_shaded_cell, _white_in_shaded_paragraph])
+def test_docx_white_run_on_a_shaded_background_stays_with_no_flag(build):
+    result = extract_cv(build("1F3A93"), ".docx")
+    assert "White words" in result.text and result.hidden_detected is False
+
+
+@pytest.mark.parametrize("build", [_white_in_shaded_cell, _white_in_shaded_paragraph])
+@pytest.mark.parametrize("fill", ["FFFFFF", "auto", "FEFEFE", "not-a-colour"])
+def test_docx_white_run_on_white_or_no_shading_is_removed_and_flagged(build, fill):
+    result = extract_cv(build(fill), ".docx")
+    assert "White words" not in result.text and "Black line" in result.text and result.hidden_detected is True
+
+
+def test_docx_white_run_on_the_bare_page_is_removed_and_flagged():
+    def configure(document):
+        document.add_paragraph("Black line")
+        _white_run(document.add_paragraph())
+
+    result = extract_cv(make_docx(configure), ".docx")
+    assert "White words" not in result.text and result.hidden_detected is True
+
+
+def test_docx_hidden_run_in_a_shaded_cell_is_still_removed():
+    def configure(document):
+        cell = document.add_table(rows=1, cols=1).cell(0, 0)
+        _shade(cell._tc.get_or_add_tcPr(), "1F3A93")
+        cell.paragraphs[0].add_run("Hidden words").font.hidden = True
+        document.add_paragraph("Black line")
+
+    result = extract_cv(make_docx(configure), ".docx")
+    assert "Hidden" not in result.text and result.hidden_detected is True
+
+
+def _pdf_of_pages(count) -> bytes:
+    buffer = io.BytesIO()
+    pdf = canvas.Canvas(buffer, pagesize=A4)
+    for number in range(count):
+        pdf.drawString(50, 780, f"Page {number}")
+        pdf.showPage()
+    pdf.save()
+    return buffer.getvalue()
+
+
+def test_a_pdf_at_the_page_limit_is_read():
+    assert MAX_PDF_PAGES == 30
+    assert "Page 29" in extract_cv(_pdf_of_pages(30), ".pdf").text
+
+
+def test_a_pdf_over_the_page_limit_is_refused():
+    with pytest.raises(CvTooLarge) as caught:
+        extract_cv(_pdf_of_pages(31), ".pdf")
+    assert "30 pages" in str(caught.value)
+
+
+def _docx_with_extra_part(size) -> bytes:
+    """A real DOCX plus one part of zeros, which compresses to almost nothing."""
+    buffer = io.BytesIO(make_docx(lambda document: document.add_paragraph("Visible")))
+    with zipfile.ZipFile(buffer, "a", zipfile.ZIP_DEFLATED) as archive:
+        current = sum(info.file_size for info in archive.infolist())
+        archive.writestr("word/padding.bin", b"\0" * (size - current))
+    return buffer.getvalue()
+
+
+def test_a_docx_at_the_uncompressed_limit_is_read():
+    assert MAX_DOCX_UNCOMPRESSED_BYTES == 50 * 1024 * 1024
+    assert extract_cv(_docx_with_extra_part(MAX_DOCX_UNCOMPRESSED_BYTES), ".docx").text == "Visible"
+
+
+def test_a_docx_over_the_uncompressed_limit_is_refused_before_it_is_parsed(monkeypatch):
+    data = _docx_with_extra_part(MAX_DOCX_UNCOMPRESSED_BYTES + 1)
+    assert len(data) < 1024 * 1024
+
+    def parser_must_not_run(_stream):
+        raise AssertionError("parsed a file over the limit")
+
+    monkeypatch.setattr(docx, "Document", parser_must_not_run)
+    with pytest.raises(CvTooLarge) as caught:
+        extract_cv(data, ".docx")
+    assert "50 MB" in str(caught.value)
