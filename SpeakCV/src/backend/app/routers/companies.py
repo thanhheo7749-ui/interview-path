@@ -164,6 +164,7 @@ def patch_company(
     for field, value in body.model_dump(exclude_unset=True, exclude_none=True).items():
         setattr(company, field, value)
     db.commit()
+    org_sync.sync_org_nodes(db, company_id)
     return company
 
 
