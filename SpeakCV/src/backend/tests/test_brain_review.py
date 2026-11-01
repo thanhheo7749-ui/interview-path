@@ -629,6 +629,14 @@ def test_an_edit_to_a_fact_field_embeds_the_new_text(client, w, field, value):
     assert w.reload(new).embedding != before
 
 
+def test_editing_a_facts_value_changes_its_stored_embedding_under_the_fake_provider(client, w):
+    new = fact(w, "Leave policy", "15")
+    decide_ok(client, w, {"action": "edit", "node_id": new.id, "title": "Leave rule"})
+    before = w.reload(new).embedding
+    decide_ok(client, w, {"action": "edit", "node_id": new.id, "fact_value": "20"})
+    assert w.reload(new).embedding != before
+
+
 def test_re_embedding_goes_through_the_retrievers_node_text(client, w, monkeypatch):
     new = fact(w, "Leave policy", "15")
     seen = []

@@ -1,9 +1,12 @@
 import json
+from types import SimpleNamespace
 
 import pytest
 
+from app import cli
 from app.ai.providers import fake
-from app.brain import ingestion
+from app.brain import audience as aud
+from app.brain import ingestion, retriever
 from app.database.sql_models import (
     Company, CompanyMember, Department, KbChunk, KbConflict, KbDocument, KbEdge, KbIngestionJob, KbNode, KbNodeSource,
 )
@@ -785,3 +788,107 @@ def test_demo_extraction_with_a_short_heading_still_passes_the_quote_gate(db, co
     job = run(db, make_doc(db, company))
     assert job.dropped_items == 0
     assert db.query(KbNode).filter_by(title="Leave", type="policy").count() == 1
+
+
+# ---- A quote in the overlap of two chunks is a source in both ----
+
+SECRET = "The salary band tops out at nine."
+OVERLAPPING = (
+    f"{'Filler sentence about ordinary things. ' * 29}{SECRET}\n\n"
+    f"{'More filler about other ordinary things. ' * 26}\n\n"
+    f"{'A third part on quite separate matters. ' * 40}"
+)
+
+
+def note(quote=SECRET):
+    return fact("Salary band", quote) | {"type": "private_note", "fact_kind": "none", "fact_value": ""}
+
+
+def overlap_chunks(db, document):
+    rows = db.query(KbChunk).filter_by(document_id=document.id).order_by(KbChunk.position).all()
+    holding = [c.id for c in rows if SECRET in c.text]
+    assert len(holding) == 2  # the test document really does overlap here
+    return holding, [c.id for c in rows if SECRET not in c.text]
+
+
+def test_a_quote_in_an_overlap_links_the_node_to_both_chunks(db, company):
+    fake.enqueue("kb_extract", extraction([note()]))
+    document = make_doc(db, company, data=OVERLAPPING.encode(), visibility="public")
+    job = run(db, document)
+    holding, _ = overlap_chunks(db, document)
+    node = db.query(KbNode).filter_by(title="Salary band").one()
+    assert {s.chunk_id for s in db.query(KbNodeSource).filter_by(node_id=node.id)} == set(holding)
+    assert job.dropped_items == 0
+
+
+def test_both_chunks_extracting_the_same_quote_make_no_duplicate_sources(db, company):
+    fake.enqueue("kb_extract", extraction([note()]))
+    fake.enqueue("kb_extract", extraction([note()]))
+    document = make_doc(db, company, data=OVERLAPPING.encode(), visibility="public")
+    run(db, document)
+    holding, _ = overlap_chunks(db, document)
+    node = db.query(KbNode).filter_by(title="Salary band").one()
+    rows = [s.chunk_id for s in db.query(KbNodeSource).filter_by(node_id=node.id)]
+    assert sorted(rows) == sorted(holding)
+
+
+def test_a_quote_is_not_linked_to_another_documents_chunk(db, company):
+    fake.enqueue("kb_extract", extraction([note()]))
+    first = make_doc(db, company, data=OVERLAPPING.encode(), visibility="public")
+    run(db, first)
+    fake.enqueue("kb_extract", extraction())
+    second = make_doc(db, company, data=OVERLAPPING.encode(), visibility="public")
+    run(db, second)
+    theirs = {c.id for c in db.query(KbChunk).filter_by(document_id=second.id)}
+    assert not theirs & {s.chunk_id for s in db.query(KbNodeSource)}
+
+
+@pytest.mark.skipif(not hasattr(aud, "chunk_filter"), reason="Needs the chunk filter from group A's retrieval fixes")
+def test_a_confidential_node_in_an_overlap_withholds_both_chunks_from_a_candidate(db, company):
+    fake.enqueue("kb_extract", extraction([note()]))
+    document = make_doc(db, company, data=OVERLAPPING.encode(), visibility="public")
+    run(db, document)
+    holding, clean = overlap_chunks(db, document)
+    db.query(KbNode).filter_by(title="Salary band").update({"status": "published"})
+    db.get(KbDocument, document.id).status = "published"
+    db.commit()
+    allowed = {row.id for row in retriever._allowed_chunks(db, aud.candidate(company.id))}
+    assert not allowed & set(holding)
+    assert clean and set(clean) <= allowed
+    assert not any(SECRET in row.text for row in retriever._allowed_chunks(db, aud.candidate(company.id)))
+
+
+# ---- Every embedding of a node reads the same text ----
+
+def embedded_texts(monkeypatch, module):
+    seen = []
+    real = module.embed
+    monkeypatch.setattr(module, "embed", lambda texts, *a, **k: seen.extend(texts) or real(texts, *a, **k))
+    monkeypatch.setattr(retriever, "node_text", lambda node: f"TEXT OF {node.title}", raising=False)
+    return seen
+
+
+def test_ingestion_embeds_the_retrievers_node_text(db, company, monkeypatch):
+    seen = embedded_texts(monkeypatch, ingestion.gateway)
+    fake.enqueue("kb_extract", extraction([fact("Annual leave", "12 days of annual leave")]))
+    run(db, make_doc(db, company))
+    assert "TEXT OF Annual leave" in seen
+
+
+def test_reembed_command_embeds_the_retrievers_node_text(db, company, monkeypatch):
+    fake.enqueue("kb_extract", extraction([fact("Annual leave", "12 days of annual leave")]))
+    run(db, make_doc(db, company))
+    seen = embedded_texts(monkeypatch, ingestion.gateway)
+    assert cli.reembed(SimpleNamespace(company="acme")) == 0
+    assert "TEXT OF Annual leave" in seen
+
+
+def test_two_values_of_one_title_embed_differently(db, company):
+    fake.enqueue("kb_extract", extraction([fact("Annual leave", "12 days of annual leave")]))
+    run(db, make_doc(db, company))
+    same_body = fact("Annual leave", "15 days of annual leave", "15") | {"body": "12 days of annual leave"}
+    fake.enqueue("kb_extract", extraction([same_body]))
+    fake.enqueue("kb_conflict_check", CONFLICT)
+    run(db, make_doc(db, company, data=SECOND.encode()))
+    first, second = facts(db)
+    assert first.embedding != second.embedding

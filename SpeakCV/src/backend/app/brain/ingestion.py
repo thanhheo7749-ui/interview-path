@@ -8,10 +8,10 @@ from sqlalchemy.orm import Session
 
 from app.ai import gateway
 from app.ai.types import AIError
-from app.brain import contradiction, org_sync, review, vectors
+from app.brain import contradiction, org_sync, retriever, review, vectors
 from app.brain.chunking import chunk_pages
 from app.brain.extraction import ExtractedEdge, ExtractedNode, ExtractionResult, extract_chunk
-from app.brain.text import guess_language, normalise_title, verified_quote
+from app.brain.text import guess_language, normalise_title, quote_in, verified_quote
 from app.core import storage
 from app.core.text_extract import NoExtractableText, extract_pages
 from app.database.database import SessionLocal
@@ -199,6 +199,8 @@ class _Graph:
     by_key: dict[tuple[str, str], list[KbNode]]
     by_title: dict[str, list[KbNode]]
     known_titles: list[str]
+    document_chunks: list[tuple[int, str]]
+    sources: set[tuple[int, int, str]]  # (node id, chunk id, quote) already held for this document's chunks
     new_nodes: list[KbNode] = field(default_factory=list)
     created_edges: list[int] = field(default_factory=list)
     dropped: int = 0
@@ -225,10 +227,20 @@ def _load_graph(db: Session, document: KbDocument, created_edges: list[int]) -> 
     known_titles = [
         n.title for n in existing if n.type in ("company", "department") or n.status == "published"
     ][:KNOWN_TITLE_CAP]
+    document_chunks = [
+        (row.id, row.text)
+        for row in db.query(KbChunk.id, KbChunk.text).filter(KbChunk.document_id == document.id).order_by(KbChunk.position)
+    ]
+    sources = {
+        (row.node_id, row.chunk_id, row.quote)
+        for row in db.query(KbNodeSource.node_id, KbNodeSource.chunk_id, KbNodeSource.quote)
+        .join(KbChunk, KbNodeSource.chunk_id == KbChunk.id)
+        .filter(KbChunk.document_id == document.id)
+    }
     return _Graph(
         company_id=company_id, document=document, department_node=department_node,
         anchor=department_node or company_node, by_key=by_key, by_title=by_title, known_titles=known_titles,
-        created_edges=created_edges,
+        document_chunks=document_chunks, sources=sources, created_edges=created_edges,
     )
 
 
@@ -281,6 +293,16 @@ def _new_node(db: Session, graph: _Graph, item: ExtractedNode) -> KbNode:
     graph.by_title.setdefault(title, []).append(node)
     graph.new_nodes.append(node)
     return node
+
+
+def _add_sources(db: Session, graph: _Graph, node: KbNode, quote: str) -> None:
+    """Link the node to every chunk of this document that holds the quote. Chunks overlap, so a sentence can be in two
+    of them, and retrieval decides whether a chunk may be read from the nodes linked to it."""
+    for chunk_id, text in graph.document_chunks:
+        key = (node.id, chunk_id, quote)
+        if key not in graph.sources and quote_in(quote, text):
+            graph.sources.add(key)
+            db.add(KbNodeSource(node_id=node.id, chunk_id=chunk_id, quote=quote))
 
 
 def _resolve_edge_end(graph: _Graph, refs: dict[str, KbNode], ref: str, types: set[str]) -> KbNode | None:
@@ -337,7 +359,7 @@ def _apply_extraction(db: Session, graph: _Graph, chunk: KbChunk, result: Extrac
         if node is None:
             node = _new_node(db, graph, item)
             chunk_new.append(node)
-        db.add(KbNodeSource(node_id=node.id, chunk_id=chunk.id, quote=item.quote))
+        _add_sources(db, graph, node, item.quote)
         refs[normalise_title(item.ref)] = node
 
     links: set[tuple[int, str]] = set()  # (node id, relation) for connectivity checks, as source or target
@@ -357,7 +379,7 @@ def _apply_extraction(db: Session, graph: _Graph, chunk: KbChunk, result: Extrac
 def _embed_new_nodes(db: Session, graph: _Graph) -> None:
     for start in range(0, len(graph.new_nodes), EMBED_BATCH):
         batch = graph.new_nodes[start:start + EMBED_BATCH]
-        result = gateway.embed([f"{n.title}\n{n.body}" for n in batch], "document", "kb_embed", graph.company_id)
+        result = gateway.embed([retriever.node_text(n) for n in batch], "document", "kb_embed", graph.company_id)
         for node, vector in zip(batch, result.vectors):
             node.embedding = vectors.encode(vector)
             node.embedding_model = result.model
