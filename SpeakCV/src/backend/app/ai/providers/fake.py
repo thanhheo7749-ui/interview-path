@@ -106,7 +106,10 @@ class FakeProvider:
         return [value / norm for value in vector]
 
     def transcribe(self, *, model, audio, mime_type, languages) -> ProviderTranscript:
-        text = audio.decode("utf-8", errors="ignore").strip() or "fake transcript"
+        try:
+            text = audio.decode("utf-8").strip() or "fake transcript"
+        except UnicodeDecodeError:  # real browser audio, so a session can run end to end
+            text = "fake transcript"
         return ProviderTranscript(
             text=text,
             language=languages[0] if languages else "en",
