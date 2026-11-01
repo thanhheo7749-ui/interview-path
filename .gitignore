@@ -45,3 +45,7 @@ storage/
 SpeakCV/src/backend/eval/reports/*
 !SpeakCV/src/backend/eval/reports/.gitkeep
 recordings/
+
+# Speech-to-text benchmark: the team records the clips and keeps them out of git.
+SpeakCV/src/backend/eval/stt/clips/*
+!SpeakCV/src/backend/eval/stt/clips/.gitkeep
