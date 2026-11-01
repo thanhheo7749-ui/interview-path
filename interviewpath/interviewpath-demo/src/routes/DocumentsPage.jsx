@@ -1,11 +1,15 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useCompany } from '../company/CompanyContext.jsx';
-import { EmptyState, ErrorAlert, cardClass, inputClass, primaryButton, secondaryButton } from '../components/KbFeedback.jsx';
+import { ConfirmBar, EmptyState, ErrorAlert, cardClass, inputClass, primaryButton, secondaryButton } from '../components/KbFeedback.jsx';
 import { api } from '../lib/api.js';
-import { getJob, listDocuments, notifyKbChanged, retryJob, uploadDocument } from '../lib/kb.js';
+import {
+  getJob, listDocuments, notifyKbChanged, retryFailedSections, retryJob, unpublishDocument, uploadDocument,
+} from '../lib/kb.js';
 
 const VISIBILITIES = ['public', 'internal', 'confidential'];
+// An empty value is Auto: nothing is sent and the server guesses from the text.
+const LANGUAGES = ['', 'vi', 'en', 'ko'];
 const ACTIVE_JOB = ['queued', 'running'];
 const POLL_MS = 1500;
 
@@ -23,6 +27,12 @@ function DocumentsPage() {
   const [visibility, setVisibility] = useState('internal');
   const [departmentId, setDepartmentId] = useState('');
   const [effectiveDate, setEffectiveDate] = useState('');
+  const [language, setLanguage] = useState('');
+  const [notice, setNotice] = useState('');
+  const [working, setWorking] = useState({});
+  const [withdrawing, setWithdrawing] = useState(null);
+  // A ref answers a double-click that lands before the next render.
+  const inFlight = useRef(new Set());
 
   const reload = useCallback(async () => {
     try {
@@ -100,12 +110,14 @@ function DocumentsPage() {
       form.append('visibility', visibility);
       if (departmentId !== '') form.append('department_id', departmentId);
       if (effectiveDate !== '') form.append('effective_date', effectiveDate);
+      if (language !== '') form.append('language', language);
       const created = await uploadDocument(companyId, form);
       setDocuments((current) => [{ ...created.document, job: created.job }, ...current]);
       setFile(null);
       setTitle('');
       setDepartmentId('');
       setEffectiveDate('');
+      setLanguage('');
       setFormKey((k) => k + 1);
     } catch (err) {
       setError(err.message);
@@ -114,19 +126,54 @@ function DocumentsPage() {
     }
   };
 
-  const retry = async (document) => {
+  // Runs one request per document at a time. A 409 means the page is out of date, so it reloads.
+  const runOnce = async (document, request, onDone) => {
+    if (inFlight.current.has(document.id)) return;
+    inFlight.current.add(document.id);
+    setWorking((current) => ({ ...current, [document.id]: true }));
     setError('');
+    setNotice('');
     try {
-      const job = await retryJob(companyId, document.job.id);
-      setDocuments((current) => current.map((d) => (d.id === document.id ? { ...d, status: 'processing', job } : d)));
+      onDone(await request());
     } catch (err) {
-      setError(err.message);
+      setError(err.status === 409 ? t('documents.conflictMessage', { detail: err.message }) : err.message);
+      if (err.status === 409) await reload();
+    } finally {
+      inFlight.current.delete(document.id);
+      setWorking((current) => ({ ...current, [document.id]: false }));
     }
+  };
+
+  const retry = (document) =>
+    runOnce(
+      document,
+      () => retryJob(companyId, document.job.id),
+      (job) => setDocuments((current) => current.map((d) => (d.id === document.id ? { ...d, status: 'processing', job } : d))),
+    );
+
+  const retryFailed = (document) =>
+    runOnce(
+      document,
+      () => retryFailedSections(companyId, document.job.id),
+      (job) => setDocuments((current) => current.map((d) => (d.id === document.id ? { ...d, job } : d))),
+    );
+
+  const withdraw = (document) => {
+    setWithdrawing(null);
+    return runOnce(
+      document,
+      () => unpublishDocument(companyId, document.id),
+      (result) => {
+        setDocuments((current) => current.map((d) => (d.id === document.id ? { ...d, ...result.document } : d)));
+        setNotice(t('documents.withdrawn', { removed: result.rejected_nodes, kept: result.kept_nodes }));
+        notifyKbChanged();
+      },
+    );
   };
 
   const statusLabel = (document) => {
     const job = document.job;
-    if (document.status === 'processing' && job) return t(`documents.job.${job.status}`, { defaultValue: job.status });
+    if (job && (document.status === 'processing' || ACTIVE_JOB.includes(job.status))) return t(`documents.job.${job.status}`, { defaultValue: job.status });
     return t(`documents.status.${document.status}`, { defaultValue: document.status });
   };
   const departmentName = (id) => departments.find((d) => d.id === id)?.name ?? '';
@@ -135,6 +182,11 @@ function DocumentsPage() {
     <div className="space-y-6 p-8">
       <h1 className="text-2xl font-extrabold tracking-tight">{t('documents.title')}</h1>
       <ErrorAlert message={error} />
+      {notice && (
+        <p role="status" className="rounded-xl border border-green-200 bg-green-50 px-3 py-2 text-sm font-semibold text-green-800">
+          {notice}
+        </p>
+      )}
 
       <section className={cardClass}>
         <h2 className="text-lg font-extrabold tracking-tight">{t('documents.uploadTitle')}</h2>
@@ -172,6 +224,16 @@ function DocumentsPage() {
             <span className="block">{t('documents.effectiveDate')}</span>
             <input type="date" value={effectiveDate} onChange={(e) => setEffectiveDate(e.target.value)} className={`${inputClass} mt-1`} />
           </label>
+          <label className="text-sm font-semibold text-slate-700">
+            <span className="block">{t('documents.language')}</span>
+            <select value={language} onChange={(e) => setLanguage(e.target.value)} className={`${inputClass} mt-1`}>
+              {LANGUAGES.map((code) => (
+                <option key={code} value={code}>
+                  {t(`documents.languages.${code || 'auto'}`)}
+                </option>
+              ))}
+            </select>
+          </label>
           <button type="submit" disabled={busy || !file} className={primaryButton}>
             {busy ? t('documents.uploading') : t('documents.upload')}
           </button>
@@ -196,6 +258,9 @@ function DocumentsPage() {
               {documents.map((document) => {
                 const job = document.job;
                 const running = job && ACTIVE_JOB.includes(job.status);
+                const rowBusy = Boolean(working[document.id]);
+                const canRetryFailed =
+                  job && !running && ['review', 'published'].includes(document.status) && (job.failed_chunks > 0 || job.contradiction_check_failed);
                 const partial = job && job.status !== 'failed' && (job.dropped_items > 0 || job.failed_chunks > 0);
                 return (
                   <tr key={document.id} className="border-b border-slate-100 align-top">
@@ -221,15 +286,34 @@ function DocumentsPage() {
                           {t('documents.partial', { dropped: job.dropped_items, failed: job.failed_chunks })}
                         </p>
                       )}
-                      {job?.status === 'failed' && (
+                      {canRetryFailed && (
+                        <button type="button" disabled={rowBusy} onClick={() => retryFailed(document)} className={secondaryButton}>
+                          {t('documents.retryFailed')}
+                        </button>
+                      )}
+                      {job?.status === 'failed' && document.status !== 'withdrawn' && (
                         <div className="space-y-1">
                           <p className="rounded-lg border border-red-200 bg-red-50 px-2 py-1 text-xs font-semibold text-red-800">
                             {job.error || t('common.genericError')}
                           </p>
-                          <button type="button" onClick={() => retry(document)} className={secondaryButton}>
+                          <button type="button" disabled={rowBusy} onClick={() => retry(document)} className={secondaryButton}>
                             {t('documents.retry')}
                           </button>
                         </div>
+                      )}
+                      {document.status === 'published' && withdrawing !== document.id && (
+                        <button type="button" disabled={rowBusy} onClick={() => setWithdrawing(document.id)} className={secondaryButton}>
+                          {t('documents.withdraw')}
+                        </button>
+                      )}
+                      {withdrawing === document.id && (
+                        <ConfirmBar
+                          message={t('documents.withdrawConfirm', { title: document.title })}
+                          confirmLabel={t('documents.withdrawYes')}
+                          busy={rowBusy}
+                          onConfirm={() => withdraw(document)}
+                          onCancel={() => setWithdrawing(null)}
+                        />
                       )}
                     </td>
                   </tr>

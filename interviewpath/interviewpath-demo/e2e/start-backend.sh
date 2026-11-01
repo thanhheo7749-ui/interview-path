@@ -25,4 +25,8 @@ printf '%s' "$HR_PASSWORD" > "$E2E_TMP/portal_e2e_password"
 # A second company for the knowledge specs, so they do not disturb the password flow tested in login.spec.js.
 BRAIN_PASSWORD=$($PY -m app.cli create-company --slug brain --name "Brain Company" --hr-email brain-hr@e2e.test --hr-name "Brain HR" | awk '/Temporary password/ {print $NF}')
 printf '%s' "$BRAIN_PASSWORD" > "$E2E_TMP/portal_e2e_brain_password"
+# One user in two companies, to test that nothing from the previous company survives a switch.
+SWITCH_PASSWORD=$($PY -m app.cli create-company --slug switch-a --name "Switch Alpha" --hr-email switch-hr@e2e.test --hr-name "Switch HR" | awk '/Temporary password/ {print $NF}')
+printf '%s' "$SWITCH_PASSWORD" > "$E2E_TMP/portal_e2e_switch_password"
+$PY -m app.cli create-company --slug switch-b --name "Switch Beta" --hr-email switch-hr@e2e.test --hr-name "Switch HR" > /dev/null
 exec env PYTHONPATH=. $PY "$E2E_DIR/serve-backend.py" "${E2E_API_PORT:-8099}"

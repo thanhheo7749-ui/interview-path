@@ -22,13 +22,15 @@ function HrOnly() {
 }
 
 function PortalLayout() {
+  const { membership } = useCompany();
   return (
     <div className="min-h-[100dvh] bg-slate-100 text-slate-950">
       <Sidebar />
       <main className="ml-64 min-h-[100dvh]">
         <SampleBanner />
         <DemoAiNotice />
-        <Outlet />
+        {/* Keyed by company so no page keeps the previous company's data after a switch. */}
+        <Outlet key={membership?.company_id ?? 'none'} />
       </main>
     </div>
   );

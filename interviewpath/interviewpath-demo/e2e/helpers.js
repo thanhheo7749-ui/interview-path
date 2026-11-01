@@ -11,6 +11,8 @@ export const CORS = { 'access-control-allow-origin': '*' };
 export const LOGIN_USER = { email: HR_EMAIL, passwordFile: 'portal_e2e_password' };
 export const BRAIN_USER = { email: 'brain-hr@e2e.test', passwordFile: 'portal_e2e_brain_password' };
 
+export const SWITCH_USER = { email: 'switch-hr@e2e.test', passwordFile: 'portal_e2e_switch_password' };
+
 export const temporaryPassword = (user = LOGIN_USER) => readFileSync(join(process.env.E2E_TMP, user.passwordFile), 'utf8');
 
 // The first login test changes the password in the browser. This keeps later tests independent of that one.
