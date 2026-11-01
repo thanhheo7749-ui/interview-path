@@ -122,7 +122,7 @@ class KbConflict(Base):
     node_a_id = Column(Integer, ForeignKey("kb_nodes.id", ondelete="CASCADE"), nullable=False, index=True)
     node_b_id = Column(Integer, ForeignKey("kb_nodes.id", ondelete="CASCADE"), nullable=False, index=True)
     status = Column(String(20), nullable=False, default="open")  # open | resolved | dismissed
-    resolution = Column(String(20), nullable=True)  # a | b | different_scope | node_rejected | edit_resolved
+    resolution = Column(String(20), nullable=True)  # a | b | different_scope | node_rejected | node_superseded | edit_resolved
     resolved_by = Column(Integer, ForeignKey("users.id"), nullable=True)
     resolved_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)

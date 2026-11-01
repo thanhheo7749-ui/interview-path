@@ -6,7 +6,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPExcepti
 from sqlalchemy.orm import Session
 
 from app.auth.dependencies import require_member
-from app.brain import ingestion
+from app.brain import ingestion, review
 from app.core.uploads import DOCUMENT_TYPES, read_upload
 from app.database.database import get_db
 from app.database.models_brain import VISIBILITIES
@@ -125,6 +125,22 @@ def list_documents(company_id: int, _: CompanyMember = Depends(require_member("h
         )
         result.append({**_document_out(document), "job": _job_out(job)})
     return result
+
+
+@router.post(f"{KB}/documents/{{document_id}}/unpublish")
+def unpublish_document(
+    company_id: int,
+    document_id: int,
+    _: CompanyMember = Depends(require_member("hr")),
+    db: Session = Depends(get_db),
+):
+    try:
+        counts = review.unpublish_document(db, company_id, document_id)
+        db.commit()
+    except review.ReviewError as exc:
+        db.rollback()
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+    return {"document": _document_out(db.get(KbDocument, document_id)), **counts}
 
 
 @router.get(f"{KB}/jobs/{{job_id}}")

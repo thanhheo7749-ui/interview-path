@@ -20,6 +20,13 @@ FACT_KINDS = ("number", "date", "boolean")
 COMPARABLE = ("draft", "published")
 MAX_CHECK_TOKENS = 300
 EDIT_RESOLVED = "edit_resolved"
+NODE_REJECTED = "node_rejected"
+NODE_SUPERSEDED = "node_superseded"
+
+
+class ConflictNotLive(Exception):
+    """One side of the conflict is no longer live, so choosing between them could leave no value."""
+
 
 SYSTEM = """You compare two company facts for a contradiction check.
 
@@ -295,11 +302,17 @@ def _fact_block(db: Session, node: KbNode) -> str:
     return f"<fact>\n{as_data(fields)}\n</fact>"
 
 
-def _already_paired(db: Session, company_id: int, first: int, second: int) -> bool:
-    """A pair closed only because an edit made its values equal may disagree again after a later edit."""
+def _already_paired(db: Session, company_id: int, first: int, second: int, recheck_dismissed: bool = False) -> bool:
+    """A pair closed only because an edit made its values equal may disagree again after a later edit.
+
+    recheck_dismissed: one side's claim has changed, so no dismissal answers for this pair any more."""
+    still_stands = (
+        KbConflict.status != "dismissed" if recheck_dismissed
+        else or_(KbConflict.resolution.is_(None), KbConflict.resolution != EDIT_RESOLVED)
+    )
     return db.query(KbConflict.id).filter(
         KbConflict.company_id == company_id,
-        or_(KbConflict.resolution.is_(None), KbConflict.resolution != EDIT_RESOLVED),
+        still_stands,
         or_(
             (KbConflict.node_a_id == first) & (KbConflict.node_b_id == second),
             (KbConflict.node_a_id == second) & (KbConflict.node_b_id == first),
@@ -307,7 +320,8 @@ def _already_paired(db: Session, company_id: int, first: int, second: int) -> bo
     ).first() is not None
 
 
-def check_new_facts(db: Session, company_id: int, node_ids: list[int], bump_version: bool = True) -> int:
+def check_new_facts(db: Session, company_id: int, node_ids: list[int], bump_version: bool = True,
+                    recheck_dismissed: bool = False) -> int:
     """Open a conflict for each new fact that disagrees with a similar fact. Returns how many were opened.
 
     AIError from the check propagates; conflicts opened before it are already committed.
@@ -345,7 +359,7 @@ def check_new_facts(db: Session, company_id: int, node_ids: list[int], bump_vers
                 continue
             if same_value(node.fact_kind, node.fact_value, node.fact_unit, other.fact_value, other.fact_unit):
                 continue
-            if _already_paired(db, company_id, other.id, node.id):
+            if _already_paired(db, company_id, other.id, node.id, recheck_dismissed):
                 continue
             prompt = f"{_fact_block(db, other)}\n\n{_fact_block(db, node)}"
             result = gateway.generate_structured(
@@ -363,17 +377,35 @@ def check_new_facts(db: Session, company_id: int, node_ids: list[int], bump_vers
 
 def resolve(db: Session, conflict: KbConflict, action: str, user_id: int) -> KbConflict:
     """action: a keeps A (B superseded), b keeps B (A superseded), different_scope dismisses the conflict."""
+    # review imports this module, so this import cannot be at the top.
+    from app.brain import review
+
     if action not in ("a", "b", "different_scope"):
         raise ValueError(f"Unknown action: {action}")
-    if action != "different_scope":
-        loser = db.get(KbNode, conflict.node_b_id if action == "a" else conflict.node_a_id)
-        if loser is not None and loser.company_id == conflict.company_id:
-            loser.status = "superseded"
+    company_id = conflict.company_id
+    node_ids = {conflict.node_a_id, conflict.node_b_id}
+    # Locked and read fresh, so another resolve that has just superseded one side is seen here.
+    sides = {
+        node.id: node for node in db.query(KbNode).filter(KbNode.id.in_(node_ids), KbNode.company_id == company_id)
+        .order_by(KbNode.id).populate_existing().with_for_update()
+    }
+    if len(sides) != 2 or any(node.status not in COMPARABLE for node in sides.values()):
+        raise ConflictNotLive(f"Conflict {conflict.id} has a side that is not live")
     conflict.status = "dismissed" if action == "different_scope" else "resolved"
     conflict.resolution = action
     conflict.resolved_by = user_id
     conflict.resolved_at = func.now()
-    bump_kb_version(db, conflict.company_id)
+    db.flush()
+    if action != "different_scope":
+        loser_id = conflict.node_b_id if action == "a" else conflict.node_a_id
+        sides[loser_id].status = "superseded"
+        _dismiss_open_conflicts(db, loser_id, NODE_SUPERSEDED, user_id)
+    db.flush()
+    review.settle_edges(db, company_id, node_ids)
+    db.flush()
+    for document_id in review.documents_of_nodes(db, company_id, node_ids):
+        review.finish_document_if_decided(db, document_id)
+    bump_kb_version(db, company_id)
     db.commit()
     db.refresh(conflict)
     return conflict
@@ -402,14 +434,18 @@ def close_conflicts_settled_by_edit(db: Session, node: KbNode, user_id: int) -> 
     return closed
 
 
-def on_node_rejected(db: Session, node_id: int) -> None:
-    """Dismiss the open conflicts of a node that was rejected in review. Flushes only; the caller commits."""
+def _dismiss_open_conflicts(db: Session, node_id: int, resolution: str, user_id: int | None = None) -> None:
     rows = db.query(KbConflict).filter(
         KbConflict.status == "open", or_(KbConflict.node_a_id == node_id, KbConflict.node_b_id == node_id)
     ).all()
     for row in rows:
-        row.status, row.resolution = "dismissed", "node_rejected"
+        row.status, row.resolution = "dismissed", resolution
+        row.resolved_by = user_id
         row.resolved_at = func.now()
-        bump_kb_version(db, row.company_id)
     if rows:
         db.flush()
+
+
+def on_node_rejected(db: Session, node_id: int) -> None:
+    """Dismiss the open conflicts of a rejected node. Flushes only; the caller commits and moves the version."""
+    _dismiss_open_conflicts(db, node_id, NODE_REJECTED)

@@ -14,6 +14,7 @@ from app.database.sql_models import CompanyMember, KbDocument, KbNode
 router = APIRouter()
 
 KB = "/api/companies/{company_id}/kb"
+MAX_EDITED_BODY = 15000
 
 
 class DecisionItem(BaseModel):
@@ -22,7 +23,7 @@ class DecisionItem(BaseModel):
     into_node_id: int | None = None
     document_id: int | None = None
     title: str | None = Field(default=None, min_length=1, max_length=500)
-    body: str | None = Field(default=None, max_length=20000)
+    body: str | None = Field(default=None, max_length=MAX_EDITED_BODY)
     visibility: str | None = Field(default=None, max_length=20)
     fact_value: str | None = Field(default=None, max_length=255)
     fact_unit: str | None = Field(default=None, max_length=50)
@@ -121,7 +122,9 @@ def graph(
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     nodes, edges = retriever.visible_graph(db, audience)
     return {
-        "nodes": [{"id": str(n.id), "layer": n.visibility, "type": n.type, "title": n.title} for n in nodes],
+        "nodes": [
+            {"id": str(n.id), "layer": n.visibility, "type": n.type, "title": n.title, "body": n.body} for n in nodes
+        ],
         "links": [
             {"source": str(e.source_node_id), "target": str(e.target_node_id), "relation": e.relation} for e in edges
         ],

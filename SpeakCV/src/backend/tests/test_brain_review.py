@@ -1,12 +1,16 @@
 import json
+from datetime import date
+from types import SimpleNamespace
 
 import pytest
+from sqlalchemy import text
 
 from app.ai.providers import fake
 from app.ai.types import AIError
-from app.brain import review, vectors
+from app.brain import audience as aud
+from app.brain import retriever, review, vectors
 from app.database.sql_models import (
-    Company, CompanyMember, Department, KbChunk, KbConflict, KbDocument, KbEdge, KbNode, KbNodeSource,
+    Company, CompanyMember, Department, KbChunk, KbConflict, KbDocument, KbEdge, KbIngestionJob, KbNode, KbNodeSource,
 )
 from tests.helpers import auth_header, make_user
 
@@ -92,7 +96,7 @@ def test_review_lists_drafts_with_sources_edges_and_merge_proposals(client, w):
     first = next(n for n in body["nodes"] if n["id"] == a.id)
     assert (first["type"], first["title"], first["body"], first["visibility"]) == (
         "fact", "Annual leave", "Annual leave body", "internal")
-    assert first["sources"] == [{"quote": "12 days", "page": 3, "document_title": "Handbook"}]
+    assert first["sources"] == [{"quote": "12 days", "page": 3, "document_title": "Handbook", "effective_date": None}]
     assert "embedding" not in first
     [edge] = body["edges"]
     assert (edge["source_title"], edge["target_title"], edge["relation"]) == ("Annual leave", "Holiday", "requires")
@@ -182,7 +186,7 @@ def test_bulk_failure_after_earlier_items_rolls_back(client, w):
     published = w.node("P", status="published")
     response = decide(client, w, [
         {"action": "accept", "node_id": a.id, "title": "Renamed"},
-        {"action": "reject", "node_id": published.id},
+        {"action": "accept", "node_id": published.id},
         {"action": "accept", "node_id": b.id},
     ])
     assert response.status_code == 409
@@ -341,7 +345,9 @@ def test_graph_hr_sees_all_published(client, graph):
 def test_graph_shape(client, graph):
     body = get_graph(client, graph).json()
     node = next(n for n in body["nodes"] if n["title"] == "Public fact")
-    assert node == {"id": str(graph.pub.id), "layer": "public", "type": "fact", "title": "Public fact"}
+    assert node == {
+        "id": str(graph.pub.id), "layer": "public", "type": "fact", "title": "Public fact", "body": "Public fact body",
+    }
     link = next(item for item in body["links"] if item["relation"] == "requires")
     assert link == {"source": str(graph.internal.id), "target": str(graph.pub.id), "relation": "requires"}
 
@@ -434,13 +440,21 @@ def decide_ok(client, w, *items):
 
 
 @pytest.fixture
+def steady_vectors(monkeypatch):
+    """Keeps an edited fact close to the others: the fake embedding is hash noise, a real one would barely move."""
+    monkeypatch.setattr(review.gateway, "embed", lambda texts, *_a, **_k: SimpleNamespace(
+        vectors=[[1.0, 0.0, 0.0, 0.0] for _ in texts], model="fake", dimension=4,
+    ))
+
+
+@pytest.fixture
 def spy_check(monkeypatch):
     calls = []
     monkeypatch.setattr(review.contradiction, "check_new_facts", lambda *a, **k: calls.append(a[2]) or 0)
     return calls
 
 
-def test_an_edit_that_creates_a_disagreement_opens_a_conflict(client, w):
+def test_an_edit_that_creates_a_disagreement_opens_a_conflict(client, w, steady_vectors):
     old, new = fact(w, "Leave", "12", "published"), fact(w, "Leave policy", "12")
     start = set_version(w)
     fake.enqueue("kb_conflict_check", AGREE)
@@ -452,7 +466,7 @@ def test_an_edit_that_creates_a_disagreement_opens_a_conflict(client, w):
     assert version(w) == start + 1
 
 
-def test_opening_several_conflicts_still_moves_the_version_once(client, w):
+def test_opening_several_conflicts_still_moves_the_version_once(client, w, steady_vectors):
     fact(w, "Leave", "12", "published")
     fact(w, "Leave two", "13", "published")
     new = fact(w, "Leave policy", "12")
@@ -503,7 +517,7 @@ def test_unparseable_values_are_not_treated_as_equal(client, w):
     assert w.reload(row).status == "open"
 
 
-def test_a_conflict_the_edit_settled_can_open_again_when_values_part(client, w):
+def test_a_conflict_the_edit_settled_can_open_again_when_values_part(client, w, steady_vectors):
     old, new = fact(w, "Leave", "12", "published"), fact(w, "Leave policy", "15")
     first = conflict_between(w, old, new)
     decide_ok(client, w, {"action": "edit", "node_id": new.id, "fact_value": "12"})
@@ -513,15 +527,33 @@ def test_a_conflict_the_edit_settled_can_open_again_when_values_part(client, w):
     assert w.db.query(KbConflict).filter_by(status="open").count() == 1
 
 
-def test_a_pair_hr_dismissed_as_different_scope_stays_closed(client, w):
+def test_a_pair_hr_dismissed_as_different_scope_stays_closed_while_the_value_holds(client, w, steady_vectors):
     old, new = fact(w, "Leave", "12", "published"), fact(w, "Leave policy", "15")
     conflict_between(w, old, new, status="dismissed", resolution="different_scope")
-    decide_ok(client, w, {"action": "accept", "node_id": new.id, "fact_value": "20"})
+    decide_ok(client, w, {"action": "accept", "node_id": new.id, "title": "Leave policy, renamed"})
     assert w.db.query(KbConflict).count() == 1
     assert fake.last_messages() == []
 
 
-def test_ai_failure_keeps_the_edit_and_returns_a_warning(client, w):
+@pytest.mark.parametrize("field,value", [("fact_value", "20"), ("fact_unit", "weeks"), ("scope_text", "Hanoi only")])
+def test_a_dismissal_does_not_hide_a_contradiction_after_a_change(client, w, steady_vectors, field, value):
+    old, new = fact(w, "Leave", "12", "published"), fact(w, "Leave policy", "15")
+    conflict_between(w, old, new, status="dismissed", resolution="different_scope")
+    fake.enqueue("kb_conflict_check", AGREE)
+    decide_ok(client, w, {"action": "edit", "node_id": new.id, field: value})
+    assert w.db.query(KbConflict).filter_by(status="open").count() == 1
+    assert w.db.query(KbConflict).filter_by(status="dismissed").count() == 1
+
+
+def test_a_recheck_never_reopens_an_open_or_resolved_pair(client, w, steady_vectors):
+    old, new = fact(w, "Leave", "12", "published"), fact(w, "Leave policy", "15")
+    conflict_between(w, old, new)
+    decide_ok(client, w, {"action": "edit", "node_id": new.id, "fact_value": "20"})
+    assert w.db.query(KbConflict).count() == 1
+    assert fake.last_messages() == []
+
+
+def test_ai_failure_keeps_the_edit_and_returns_a_warning(client, w, steady_vectors):
     fact(w, "Leave", "12", "published")
     new = fact(w, "Leave policy", "12")
     start = set_version(w)
@@ -574,18 +606,37 @@ def test_a_plain_accept_does_not_call_the_ai(client, w, spy_check):
 
 @pytest.mark.parametrize("field,value", [
     ("fact_value", "20"), ("fact_unit", "weeks"), ("title", "New title"), ("body", "New body"),
+    ("scope_text", "Hanoi office"),
 ])
-def test_each_fact_field_triggers_the_check(client, w, spy_check, field, value):
-    new = fact(w, "Leave policy", "15")
-    decide_ok(client, w, {"action": "accept", "node_id": new.id, field: value})
+@pytest.mark.parametrize("action,status", [("accept", "draft"), ("edit", "draft"), ("edit", "published")])
+def test_each_fact_field_triggers_the_check_at_any_status(client, w, spy_check, field, value, action, status):
+    new = fact(w, "Leave policy", "15", status)
+    decide_ok(client, w, {"action": action, "node_id": new.id, field: value})
     assert spy_check == [[new.id]]
 
 
-@pytest.mark.parametrize("field,value", [("visibility", "public"), ("scope_text", "Hanoi office")])
-def test_other_fields_do_not_trigger_the_check(client, w, spy_check, field, value):
+def test_a_layer_change_does_not_trigger_the_check(client, w, spy_check):
     new = fact(w, "Leave policy", "15")
-    decide_ok(client, w, {"action": "accept", "node_id": new.id, field: value})
+    decide_ok(client, w, {"action": "accept", "node_id": new.id, "visibility": "public"})
     assert spy_check == []
+
+
+@pytest.mark.parametrize("field,value", [("fact_value", "20"), ("fact_unit", "weeks"), ("scope_text", "Hanoi office")])
+def test_an_edit_to_a_fact_field_embeds_the_new_text(client, w, field, value):
+    new = fact(w, "Leave policy", "15")
+    before = new.embedding
+    decide_ok(client, w, {"action": "edit", "node_id": new.id, field: value})
+    assert w.reload(new).embedding != before
+
+
+def test_re_embedding_goes_through_the_retrievers_node_text(client, w, monkeypatch):
+    new = fact(w, "Leave policy", "15")
+    seen = []
+    real = review.gateway.embed
+    monkeypatch.setattr(review.gateway, "embed", lambda texts, *a, **k: seen.extend(texts) or real(texts, *a, **k))
+    monkeypatch.setattr(retriever, "node_text", lambda node: f"TEXT OF {node.id}", raising=False)
+    decide_ok(client, w, {"action": "edit", "node_id": new.id, "fact_value": "20"})
+    assert f"TEXT OF {new.id}" in seen
 
 
 def test_a_node_without_a_fact_kind_is_not_checked(client, w, spy_check):
@@ -594,10 +645,12 @@ def test_a_node_without_a_fact_kind_is_not_checked(client, w, spy_check):
     assert spy_check == []
 
 
-def test_a_draft_edit_closes_conflicts_but_is_not_rechecked(client, w, spy_check):
+def test_a_draft_edit_is_rechecked_and_moves_the_version_once(client, w, spy_check):
     new = fact(w, "Leave policy", "15")
+    start = set_version(w)
     decide_ok(client, w, {"action": "edit", "node_id": new.id, "fact_value": "20"})
-    assert spy_check == []
+    assert spy_check == [[new.id]]
+    assert version(w) == start + 1
 
 
 def test_edit_then_accept_in_one_request_is_rechecked_once(client, w, spy_check):
@@ -631,3 +684,280 @@ def test_a_bad_item_undoes_the_closing_and_runs_no_check(client, w, spy_check):
     assert w.reload(row).status == "open"
     assert w.reload(new).fact_value == "15"
     assert spy_check == []
+
+
+# Published knowledge can be corrected and retracted
+
+def candidate_titles(w):
+    w.db.commit()
+    nodes, _ = retriever.visible_graph(w.db, aud.candidate(w.company.id))
+    return {n.title for n in nodes}
+
+
+def test_a_wrong_layer_publish_can_be_corrected_and_the_candidate_stops_seeing_it(client, w):
+    node = w.node("Salary band", type="private_note", visibility="public", status="published")
+    assert "Salary band" in candidate_titles(w)
+    start = set_version(w)
+    decide_ok(client, w, {"action": "edit", "node_id": node.id, "visibility": "confidential"})
+    node = w.reload(node)
+    assert (node.status, node.visibility) == ("published", "confidential")
+    assert "Salary band" not in candidate_titles(w)
+    assert version(w) == start + 1
+
+
+def test_rejecting_a_published_node_unpublishes_it(client, w):
+    node = w.node("Wrong", status="published", visibility="public")
+    other = w.node("Other", status="published", visibility="public")
+    third = w.node("Third")
+    published_edge, draft_edge = w.edge(node, other, status="published"), w.edge(third, node)
+    conflict = conflict_between(w, node, other)
+    start = set_version(w)
+    decide_ok(client, w, {"action": "reject", "node_id": node.id})
+    assert w.reload(node).status == "rejected"
+    assert "Wrong" not in candidate_titles(w)
+    row = w.reload(conflict)
+    assert (row.status, row.resolution) == ("dismissed", "node_rejected")
+    assert w.reload(published_edge).status == "rejected" and w.reload(draft_edge).status == "rejected"
+    assert version(w) == start + 1
+
+
+@pytest.mark.parametrize("action,status,extra", [
+    ("accept", "published", {}), ("accept", "rejected", {}), ("edit", "rejected", {"title": "x"}),
+    ("edit", "superseded", {"title": "x"}), ("reject", "rejected", {}), ("reject", "superseded", {}),
+])
+def test_what_review_still_refuses(client, w, action, status, extra):
+    node = w.node("Done", status=status)
+    assert decide(client, w, [{"action": action, "node_id": node.id, **extra}]).status_code == 409
+
+
+def test_a_published_node_cannot_be_merged_away(client, w):
+    published, target = w.node("Published", status="published"), w.node("Target")
+    response = decide(client, w, [{"action": "merge", "node_id": published.id, "into_node_id": target.id}])
+    assert response.status_code == 409
+
+
+def test_edit_body_longer_than_15000_characters_is_422(client, w):
+    node = w.node("Long")
+    assert decide(client, w, [{"action": "edit", "node_id": node.id, "body": "x" * 15001}]).status_code == 422
+    assert decide(client, w, [{"action": "edit", "node_id": node.id, "body": "x" * 15000}]).status_code == 200
+
+
+def test_version_moves_by_atomic_update_and_keeps_a_concurrent_bump(client, w, monkeypatch):
+    node = w.node("Leave")
+    start = set_version(w)
+    real = review._embed_nodes
+
+    def bump_from_elsewhere(db, company_id, nodes):
+        db.execute(text("UPDATE companies SET kb_version = kb_version + 1 WHERE id = :id"), {"id": company_id})
+        real(db, company_id, nodes)
+
+    monkeypatch.setattr(review, "_embed_nodes", bump_from_elsewhere)
+    decide_ok(client, w, {"action": "accept", "node_id": node.id, "title": "New title"})
+    assert version(w) == start + 2
+
+
+def test_auto_approve_moves_the_version_once(db, w):
+    db.get(Company, w.company.id).is_sample = True
+    db.commit()
+    w.node("A"), w.node("B")
+    start = set_version(w)
+    review.auto_approve_document(db, w.doc.id, w.hr_user.id)
+    assert version(w) == start + 1
+
+
+# Unpublishing a document
+
+@pytest.fixture
+def two_documents(w):
+    w.second = w.document("Second", status="published")
+    w.second_chunk = KbChunk(company_id=w.company.id, document_id=w.second.id, position=0, page=1, text="s")
+    w.db.add(w.second_chunk)
+    w.doc.status = "published"
+    w.db.commit()
+    w.sole = w.node("Sole", status="published", visibility="public", quote="sole quote")
+    w.sole_draft = w.node("Sole draft", quote="draft quote")
+    w.shared = w.node("Shared", status="published", visibility="public", quote="first quote")
+    w.db.add(KbNodeSource(node_id=w.shared.id, chunk_id=w.second_chunk.id, quote="second quote"))
+    w.db.commit()
+    return w
+
+
+def unpublish(client, w, document_id=None, headers=None):
+    return client.post(w.url(f"documents/{document_id or w.doc.id}/unpublish"), headers=headers or w.hr)
+
+
+def test_unpublish_withdraws_the_document_and_its_sole_source_nodes(client, two_documents):
+    w = two_documents
+    other = w.node("Elsewhere", status="published", doc=False)
+    conflict = conflict_between(w, w.sole, other)
+    edge = w.edge(w.sole, other, status="published")
+    start = set_version(w)
+    response = unpublish(client, w)
+    assert response.status_code == 200
+    body = response.json()
+    assert body["document"]["status"] == "withdrawn"
+    assert (body["rejected_nodes"], body["kept_nodes"]) == (2, 1)
+    assert w.reload(w.doc).status == "withdrawn"
+    assert (w.reload(w.sole).status, w.reload(w.sole_draft).status) == ("rejected", "rejected")
+    assert w.reload(w.shared).status == "published"
+    row = w.reload(conflict)
+    assert (row.status, row.resolution) == ("dismissed", "node_rejected")
+    assert w.reload(edge).status == "rejected"
+    assert version(w) == start + 1
+
+
+def test_unpublish_removes_chunks_from_retrieval_and_sole_nodes_from_the_candidate(client, two_documents):
+    w = two_documents
+    hr = aud.simulated(w.db, w.company.id, "hr", None)
+    assert w.chunk.id in {row.id for row in retriever._allowed_chunks(w.db, hr)}
+    assert "Sole" in candidate_titles(w)
+    assert unpublish(client, w).status_code == 200
+    w.db.commit()
+    assert w.chunk.id not in {row.id for row in retriever._allowed_chunks(w.db, hr)}
+    assert w.second_chunk.id in {row.id for row in retriever._allowed_chunks(w.db, hr)}
+    titles = candidate_titles(w)
+    assert "Sole" not in titles and "Shared" in titles
+
+
+def test_a_kept_node_stops_citing_the_withdrawn_document(client, two_documents):
+    w = two_documents
+    assert unpublish(client, w).status_code == 200
+    w.db.expire_all()
+    assert [s.quote for s in w.db.query(KbNodeSource).filter_by(node_id=w.shared.id)] == ["second quote"]
+
+
+def test_withdrawing_each_source_in_turn_finally_rejects_the_node(client, two_documents):
+    w = two_documents
+    assert unpublish(client, w).status_code == 200
+    assert w.reload(w.shared).status == "published"
+    assert unpublish(client, w, w.second.id).status_code == 200
+    assert w.reload(w.shared).status == "rejected"
+
+
+@pytest.mark.parametrize("status", ["processing", "failed", "withdrawn"])
+def test_only_a_reviewed_or_published_document_can_be_unpublished(client, w, status):
+    w.doc.status = status
+    w.db.commit()
+    assert unpublish(client, w).status_code == 409
+    assert w.reload(w.doc).status == status
+
+
+def test_a_document_in_review_can_be_unpublished(client, w):
+    draft = w.node("Draft")
+    assert unpublish(client, w).status_code == 200
+    assert w.reload(draft).status == "rejected"
+
+
+def test_a_document_with_a_running_job_cannot_be_unpublished(client, w):
+    w.doc.status = "published"
+    w.db.add(KbIngestionJob(document_id=w.doc.id, status="running"))
+    w.db.commit()
+    assert unpublish(client, w).status_code == 409
+
+
+def test_unpublish_permissions(client, w):
+    foreign = w.document("Foreign", company=w.other)
+    assert unpublish(client, w, foreign.id).status_code == 404
+    assert unpublish(client, w, 999999).status_code == 404
+    assert unpublish(client, w, headers=auth_header("emp@example.test")).status_code == 403
+    assert unpublish(client, w, headers=auth_header("mgr@example.test")).status_code == 403
+    assert w.reload(w.doc).status == "review"
+
+
+def test_a_withdrawn_document_cannot_be_retried(client, w):
+    w.doc.status = "withdrawn"
+    job = KbIngestionJob(document_id=w.doc.id, status="failed", failed_chunk_ids=[w.chunk.id])
+    w.db.add(job)
+    w.db.commit()
+    assert client.post(w.url(f"jobs/{job.id}/retry"), headers=w.hr).status_code == 409
+    assert client.post(w.url(f"jobs/{job.id}/retry-failed"), headers=w.hr).status_code == 409
+    assert w.db.query(KbChunk).filter_by(document_id=w.doc.id).count() == 1
+
+
+# Resolving conflicts
+
+def facts_abc(w, status="draft"):
+    a, b, c = fact(w, "A", "12", status), fact(w, "B", "15", status), fact(w, "C", "20", status)
+    return a, b, c, conflict_between(w, a, b), conflict_between(w, a, c), conflict_between(w, b, c)
+
+
+def resolve(client, w, row, action):
+    return client.post(w.url(f"conflicts/{row.id}/resolve"), json={"action": action}, headers=w.hr)
+
+
+def test_superseding_a_node_closes_its_other_conflicts(client, w):
+    a, b, c, ab, ac, bc = facts_abc(w)
+    assert resolve(client, w, ab, "a").status_code == 200
+    assert w.reload(b).status == "superseded"
+    row = w.reload(bc)
+    assert (row.status, row.resolution) == ("dismissed", "node_superseded")
+    assert row.resolved_at is not None
+    assert w.reload(ac).status == "open"
+    # The Radar's list no longer offers a choice that would leave no live value.
+    listed = client.get(w.url("conflicts"), headers=w.hr).json()
+    assert [item["id"] for item in listed] == [ac.id]
+    assert resolve(client, w, ac, "b").status_code == 200
+    assert {w.reload(a).status, w.reload(c).status} == {"superseded", "draft"}
+
+
+def test_resolve_is_409_when_a_side_is_not_live(client, w):
+    a, b = fact(w, "A", "12"), fact(w, "B", "15")
+    for status in ("superseded", "rejected"):
+        b = w.reload(b)
+        b.status = status
+        w.db.commit()
+        row = conflict_between(w, a, b)
+        for action in ("a", "b", "different_scope"):
+            assert resolve(client, w, row, action).status_code == 409
+        assert w.reload(row).status == "open"
+        assert w.reload(a).status == "draft"
+
+
+def test_resolve_settles_edges_and_finishes_the_document(client, w):
+    org = w.node("Acme", "company", "published", "public", doc=False)
+    keep, lose = fact(w, "Keep", "12", "published"), fact(w, "Lose", "15")
+    keep_edge, lose_edge = w.edge(keep, org), w.edge(lose, org)
+    published_edge = w.edge(lose, keep, status="published")
+    row = conflict_between(w, keep, lose)
+    start = set_version(w)
+    assert resolve(client, w, row, "a").status_code == 200
+    assert w.reload(lose_edge).status == "rejected" and w.reload(published_edge).status == "rejected"
+    assert w.reload(keep_edge).status == "published"
+    assert w.reload(w.doc).status == "published"
+    assert version(w) == start + 1
+
+
+def test_resolve_leaves_the_document_in_review_while_a_draft_remains(client, w):
+    keep, lose, _other = fact(w, "Keep", "12"), fact(w, "Lose", "15"), fact(w, "Other", "20")
+    assert resolve(client, w, conflict_between(w, keep, lose), "a").status_code == 200
+    assert w.reload(w.doc).status == "review"
+
+
+def test_conflicts_list_each_sides_sources(client, db, w):
+    doc = w.document("Leave policy")
+    doc.effective_date = date(2026, 3, 1)
+    chunk = KbChunk(company_id=w.company.id, document_id=doc.id, position=0, page=7, text="t")
+    db.add(chunk)
+    db.commit()
+    a, b = fact(w, "A", "12"), fact(w, "B", "15")
+    db.add(KbNodeSource(node_id=b.id, chunk_id=chunk.id, quote="15 days"))
+    db.commit()
+    conflict_between(w, a, b)
+    [item] = client.get(w.url("conflicts"), headers=w.hr).json()
+    assert item["node_a"]["sources"] == [
+        {"quote": "quote", "page": 3, "document_title": "Handbook", "effective_date": None}
+    ]
+    assert {"quote": "15 days", "page": 7, "document_title": "Leave policy", "effective_date": "2026-03-01"} in item["node_b"]["sources"]
+    assert "embedding" not in item["node_a"]
+
+
+def test_graph_returns_body_and_no_embeddings(client, graph):
+    body = get_graph(client, graph).json()
+    node = next(n for n in body["nodes"] if n["title"] == "Internal fact")
+    assert node["body"] == "Internal fact body"
+    assert not any("embedding" in key for key in node)
+
+
+def test_graph_body_stays_within_the_audience(client, graph):
+    body = get_graph(client, graph, "?view_as=candidate").json()
+    assert all("Internal fact" not in n["body"] for n in body["nodes"])

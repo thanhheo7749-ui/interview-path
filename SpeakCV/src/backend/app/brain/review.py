@@ -3,22 +3,29 @@
 Every function here works inside the caller's transaction and does not commit, except `auto_approve_document`
 which has no request around it, and `recheck_edited_facts` which runs after the caller's commit."""
 import numpy as np
-from sqlalchemy import func, or_
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from app.ai import gateway
 from app.ai.types import AIError
-from app.brain import contradiction, vectors
+from app.brain import contradiction, retriever, vectors
 from app.brain.text import normalise_title
 from app.database.models_brain import VISIBILITIES
-from app.database.sql_models import Company, KbChunk, KbDocument, KbEdge, KbNode, KbNodeSource
+from app.database.sql_models import Company, KbChunk, KbDocument, KbEdge, KbIngestionJob, KbNode, KbNodeSource
 
 MERGE_COSINE = 0.90
 ORG_TYPES = ("company", "department")
 EDITABLE = ("title", "body", "visibility", "fact_value", "fact_unit", "scope_text")
-FACT_CHECKED = ("title", "body", "fact_value", "fact_unit")
+# A change to what a fact says: it looks for contradictions again, and its embedded text changes.
+FACT_CHECKED = ("title", "body", "fact_value", "fact_unit", "scope_text")
+# A change to the claim itself: a pair HR dismissed before no longer answers for it.
+FACT_CLAIM = ("fact_value", "fact_unit", "scope_text")
 LIVE = ("draft", "published")
 DEAD = ("rejected", "superseded")
+# What each review action may be applied to. Published knowledge can be corrected or retracted, not published again.
+ACTION_STATUSES = {"accept": ("draft",), "merge": ("draft",), "edit": LIVE, "reject": LIVE}
+UNPUBLISHABLE = ("review", "published")
+ACTIVE_JOB = ("queued", "running")
 
 
 class ReviewError(Exception):
@@ -40,7 +47,7 @@ def document_node_ids(db: Session, company_id: int, document_id: int) -> set[int
     return {row[0] for row in rows}
 
 
-def _documents_of_nodes(db: Session, company_id: int, node_ids) -> set[int]:
+def documents_of_nodes(db: Session, company_id: int, node_ids) -> set[int]:
     if not node_ids:
         return set()
     rows = (
@@ -65,15 +72,18 @@ def node_sources(db: Session, company_id: int, node_ids: list[int]) -> dict[int,
     if not node_ids:
         return {}
     rows = (
-        db.query(KbNodeSource.node_id, KbNodeSource.quote, KbChunk.page, KbDocument.title)
+        db.query(KbNodeSource.node_id, KbNodeSource.quote, KbChunk.page, KbDocument.title, KbDocument.effective_date)
         .join(KbChunk, KbNodeSource.chunk_id == KbChunk.id)
         .join(KbDocument, KbChunk.document_id == KbDocument.id)
         .filter(KbNodeSource.node_id.in_(node_ids), KbChunk.company_id == company_id)
         .order_by(KbNodeSource.id)
     )
     out: dict[int, list[dict]] = {}
-    for node_id, quote, page, title in rows:
-        out.setdefault(node_id, []).append({"quote": quote, "page": page, "document_title": title})
+    for node_id, quote, page, title, effective_date in rows:
+        out.setdefault(node_id, []).append({
+            "quote": quote, "page": page, "document_title": title,
+            "effective_date": effective_date.isoformat() if effective_date else None,
+        })
     return out
 
 
@@ -116,30 +126,21 @@ def merge_proposals(db: Session, company_id: int, drafts: list[KbNode]) -> list[
 
 # ---------- publishing ----------
 
-def _bump_to(db: Session, company_id: int, value: int) -> None:
-    company = db.get(Company, company_id)
-    if company is not None:
-        company.kb_version = value
-
-
-def _version(db: Session, company_id: int) -> int:
-    company = db.get(Company, company_id)
-    return (company.kb_version or 0) if company is not None else 0
-
-
 def publish_node(db: Session, node: KbNode, user_id: int) -> None:
-    """Stamp and publish one node, and bump the knowledge version. Does not commit.
-
-    Callers that publish several nodes in one request reset the version afterwards so it moves once."""
+    """Stamp and publish one node. Does not commit. The caller moves the knowledge version, once per request."""
     node.status = "published"
     node.approved_by = user_id
     node.approved_at = func.now()
-    _bump_to(db, node.company_id, _version(db, node.company_id) + 1)
 
 
 def settle_edges(db: Session, company_id: int, node_ids: set[int]) -> None:
-    """Publish draft edges whose ends are both published; reject those with a dead end."""
-    for edge in draft_edges(db, company_id, node_ids):
+    """Publish draft edges whose ends are both published; reject draft or published edges with a dead end."""
+    ids = list(node_ids) or [-1]
+    edges = db.query(KbEdge).filter(
+        KbEdge.company_id == company_id, KbEdge.status.in_(("draft", "published")),
+        or_(KbEdge.source_node_id.in_(ids), KbEdge.target_node_id.in_(ids)),
+    ).order_by(KbEdge.id).all()
+    for edge in edges:
         ends = {
             row.id: row.status for row in db.query(KbNode.id, KbNode.status).filter(
                 KbNode.company_id == company_id, KbNode.id.in_([edge.source_node_id, edge.target_node_id])
@@ -178,15 +179,59 @@ def auto_approve_document(db: Session, document_id: int, user_id: int) -> None:
     company = db.get(Company, document.company_id)
     if company is None or not company.is_sample:
         raise PermissionError("Auto approve is only allowed for the sample company")
-    start = _version(db, company.id)
     nodes = draft_nodes(db, company.id, document_id)
     for node in nodes:
         publish_node(db, node, user_id)
     db.flush()
     settle_edges(db, company.id, {n.id for n in nodes})
     finish_document_if_decided(db, document_id)
-    _bump_to(db, company.id, start + 1)
+    contradiction.bump_kb_version(db, company.id)
     db.commit()
+
+
+def unpublish_document(db: Session, company_id: int, document_id: int) -> dict:
+    """Withdraw a document. Its chunks leave retrieval, which requires a published document. Nodes that rest on it
+    alone are rejected; nodes with other sources stay and stop citing it. Does not commit."""
+    document = (
+        db.query(KbDocument)
+        .filter(KbDocument.id == document_id, KbDocument.company_id == company_id)
+        .populate_existing()
+        .with_for_update()
+        .first()
+    )
+    if document is None:
+        raise ReviewError(404, "Document not found")
+    if document.status not in UNPUBLISHABLE:
+        raise ReviewError(409, "Only a document in review or published can be unpublished")
+    if db.query(KbIngestionJob.id).filter(
+        KbIngestionJob.document_id == document_id, KbIngestionJob.status.in_(ACTIVE_JOB)
+    ).with_for_update().first():
+        raise ReviewError(409, "This document has a job in progress")
+
+    node_ids = document_node_ids(db, company_id, document_id)
+    nodes = db.query(KbNode).filter(KbNode.id.in_(list(node_ids) or [-1]), KbNode.status.in_(LIVE)).order_by(KbNode.id).all()
+    chunk_ids = select(KbChunk.id).where(KbChunk.document_id == document_id)
+    rejected: set[int] = set()
+    for node in nodes:
+        elsewhere = (
+            db.query(KbNodeSource.id)
+            .join(KbChunk, KbNodeSource.chunk_id == KbChunk.id)
+            .filter(KbNodeSource.node_id == node.id, KbChunk.document_id != document_id)
+            .first()
+        )
+        if elsewhere:
+            db.query(KbNodeSource).filter(
+                KbNodeSource.node_id == node.id, KbNodeSource.chunk_id.in_(chunk_ids)
+            ).delete(synchronize_session=False)
+        else:
+            node.status = "rejected"
+            contradiction.on_node_rejected(db, node.id)
+            rejected.add(node.id)
+    document.status = "withdrawn"
+    db.flush()
+    settle_edges(db, company_id, rejected)
+    contradiction.bump_kb_version(db, company_id)
+    return {"rejected_nodes": len(rejected), "kept_nodes": len(nodes) - len(rejected)}
 
 
 # ---------- deciding ----------
@@ -194,32 +239,36 @@ def auto_approve_document(db: Session, document_id: int, user_id: int) -> None:
 def _embed_nodes(db: Session, company_id: int, nodes: list[KbNode]) -> None:
     if not nodes:
         return
-    result = gateway.embed([f"{n.title}\n{n.body}" for n in nodes], "document", "kb_embed", company_id)
+    result = gateway.embed([retriever.node_text(n) for n in nodes], "document", "kb_embed", company_id)
     for node, vector in zip(nodes, result.vectors):
         node.embedding = vectors.encode(vector)
         node.embedding_model = result.model
         node.embedding_dim = result.dimension
 
 
-def _apply_fields(item, node: KbNode, reembed: dict[int, KbNode], edited_facts: dict[int, KbNode]) -> None:
+def _apply_fields(item, node: KbNode, reembed: dict[int, KbNode], edited_facts: dict[int, KbNode],
+                 changed_claims: set[int]) -> None:
     for name in EDITABLE:
         value = getattr(item, name)
         if value is None:
             continue
         if name == "visibility" and value not in VISIBILITIES:
             raise ReviewError(422, f"Unknown visibility: {value}")
-        if name in ("title", "body") and value != getattr(node, name):
+        changed = value != getattr(node, name)
+        if changed and (name in ("title", "body") or (node.fact_kind and name in FACT_CHECKED)):
             reembed[node.id] = node
-        if name in FACT_CHECKED and node.fact_kind and value != getattr(node, name):
+        if changed and name in FACT_CHECKED and node.fact_kind:
             edited_facts[node.id] = node
+        if changed and name in FACT_CLAIM and node.fact_kind:
+            changed_claims.add(node.id)
         setattr(node, name, value)
 
 
-def _load_draft(db: Session, company_id: int, node_id: int) -> KbNode:
+def _load_for(db: Session, company_id: int, node_id: int, action: str) -> KbNode:
     node = db.query(KbNode).filter(KbNode.id == node_id, KbNode.company_id == company_id).first()
     if node is None or node.type in ORG_TYPES:
         raise ReviewError(404, "Node not found")
-    if node.status != "draft":
+    if node.status not in ACTION_STATUSES[action]:
         raise ReviewError(409, "This item was already reviewed")
     return node
 
@@ -260,15 +309,16 @@ def _merge(db: Session, company_id: int, node: KbNode, into_id: int, user_id: in
     contradiction.on_node_rejected(db, node.id)
 
 
-def apply_decisions(db: Session, company_id: int, user_id: int, items) -> list[int]:
+def apply_decisions(db: Session, company_id: int, user_id: int, items) -> dict[int, bool]:
     """Apply review items in order. Raises ReviewError; the caller rolls back so a bad item changes nothing.
 
-    Returns the published facts this request edited. The caller commits, then passes them to recheck_edited_facts."""
-    start = _version(db, company_id)
+    Returns the live facts this request edited, each with whether its value, unit or scope changed. The caller
+    commits, then passes them to recheck_edited_facts."""
     touched: set[int] = set()
     documents: set[int] = set()
     reembed: dict[int, KbNode] = {}
     edited_facts: dict[int, KbNode] = {}
+    changed_claims: set[int] = set()
     explicit_documents: list[int] = []
     changed = False
 
@@ -276,13 +326,14 @@ def apply_decisions(db: Session, company_id: int, user_id: int, items) -> list[i
         if item.action == "publish_document":
             explicit_documents.append(item.document_id)
             continue
-        node = _load_draft(db, company_id, item.node_id)
-        documents |= _documents_of_nodes(db, company_id, {node.id})
+        node = _load_for(db, company_id, item.node_id, item.action)
+        documents |= documents_of_nodes(db, company_id, {node.id})
         touched.add(node.id)
         if item.action == "edit":
-            _apply_fields(item, node, reembed, edited_facts)
+            _apply_fields(item, node, reembed, edited_facts, changed_claims)
+            changed = changed or node.status == "published"
         elif item.action == "accept":
-            _apply_fields(item, node, reembed, edited_facts)
+            _apply_fields(item, node, reembed, edited_facts, changed_claims)
             publish_node(db, node, user_id)
             changed = True
         elif item.action == "reject":
@@ -316,19 +367,20 @@ def apply_decisions(db: Session, company_id: int, user_id: int, items) -> list[i
         if document.status != "review" or not finish_document_if_decided(db, document_id):
             raise ReviewError(409, "This document still has items to review or is not waiting for review")
         changed = True
-    if changed or reembed:
-        _bump_to(db, company_id, start + 1)
-    return [node.id for node in edited_facts.values() if node.status == "published"]
+    if changed or reembed or edited_facts:
+        contradiction.bump_kb_version(db, company_id)
+    return {node.id: node.id in changed_claims for node in edited_facts.values() if node.status in LIVE}
 
 
-def recheck_edited_facts(db: Session, company_id: int, node_ids: list[int]) -> list[str]:
+def recheck_edited_facts(db: Session, company_id: int, edited: dict[int, bool]) -> list[str]:
     """Look for new contradictions after an edit is committed, so a failed check cannot undo it. Returns warnings.
 
-    A request with a published edit has already moved kb_version, so opening a conflict here does not move it again."""
+    The request has already moved kb_version, so opening a conflict here does not move it again. A pair HR dismissed
+    is looked at again only when the fact's value, unit or scope changed: the dismissal answered for the old claim."""
     warnings = []
-    for node_id in node_ids:
+    for node_id, claim_changed in edited.items():
         try:
-            contradiction.check_new_facts(db, company_id, [node_id], bump_version=False)
+            contradiction.check_new_facts(db, company_id, [node_id], bump_version=False, recheck_dismissed=claim_changed)
         except AIError:
             db.rollback()
             warnings.append(f"The edit to node {node_id} was saved, but its contradiction check did not finish.")
