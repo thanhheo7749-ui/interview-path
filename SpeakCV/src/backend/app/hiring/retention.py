@@ -9,8 +9,8 @@ from sqlalchemy import or_
 from app.core import storage
 from app.database.database import SessionLocal
 from app.database.sql_models import (
-    Application, AuditLog, Company, CompanyMember, Consent, CultureNote, CvClaim, Job, Notification, RequirementResult,
-    ScreeningCache, VoiceSession, VoiceTurn,
+    Application, AuditLog, CandidateBrief, Company, CompanyMember, Consent, CultureNote, CvClaim, InterviewScorecard,
+    Job, Notification, RequirementResult, ScreeningCache, VoiceSession, VoiceTurn,
 )
 from app.hiring import audit, notify
 from app.hiring.state import advance
@@ -42,6 +42,8 @@ ERASED = {
     "voice_turns": ("question_text", "source_ref", "audio_path", "transcript"),
     "culture_notes": ("note", "quote"),
     "consents": ("user_id",),
+    "candidate_briefs": ("content",),  # original quotes and recording times
+    "interview_scorecards": ("requirement_scores", "notes"),
 }
 # Whole rows go. A notification's user_id cannot be NULL, and a cache row is nothing but quotes and claims.
 DELETED_ROWS = ("screening_cache", "notifications")
@@ -192,7 +194,7 @@ def anonymize_application(db, application, *, trigger: str = TRIGGER_RETENTION) 
     turns = db.query(VoiceTurn).filter(VoiceTurn.session_id.in_(session_ids)).all() if session_ids else []
     audio_paths = [turn.audio_path for turn in turns if turn.audio_path]
 
-    for model in (RequirementResult, CvClaim, CultureNote, Consent):
+    for model in (RequirementResult, CvClaim, CultureNote, Consent, CandidateBrief, InterviewScorecard):
         for row in db.query(model).filter_by(application_id=application_id):
             _erase(row)
     for row in (*sessions, *turns):

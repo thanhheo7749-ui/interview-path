@@ -676,7 +676,7 @@ def test_every_text_column_and_user_link_is_classified_for_retention(table):
 
 
 def test_the_classification_names_only_real_columns_and_no_column_twice():
-    tables = {table.name: table for table in hiring_tables()}
+    tables = {table.name: table for table in Base.metadata.sorted_tables}  # includes the bridges tables
     for name, columns in (*retention.ERASED.items(), *retention.KEPT.items()):
         assert set(columns) <= set(tables[name].columns.keys()), name
     for name in retention.ERASED:
