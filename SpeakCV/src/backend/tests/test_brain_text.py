@@ -1,6 +1,8 @@
 import unicodedata
 
-from app.brain.text import guess_language, keyword_scores, normalise_for_match, normalise_title, quote_in, tokenise
+from app.brain.text import (
+    guess_language, keyword_scores, normalise_for_match, normalise_title, quote_in, tokenise, verified_quote,
+)
 
 
 def test_quote_matches_across_unicode_forms_and_whitespace():
@@ -60,3 +62,24 @@ def test_vectors_roundtrip_and_cosine():
     m = np.array([[1.0, 0.0], [0.0, 1.0], [0.0, 0.0]], dtype="<f4")
     assert np.allclose(cosine_matrix(v, m), [1.0, 0.0, 0.0])
     assert cosine_matrix(v, np.zeros((0, 2), dtype="<f4")).size == 0
+
+
+def test_latin_1_accents_do_not_make_text_vietnamese():
+    assert guess_language("Where do I send my résumé?") == "en"
+    assert guess_language("Résumé à la carte") == "en"
+
+
+def test_real_vietnamese_is_still_recognised():
+    assert guess_language("Nhân viên được nghỉ phép năm") == "vi"
+    assert guess_language("Thời gian thử việc của nhân viên mới là 3 tháng") == "vi"
+    assert guess_language("Công ty xét thưởng một lần") == "vi"
+
+
+def test_a_quote_needs_substance_to_verify():
+    source = "Employees receive 12 days of annual leave. 연차는 스무 일을 부여한다."
+    assert verified_quote("12 days of annual leave", source)
+    assert not verified_quote("12 days", source)  # found, but trivial
+    assert not verified_quote("12 days of leave each", source)  # long enough, but not in the source
+    assert verified_quote("스무 일을 부여", source)  # six characters are enough with Korean text
+    assert not verified_quote("연차는", source)
+    assert not verified_quote("   ", source)

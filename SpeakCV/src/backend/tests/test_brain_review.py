@@ -400,7 +400,7 @@ def test_finish_document_if_decided_only_acts_on_review_documents(db, w):
 
 # Editing a fact and contradictions
 
-AGREE = json.dumps({"same_topic": True, "same_scope": True})
+AGREE = json.dumps({"same_topic": True, "same_scope": True, "same_value": False})
 
 
 def fact(w, title, value, status="draft"):

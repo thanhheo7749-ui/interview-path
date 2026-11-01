@@ -6,7 +6,10 @@ _HANGUL = re.compile(r"[가-힣]")
 _WORD = re.compile(r"\w+")
 _SPLIT_HANGUL = re.compile(r"[가-힣]+|[^가-힣]+")
 _VI_SPECIFIC = set("ăâđêôơưĂÂĐÊÔƠƯ")
-_VI_RANGE = re.compile("[À-ỹ]")
+# Tilde vowels and Latin Extended Additional. Latin-1 accents, as in "résumé", say nothing about the language.
+_VI_RANGE = re.compile("[ĨĩŨũẠ-ỹ]")
+MIN_QUOTE_CHARS = 12
+MIN_QUOTE_CHARS_KOREAN = 6
 
 K1 = 1.5
 B = 0.75
@@ -25,6 +28,13 @@ def quote_in(quote: str, source: str) -> bool:
     if not needle:
         return False
     return needle in normalise_for_match(source)
+
+
+def verified_quote(quote: str, source: str) -> bool:
+    """The anti-fabrication gate: the quote is in its source and long enough to prove something."""
+    needle = normalise_for_match(quote)
+    minimum = MIN_QUOTE_CHARS_KOREAN if _HANGUL.search(needle) else MIN_QUOTE_CHARS
+    return len(needle) >= minimum and quote_in(needle, source)
 
 
 def tokenise(text: str) -> list[str]:

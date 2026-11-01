@@ -1,8 +1,9 @@
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 from app.ai import gateway
+from app.brain.prompting import as_data
 from app.database.models_brain import EXTRACTABLE_NODE_TYPES
 
 MAX_EXTRACTION_TOKENS = 4000
@@ -26,9 +27,11 @@ Rules:
 
 
 class ExtractedNode(BaseModel):
+    """Field lengths are checked per item in ingestion, so one bad item cannot fail its whole chunk."""
+
     ref: str
     type: Literal[EXTRACTABLE_NODE_TYPES]  # type: ignore[valid-type]
-    title: str = Field(min_length=1, max_length=500)
+    title: str
     body: str
     quote: str
     fact_kind: Literal["none", "number", "date", "boolean"] = "none"
@@ -52,8 +55,11 @@ class ExtractionResult(BaseModel):
 
 
 def extract_chunk(chunk_text: str, language: str, known_titles: list[str], company_id: int) -> ExtractionResult:
-    known = "\n".join(f"- {title}" for title in known_titles) or "(none)"
-    user = f"Known nodes you may link to:\n{known}\n\nDocument language: {language}\n\n<document>\n{chunk_text}\n</document>"
+    known = "\n".join(f"- {as_data(title)}" for title in known_titles) or "(none)"
+    user = (
+        f"Known nodes you may link to:\n{known}\n\nDocument language: {as_data(language)}\n\n"
+        f"<document>\n{as_data(chunk_text)}\n</document>"
+    )
     result = gateway.generate_structured(
         "bulk", SYSTEM_PROMPT, [{"role": "user", "content": user}], ExtractionResult,
         MAX_EXTRACTION_TOKENS, "kb_extract", company_id,

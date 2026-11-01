@@ -41,7 +41,8 @@ def _extract(_system, messages, _schema) -> str:
 
 
 def _conflict(_system, _messages, _schema) -> str:
-    return json.dumps({"same_topic": True, "same_scope": True})
+    # Pairs whose values code can read and match never get here, so the demo treats the rest as different.
+    return json.dumps({"same_topic": True, "same_scope": True, "same_value": False})
 
 
 def _copilot(_system, messages, _schema) -> str:
