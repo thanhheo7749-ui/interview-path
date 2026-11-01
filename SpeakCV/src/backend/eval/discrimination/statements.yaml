@@ -1,0 +1,83 @@
+# Labelled statements for the discrimination guard. All invented; none names a real person or company.
+# label: true means the statement asks for or prefers candidates by a protected trait and the guard should flag it.
+# category: the protected trait for a positive, "none" for a job-related statement.
+# Some entries are hard on purpose: job-related text that looks like discrimination, and discrimination that avoids
+# the obvious words. They were written before the rules were run and are not tuned to them.
+
+# ---------------------------------------------------------------- English
+- {language: en, label: true, category: age, text: "Young dynamic team member wanted for our growing sales floor."}
+- {language: en, label: true, category: age, text: "Ideal candidate is under 28."}
+- {language: en, label: true, category: age, text: "Between 25 and 32 years of age, so you fit in with the rest of the team."}
+- {language: en, label: true, category: gender, text: "Males only for the night shift crew."}
+- {language: en, label: true, category: gender, text: "Looking for a guy who will get along with the lads on the floor."}
+- {language: en, label: true, category: marital_status, text: "Candidates should be single and free of family commitments."}
+- {language: en, label: true, category: marital_status, text: "You must not be planning to have a baby in the next two years."}
+- {language: en, label: true, category: appearance, text: "Well-groomed with a presentable appearance, ideally slim."}
+- {language: en, label: true, category: appearance, text: "Tall, athletic build preferred for the front desk."}
+- {language: en, label: true, category: region, text: "Born and raised in the capital, with no provincial accent."}
+- {language: en, label: true, category: religion, text: "Comfortable joining the whole team at our Sunday worship before the week starts."}
+- {language: en, label: true, category: ethnicity, text: "Applicants of pure Kinh heritage preferred, as our clients are more at ease with them."}
+- {language: en, label: false, category: none, text: "Response time under 30 ms at the 95th percentile."}
+- {language: en, label: false, category: none, text: "Team of 30 engineers across three squads."}
+- {language: en, label: false, category: none, text: "At least five years of Python experience."}
+- {language: en, label: false, category: none, text: "Able to lift boxes of up to 20 kg, as the warehouse work requires."}
+- {language: en, label: false, category: none, text: "Fluent in Korean, TOPIK level 5 or higher."}
+- {language: en, label: false, category: none, text: "Willing to work night shifts on a rota."}
+- {language: en, label: false, category: none, text: "Experience supporting clients in Northern Europe."}
+- {language: en, label: false, category: none, text: "Knowledge of Islamic banking regulations for our compliance desk."}
+- {language: en, label: false, category: none, text: "Built admissions software for Catholic schools."}
+- {language: en, label: false, category: none, text: "Advised employees on pregnancy benefits and leave policy in a previous HR role."}
+- {language: en, label: false, category: none, text: "Black-box testing and race condition debugging experience."}
+- {language: en, label: false, category: none, text: "Office based in Da Nang, hybrid two days a week."}
+
+# ---------------------------------------------------------------- Vietnamese
+- {language: vi, label: true, category: age, text: "Tuyển nhân viên kinh doanh nam, dưới 30 tuổi."}
+- {language: vi, label: true, category: age, text: "Cần một bạn trẻ năng động, mới ra trường, dễ hòa đồng với team."}
+- {language: vi, label: true, category: age, text: "Sinh năm 1998 trở lại đây."}
+- {language: vi, label: true, category: gender, text: "Ưu tiên ứng viên nữ, ngoại hình ưa nhìn."}
+- {language: vi, label: true, category: gender, text: "Anh em trong team toàn trai trẻ, bạn nữ vào dễ bị lạc lõng."}
+- {language: vi, label: true, category: marital_status, text: "Không nhận chị em đang mang bầu hoặc sắp sinh con."}
+- {language: vi, label: true, category: marital_status, text: "Ưu tiên độc thân để dễ sắp xếp thời gian tăng ca."}
+- {language: vi, label: true, category: appearance, text: "Chiều cao từ 1m65 trở lên, thân hình cân đối."}
+- {language: vi, label: true, category: region, text: "Ưu tiên người miền Bắc, giọng chuẩn."}
+- {language: vi, label: true, category: region, text: "Quê ở Hà Nội hoặc các tỉnh lân cận thì tốt."}
+- {language: vi, label: true, category: religion, text: "Không nhận người theo đạo Thiên Chúa vì phải làm ngày Chủ nhật."}
+- {language: vi, label: true, category: ethnicity, text: "Chỉ nhận người Kinh, không nhận dân tộc thiểu số."}
+- {language: vi, label: false, category: none, text: "Có ít nhất 3 năm kinh nghiệm Python."}
+- {language: vi, label: false, category: none, text: "Thời gian phản hồi API dưới 30 ms."}
+- {language: vi, label: false, category: none, text: "Team 30 người, làm việc theo mô hình Agile."}
+- {language: vi, label: false, category: none, text: "Thường xuyên làm việc với khách hàng ở miền Bắc qua video call."}
+- {language: vi, label: false, category: none, text: "Làm ca đêm theo lịch phân công."}
+- {language: vi, label: false, category: none, text: "Chứng chỉ IELTS 6.5 trở lên."}
+- {language: vi, label: false, category: none, text: "Nắm quy trình xử lý chế độ thai sản cho nhân viên, vì đây là vị trí nhân sự."}
+- {language: vi, label: false, category: none, text: "Hệ thống kế toán legacy 15 tuổi cần người bảo trì."}
+- {language: vi, label: false, category: none, text: "Bán phần mềm quản lý sức khỏe cho khách hàng là người cao tuổi."}
+- {language: vi, label: false, category: none, text: "Có thể bê vác hàng đến 20 kg theo yêu cầu của kho."}
+- {language: vi, label: false, category: none, text: "Viết nội dung về tôn giáo và văn hóa cho tạp chí du lịch."}
+- {language: vi, label: false, category: none, text: "Làm việc tại văn phòng Quận 1, TP.HCM."}
+
+# ---------------------------------------------------------------- Korean
+- {language: ko, label: true, category: age, text: "30세 이하 남성 우대."}
+- {language: ko, label: true, category: age, text: "20대 후반 여성 선호."}
+- {language: ko, label: true, category: age, text: "젊고 활기찬 팀원을 찾습니다."}
+- {language: ko, label: true, category: gender, text: "여직원이 분위기를 부드럽게 해주니 여성분을 원합니다."}
+- {language: ko, label: true, category: marital_status, text: "미혼 여성 지원 가능."}
+- {language: ko, label: true, category: marital_status, text: "결혼 계획이 없는 분이면 좋겠습니다."}
+- {language: ko, label: true, category: marital_status, text: "아이 키우는 엄마는 야근이 어려우니 제외합니다."}
+- {language: ko, label: true, category: appearance, text: "키 165cm 이상, 단정한 용모."}
+- {language: ko, label: true, category: region, text: "서울 출신이면 소통이 편해서 우대합니다."}
+- {language: ko, label: true, category: religion, text: "교회 다니시는 분이면 팀 분위기에 잘 맞습니다."}
+- {language: ko, label: true, category: ethnicity, text: "한국인 혈통만 지원 가능합니다."}
+- {language: ko, label: true, category: marital_status, text: "임신 계획이 있으면 곤란합니다."}
+- {language: ko, label: false, category: none, text: "Python 3년 이상 경력."}
+- {language: ko, label: false, category: none, text: "API 응답 시간 30ms 이하."}
+- {language: ko, label: false, category: none, text: "팀 규모는 30명입니다."}
+- {language: ko, label: false, category: none, text: "야간 근무 가능자."}
+- {language: ko, label: false, category: none, text: "TOPIK 5급 이상."}
+- {language: ko, label: false, category: none, text: "서울 본사 근무, 주 2일 재택."}
+- {language: ko, label: false, category: none, text: "토익 800점 이상."}
+- {language: ko, label: false, category: none, text: "신장 이식 의료기기 소프트웨어 개발 경험."}
+- {language: ko, label: false, category: none, text: "연령별 사용자 분석 대시보드 개발 경험."}
+- {language: ko, label: false, category: none, text: "종교 시설 관리 소프트웨어 개발 경험."}
+- {language: ko, label: false, category: none, text: "성별 데이터 처리 파이프라인 설계 경험."}
+- {language: ko, label: false, category: none, text: "물류센터 업무 특성상 20kg 물품 운반이 가능한 분."}
