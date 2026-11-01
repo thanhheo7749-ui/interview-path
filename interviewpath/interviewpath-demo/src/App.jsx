@@ -3,6 +3,7 @@ import RequireAuth from './auth/RequireAuth.jsx';
 import { CompanyProvider } from './company/CompanyContext.jsx';
 import SampleBanner from './components/SampleBanner.jsx';
 import Sidebar from './components/Sidebar.jsx';
+import ChangePasswordPage from './routes/ChangePasswordPage.jsx';
 import CompanySettingsPage from './routes/CompanySettingsPage.jsx';
 import LoginPage from './routes/LoginPage.jsx';
 
@@ -32,6 +33,7 @@ function App() {
         }
       >
         <Route path="/settings" element={<CompanySettingsPage />} />
+        <Route path="/account/password" element={<ChangePasswordPage />} />
         <Route path="*" element={<Navigate to="/settings" replace />} />
       </Route>
     </Routes>

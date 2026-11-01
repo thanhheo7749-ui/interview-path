@@ -37,7 +37,8 @@ export function CompanyProvider({ children }) {
   const refresh = useCallback(() => setVersion((v) => v + 1), []);
 
   const value = useMemo(
-    () => ({ memberships, company: companyId == null ? null : company, membership, selectCompany, refresh }),
+    // During a switch the state still holds the previous company until the new one arrives.
+    () => ({ memberships, company: company?.id === companyId ? company : null, membership, selectCompany, refresh }),
     [memberships, company, companyId, membership, selectCompany, refresh],
   );
   return <CompanyContext.Provider value={value}>{children}</CompanyContext.Provider>;
