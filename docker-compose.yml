@@ -14,8 +14,10 @@ services:
       # MYSQL_ROOT_PASSWORD goes into this URL as is, so it must be URL-safe (no @ : / ? # %).
       DATABASE_URL: mysql+pymysql://root:${MYSQL_ROOT_PASSWORD:?set MYSQL_ROOT_PASSWORD in .env}@db:3306/${MYSQL_DATABASE:?set MYSQL_DATABASE in .env}
       STORAGE_DIR: /data/storage
+      RECORDINGS_DIR: /data/recordings
     volumes:
       - speakcv_storage:/data/storage
+      - speakcv_recordings:/data/recordings
     depends_on:
       db:
         condition: service_healthy
@@ -71,5 +73,6 @@ services:
 
 volumes:
   speakcv_storage:
+  speakcv_recordings:
   speakcv_db_data:
   interviewpath_node_modules:
