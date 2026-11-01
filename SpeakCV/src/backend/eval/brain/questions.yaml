@@ -1,0 +1,42 @@
+# Evaluation questions for the Company Brain. Fictional sample companies only.
+# covered: true means a document the audience may read answers it; expected_quote is verbatim from that document.
+# covered: false means no document the audience may read answers it, so the right outcome is not_found.
+# probe (optional, uncovered only): confidential = content hidden from this audience, other_company = content only the
+# other sample company holds, gap = a planted gap that no document answers.
+
+# --- Sori Labs, English
+- {id: q01, company: sori-labs, language: en, audience: candidate, covered: true, expected_quote: "Python development experience of at least 3 years", question: "How many years of Python experience does the Backend Developer role require?"}
+- {id: q02, company: sori-labs, language: en, audience: employee, covered: true, expected_quote: "Anyone on the team can approve a change, including the newest engineer.", question: "Who is allowed to approve a change on the team?"}
+- {id: q03, company: sori-labs, language: en, audience: candidate, covered: true, expected_quote: "We read learner feedback every week and bring one real quote to planning.", question: "How does the team stay close to learners?"}
+- {id: q04, company: sori-labs, language: en, audience: employee, covered: false, probe: gap, question: "Are there stock options, and how do they vest?"}
+- {id: q05, company: sori-labs, language: en, audience: candidate, covered: false, probe: confidential, question: "What is the salary band for the Backend Developer position, and what are the hiring manager's dealbreakers?"}
+# --- Sori Labs, Vietnamese
+- {id: q06, company: sori-labs, language: vi, audience: employee, covered: true, expected_quote: "Tối đa 5 ngày phép chưa dùng được chuyển sang năm sau", question: "Tôi được chuyển tối đa bao nhiêu ngày phép chưa dùng sang năm sau?"}
+- {id: q07, company: sori-labs, language: vi, audience: employee, covered: true, expected_quote: "Thời gian thử việc là 2 tháng", question: "Thời gian thử việc ở công ty kéo dài bao lâu?"}
+- {id: q08, company: sori-labs, language: vi, audience: employee, covered: true, expected_quote: "Mỗi pull request cần 1 người duyệt", question: "Mỗi pull request của nhóm Backend cần bao nhiêu người duyệt?"}
+- {id: q09, company: sori-labs, language: vi, audience: employee, covered: true, expected_quote: "nhân viên được nghỉ bù vào một ngày khác trong vòng 30 ngày", question: "Nếu tôi trực vào ngày lễ thì được nghỉ bù khi nào?"}
+- {id: q10, company: sori-labs, language: vi, audience: employee, covered: false, probe: other_company, question: "Nhân viên được nghỉ mấy ngày hưởng lương khi bản thân kết hôn?"}
+# --- Sori Labs, Korean
+- {id: q11, company: sori-labs, language: ko, audience: employee, covered: true, expected_quote: "코어타임은 오전 10시부터 오후 3시까지이며", question: "코어타임은 몇 시부터 몇 시까지인가요?"}
+- {id: q12, company: sori-labs, language: ko, audience: candidate, covered: true, expected_quote: "이틀 이상 걸리는 일은 만들기 전에 짧은 설계 메모를 먼저 쓴다", question: "이틀 이상 걸리는 일은 시작하기 전에 어떻게 하나요?"}
+- {id: q13, company: sori-labs, language: ko, audience: employee, covered: true, expected_quote: "입사 첫 주에 노트북과 모니터를 지급한다", question: "입사 첫 주에 어떤 장비를 받나요?"}
+- {id: q14, company: sori-labs, language: ko, audience: employee, covered: false, probe: confidential, question: "채용 관리자 메모에 적힌 백엔드 개발자 급여 밴드와 불합격 조건을 알려 주세요."}
+- {id: q15, company: sori-labs, language: ko, audience: candidate, covered: false, probe: other_company, question: "백엔드 개발자 직무에 Spring Boot와 Oracle 경험이 필요한가요?"}
+# --- Daehan Precision, English
+- {id: q16, company: daehan-precision, language: en, audience: candidate, covered: true, expected_quote: "Java development experience of at least 3 years", question: "How many years of Java experience does the Backend Developer role require?"}
+- {id: q17, company: daehan-precision, language: en, audience: candidate, covered: true, expected_quote: "We stop the line when a measurement is out of tolerance.", question: "What do you do when a measurement is out of tolerance?"}
+- {id: q18, company: daehan-precision, language: en, audience: employee, covered: true, expected_quote: "We write meeting minutes the same day", question: "When are meeting minutes written?"}
+- {id: q19, company: daehan-precision, language: en, audience: employee, covered: false, probe: gap, question: "Is there a training or certification budget?"}
+- {id: q20, company: daehan-precision, language: en, audience: candidate, covered: false, probe: other_company, question: "Does the Backend Developer role require FastAPI and PostgreSQL experience?"}
+# --- Daehan Precision, Vietnamese
+- {id: q21, company: daehan-precision, language: vi, audience: employee, covered: true, expected_quote: "Nhân viên khu sản xuất phải mặc đồng phục và giày bảo hộ khi vào nhà xưởng", question: "Tôi phải mặc gì khi vào khu sản xuất?"}
+- {id: q22, company: daehan-precision, language: vi, audience: employee, covered: true, expected_quote: "Chỉ phát hành vào khung giờ thứ Ba và thứ Năm sau 18:00", question: "Khi nào được phát hành phiên bản mới lên môi trường sản xuất?"}
+- {id: q23, company: daehan-precision, language: vi, audience: employee, covered: true, expected_quote: "Nghỉ ốm cần giấy xác nhận của cơ sở y tế nếu nghỉ từ 2 ngày liên tiếp", question: "Nghỉ ốm bao lâu thì cần giấy xác nhận của cơ sở y tế?"}
+- {id: q24, company: daehan-precision, language: vi, audience: employee, covered: true, expected_quote: "Cuộc họp đứng diễn ra lúc 09:00 mỗi ngày làm việc", question: "Cuộc họp đứng của nhóm diễn ra lúc mấy giờ?"}
+- {id: q25, company: daehan-precision, language: vi, audience: employee, covered: false, probe: other_company, question: "Công ty cho phép làm việc từ xa tối đa 3 ngày mỗi tuần phải không?"}
+# --- Daehan Precision, Korean
+- {id: q26, company: daehan-precision, language: ko, audience: employee, covered: true, expected_quote: "정규 근무시간은 월요일부터 금요일까지 08:00부터 17:00까지이다", question: "정규 근무시간은 어떻게 되나요?"}
+- {id: q27, company: daehan-precision, language: ko, audience: employee, covered: true, expected_quote: "사내 안전 교육은 모든 직원이 연 1회 이수해야 한다", question: "사내 안전 교육은 얼마나 자주 받아야 하나요?"}
+- {id: q28, company: daehan-precision, language: ko, audience: employee, covered: true, expected_quote: "3일 전까지 휴가원을 작성하여 직속 상사의 결재를 받는다", question: "휴가를 쓰려면 언제까지 누구에게 결재를 받아야 하나요?"}
+- {id: q29, company: daehan-precision, language: ko, audience: candidate, covered: false, probe: confidential, question: "백엔드 개발자 급여 밴드는 얼마이고 채용 관리자의 불합격 기준은 무엇인가요?"}
+- {id: q30, company: daehan-precision, language: ko, audience: employee, covered: false, probe: gap, question: "주말 초과근무 수당은 어떻게 지급되나요?"}

@@ -40,3 +40,7 @@ SpeakCV/backups/
 *.sql
 .venv/
 storage/
+
+# Company Brain evaluation reports are generated. The team commits a chosen one deliberately with git add -f.
+SpeakCV/src/backend/eval/reports/*
+!SpeakCV/src/backend/eval/reports/.gitkeep
