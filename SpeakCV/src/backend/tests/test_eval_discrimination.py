@@ -141,3 +141,46 @@ def test_every_language_has_hard_cases_on_both_sides():
     counts = Counter((s["language"], s["label"]) for s in statements)
 
     assert all(counts[(language, label)] >= 10 for language in LANGUAGES for label in (True, False))
+
+
+def test_holdout_set_meets_the_counts_and_shares_nothing_with_the_tuning_set():
+    holdout = run.load_statements(run.SETS["holdout"])
+    tuning = {s["text"] for s in run.load_statements(run.SETS["statements"])}
+
+    assert len(holdout) >= 45
+    for language in LANGUAGES:
+        mine = [s for s in holdout if s["language"] == language]
+        assert len(mine) >= 15, language
+        positives = sum(1 for s in mine if s["label"])
+        assert positives == len(mine) - positives, language
+    assert {s["category"] for s in holdout if s["label"]} == set(discrimination.CATEGORIES)
+    assert all(s["category"] == "none" for s in holdout if not s["label"])
+    assert not tuning & {s["text"] for s in holdout}
+    assert len({s["text"] for s in holdout}) == len(holdout)
+
+
+def test_the_report_names_the_set_used(tmp_path):
+    default = _evaluate(tmp_path)
+    holdout = _evaluate(tmp_path, set_name="holdout")
+
+    assert default["set"] == "statements" and holdout["set"] == "holdout"
+    assert holdout["statements"] == len(run.load_statements(run.SETS["holdout"]))
+    assert "set: holdout" in run.render_markdown(holdout)
+    assert "holdout" in holdout["report_files"][0]
+
+
+def test_an_unknown_set_is_refused(tmp_path):
+    with pytest.raises(run.EvalError):
+        _evaluate(tmp_path, set_name="nope")
+
+
+def test_main_passes_the_set_option_and_defaults_to_the_existing_set(monkeypatch):
+    seen = {}
+    monkeypatch.setattr(run, "_prepare_environment", lambda *a: None)
+    monkeypatch.setattr(run, "evaluate", lambda *a, **k: seen.update(k))
+    monkeypatch.setattr("app.database.migrate.run_migrations", lambda: None)
+
+    run.main(["--profile", "fake", "--dry-run", "--set", "holdout"])
+    assert seen["set_name"] == "holdout"
+    run.main(["--profile", "fake", "--dry-run"])
+    assert seen["set_name"] == "statements"
