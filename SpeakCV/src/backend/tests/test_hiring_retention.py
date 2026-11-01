@@ -546,7 +546,7 @@ def test_a_file_that_cannot_be_deleted_leaves_the_candidate_able_to_retry(app, d
 
 
 def test_hr_audio_after_anonymizing_gets_404_with_no_stack_trace(app, db, world):
-    """The route is Task 6's. Before that merges this 404 comes from routing; after it, from the route itself."""
+    """The real route answers: test_hiring_board shows it serving this same audio through recordings.read first."""
     item = full_application(db, world, **decided(world, RETENTION_DAYS + 1))
     position = item.turn.position
     url = f"/api/companies/{world.company_id}/applications/{item.id}/turns/{position}/audio"
@@ -689,7 +689,7 @@ def test_every_table_pointing_at_an_application_is_classified():
         table.name for table in Base.metadata.sorted_tables
         if any(key.target_fullname == "applications.id" for column in table.columns for key in column.foreign_keys)
     ]
-    assert sorted(linked) == sorted(set(linked) & set(retention.ERASED))
+    assert sorted(linked) == sorted(set(linked) & {*retention.ERASED, *retention.DELETED_ROWS})
 
 
 # Reminders

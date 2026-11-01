@@ -8,7 +8,8 @@ ALLOWED = [
     ("cv_failed", "cv_processing"), ("invited", "session_in_progress"), ("invited", "withdrawn"),
     ("invited", "declined_recording"), ("invited", "ready_for_hr"), ("declined_recording", "ready_for_hr"),
     ("session_in_progress", "session_completed"), ("session_in_progress", "ready_for_hr"),
-    ("session_completed", "analyzing"), ("analyzing", "ready_for_hr"), ("ready_for_hr", "invited"),
+    ("session_completed", "analyzing"), ("analyzing", "ready_for_hr"), ("analyzing", "session_completed"),
+    ("ready_for_hr", "invited"),
 ]
 
 
