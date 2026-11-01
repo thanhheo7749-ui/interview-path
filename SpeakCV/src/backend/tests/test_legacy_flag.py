@@ -2,6 +2,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.main import create_app
+from tests.helpers import iter_routes, route_path
 
 LEGACY_PATHS = [
     ("post", "/api/chat"),
@@ -19,19 +20,7 @@ LEGACY_PATHS = [
 
 def _paths(app):
     """Collect every mounted path, including routes nested inside included routers."""
-    found = set()
-
-    def walk(routes):
-        for route in routes:
-            if hasattr(route, "effective_candidates"):
-                walk(route.effective_candidates())
-            else:
-                path = getattr(route, "path", "")
-                if path:
-                    found.add(path)
-
-    walk(app.routes)
-    return found
+    return {route_path(route) for route in iter_routes(app)} - {""}
 
 
 @pytest.mark.parametrize("method,path", LEGACY_PATHS)
@@ -49,6 +38,7 @@ def test_flag_off_mounts_no_payment_or_support_routes():
 def test_flag_on_mounts_legacy_routes():
     paths = _paths(create_app(legacy_b2c=True))
     assert {"/api/chat", "/api/upgrade-pro", "/api/admin/ai-brain/versions"} <= paths
+    assert [p for p in paths if "/ws/" in p], "the walk must see websocket routes"
 
 
 def test_core_routes_stay_mounted_when_the_flag_is_off():

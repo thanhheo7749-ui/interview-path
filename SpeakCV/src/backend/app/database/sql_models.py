@@ -2,7 +2,7 @@
 # This project is licensed under the MIT License.
 # See the LICENSE file in the project root for more information.
 
-from sqlalchemy import Column, Integer, String, Text, Float, DateTime, ForeignKey, JSON, Date, Boolean
+from sqlalchemy import CheckConstraint, Column, Integer, String, Text, Float, DateTime, ForeignKey, JSON, Date, Boolean, UniqueConstraint
 from sqlalchemy.sql import func
 from .database import Base
 
@@ -247,3 +247,42 @@ class AIUsageLog(Base):
     estimated_cost_usd = Column(Float, nullable=True)
     success = Column(Boolean, nullable=False)
     error_type = Column(String(100), nullable=True)
+
+
+class Company(Base):
+    __tablename__ = "companies"
+
+    id = Column(Integer, primary_key=True, index=True)
+    slug = Column(String(100), unique=True, nullable=False, index=True)
+    name = Column(String(255), nullable=False)
+    is_sample = Column(Boolean, nullable=False, default=False)
+    default_locale = Column(String(10), nullable=False, default="en")
+    retention_days = Column(Integer, nullable=False, default=90)
+    kb_version = Column(Integer, nullable=False, default=0)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
+class Department(Base):
+    __tablename__ = "departments"
+    __table_args__ = (UniqueConstraint("company_id", "parent_id", "name", name="uq_department_sibling_name"),)
+
+    id = Column(Integer, primary_key=True, index=True)
+    company_id = Column(Integer, ForeignKey("companies.id", ondelete="CASCADE"), nullable=False, index=True)
+    parent_id = Column(Integer, ForeignKey("departments.id"), nullable=True, index=True)
+    name = Column(String(255), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
+class CompanyMember(Base):
+    __tablename__ = "company_members"
+    __table_args__ = (
+        UniqueConstraint("company_id", "user_id", name="uq_company_member"),
+        CheckConstraint("role IN ('hr', 'manager', 'employee')", name="ck_company_member_role"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    company_id = Column(Integer, ForeignKey("companies.id", ondelete="CASCADE"), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    department_id = Column(Integer, ForeignKey("departments.id"), nullable=True, index=True)
+    role = Column(String(20), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
