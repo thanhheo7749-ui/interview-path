@@ -1,4 +1,4 @@
-.PHONY: docker-build docker-up docker-down docker-logs docker-ps docker-build-speakcv docker-up-speakcv docker-restart test
+.PHONY: docker-build docker-up docker-down docker-logs docker-ps docker-build-speakcv docker-up-speakcv docker-restart test reembed
 
 BACKEND_DIR = SpeakCV/src/backend
 BACKEND_PY = $(if $(wildcard $(BACKEND_DIR)/.venv/bin/python),.venv/bin/python,python3)
@@ -56,3 +56,7 @@ prod-down:
 
 test:
 	cd $(BACKEND_DIR) && $(BACKEND_PY) -m pytest -q
+
+# Calls the configured embedding vendor. Limit to one company with COMPANY=<slug>.
+reembed:
+	cd $(BACKEND_DIR) && $(BACKEND_PY) -m app.cli reembed $(if $(COMPANY),--company $(COMPANY))
