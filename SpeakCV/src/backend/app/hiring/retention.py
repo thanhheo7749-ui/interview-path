@@ -39,7 +39,7 @@ ERASED = {
     "requirement_results": ("quote",),
     "cv_claims": ("text", "quote", "evidence_quote"),
     "voice_sessions": ("owner_user_id", "plan"),  # the plan holds question text, which quotes the CV
-    "voice_turns": ("question_text", "source_ref", "audio_path", "transcript"),
+    "voice_turns": ("question_text", "source_ref", "audio_path", "question_audio_path", "transcript"),
     "culture_notes": ("note", "quote"),
     "consents": ("user_id",),
     "candidate_briefs": ("content",),  # original quotes and recording times
@@ -198,7 +198,7 @@ def anonymize_application(db, application, *, trigger: str = TRIGGER_RETENTION) 
     sessions = db.query(VoiceSession).filter_by(application_id=application_id).all()
     session_ids = [session.id for session in sessions]
     turns = db.query(VoiceTurn).filter(VoiceTurn.session_id.in_(session_ids)).all() if session_ids else []
-    audio_paths = [turn.audio_path for turn in turns if turn.audio_path]
+    audio_paths = [path for turn in turns for path in (turn.audio_path, turn.question_audio_path) if path]
 
     for model in (RequirementResult, CvClaim, CultureNote, Consent, CandidateBrief, InterviewScorecard):
         for row in db.query(model).filter_by(application_id=application_id):

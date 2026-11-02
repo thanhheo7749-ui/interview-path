@@ -12,11 +12,21 @@ application was deleted, and it runs again after every AI call, so nothing is wr
 
 The clock: `active_seconds` is the time a candidate has been at it, and it is what the limits measure. A gap between two
 requests counts up to `max_counted_gap_seconds`, so a dropped connection costs little and the session can resume.
+
+The hard limit and an answer already under way: a question that was open before the limit may have its upload accepted
+for `max_counted_gap_seconds` past the limit (the 3 minutes an answer may take, and time to send it). It is the last
+answer. Anything later is refused, the audio is discarded and the candidate is told (NOTICE_TIME_UP).
+
+Cost: one transcription may be in flight per position (`VoiceTurn.stt_started_at`, set under the lock and cleared after,
+and it expires after STT_CLAIM_SECONDS in case of a crash). An answer longer than MAX_ANSWER_AUDIO_SECONDS is refused,
+measured by the provider's own duration when it reports one, and always by a size cap for the codec (max_audio_bytes).
+A question's spoken audio is made once per turn and kept on disk.
 """
 import importlib
 import logging
 import re
 import threading
+import zlib
 from dataclasses import asdict, dataclass, is_dataclass, replace
 from datetime import datetime, timedelta, timezone
 from typing import Any, Callable
@@ -33,6 +43,12 @@ from app.hiring.state import NOT_TAKEN, advance
 logger = logging.getLogger(__name__)
 
 MAX_AUDIO_BYTES = 15 * 1024 * 1024
+MAX_ANSWER_AUDIO_SECONDS = 200  # the 3 minutes an answer may take, with a little slack for the recorder
+# The most a browser's recording of each type can plausibly take per second. No ffprobe is used: a size cap by type
+# stops a long file before it is transcribed, and the provider's reported duration (when it gives one) is checked after.
+MAX_AUDIO_BYTES_PER_SECOND = {".wav": 96_000}  # 48 kHz mono, 16 bit
+DEFAULT_MAX_AUDIO_BYTES_PER_SECOND = 24_000  # 192 kbit/s, above anything MediaRecorder produces for speech
+STT_CLAIM_SECONDS = 120
 ALLOWED_AUDIO = {
     "audio/webm": ".webm", "audio/mp4": ".mp4", "audio/x-m4a": ".m4a", "audio/m4a": ".m4a",
     "audio/ogg": ".ogg", "audio/wav": ".wav", "audio/x-wav": ".wav",
@@ -64,6 +80,9 @@ ACTIVE_STATUSES = (IN_PROGRESS, PAUSED)
 TERMINAL_STATUSES = (COMPLETED, ABANDONED)
 NOTICE_RETRY = "retry"
 NOTICE_REPEAT = "repeat"
+NOTICE_TIME_UP = "time_up"  # the answer just sent came after the time was up, and was not kept
+QUESTION_AUDIO_SUFFIXES = {"audio/mpeg": ".mp3", "audio/mp4": ".m4a", "audio/ogg": ".ogg", "audio/wav": ".wav",
+                           "audio/x-wav": ".wav", "audio/webm": ".webm", "audio/aac": ".aac", "audio/opus": ".opus"}
 
 ANSWERED = "transcribed"
 NO_ANSWER = "no_answer"
@@ -89,6 +108,28 @@ class UnsupportedAudio(ValueError):
 
 class AudioTooLarge(ValueError):
     pass
+
+
+class AudioTooLong(ValueError):
+    """The provider measured more than MAX_ANSWER_AUDIO_SECONDS. Nothing was stored."""
+
+
+class TranscriptionInFlight(Exception):
+    """Another upload of this position is being transcribed. It pays once; this one waits for it."""
+
+
+class SessionEnded(Exception):
+    """The session is finished: it no longer speaks its questions."""
+
+
+class NoSuchTurn(Exception):
+    pass
+
+
+def max_audio_bytes(mime_type: str) -> int:
+    """The most an answer of this type may weigh: what MAX_ANSWER_AUDIO_SECONDS can take at the type's top bitrate."""
+    rate = MAX_AUDIO_BYTES_PER_SECOND.get(ALLOWED_AUDIO.get(mime_type), DEFAULT_MAX_AUDIO_BYTES_PER_SECOND)
+    return min(MAX_AUDIO_BYTES, MAX_ANSWER_AUDIO_SECONDS * rate)
 
 
 class PositionNotCurrent(Exception):
@@ -354,23 +395,33 @@ def _count_activity(session: VoiceSession, now: datetime) -> None:
     session.expires_at = now + timedelta(hours=rules.resume_hours)
 
 
-def _clock_action(db, session: VoiceSession, now: datetime):
-    """On a locked running session, count the time and say how it ends now, if it does."""
+def _clock_action(db, session: VoiceSession, now: datetime, upload: bool = False):
+    """On a locked running session, count the time and say how it ends now, if it does.
+
+    An `upload` of an answer gets the grace in the module note: a question open before the hard limit may be answered
+    until `max_counted_gap_seconds` past it.
+    """
     rules = _rules(session)
-    if (now - _last_activity(session, now)).total_seconds() > rules.resume_hours * 3600:
+    gap = (now.replace(microsecond=0) - _last_activity(session, now)).total_seconds()
+    if gap > rules.resume_hours * 3600:
         return _complete if _has_an_answer(db, session) else _abandon
+    before = session.active_seconds or 0
     _count_activity(session, now)
-    return _complete if session.active_seconds > rules.hard_limit_seconds else None
+    if session.active_seconds <= rules.hard_limit_seconds:
+        return None
+    within_grace = upload and before <= rules.hard_limit_seconds and gap <= (
+        rules.hard_limit_seconds - before + rules.max_counted_gap_seconds)
+    return None if within_grace else _complete
 
 
-def _apply_clock(db, session: VoiceSession, now: datetime | None = None) -> bool:
+def _apply_clock(db, session: VoiceSession, now: datetime | None = None, upload: bool = False) -> bool:
     """On a locked session, count the time, and finish it and commit if its time is up. Returns whether it finished.
 
     If not, the count is pending in this transaction. A rollback loses none of it: the next request counts the same gap.
     """
     if session.status not in ACTIVE_STATUSES:
         return False
-    action = _clock_action(db, session, now or _now())
+    action = _clock_action(db, session, now or _now(), upload)
     if action is None:
         return False
     info = _info(session)
@@ -500,27 +551,42 @@ def _commit_or_current(db, session_id: int, position: int, path: str) -> bool:
         return False
 
 
+def _release_claim(db, session_id: int, position: int, claim: datetime) -> None:
+    """Clear this request's claim after a failure. Only its own: one that expired and was taken over stays."""
+    try:
+        db.rollback()
+        db.query(VoiceTurn).filter(
+            VoiceTurn.session_id == session_id, VoiceTurn.position == position, VoiceTurn.stt_started_at == claim,
+        ).update({VoiceTurn.stt_started_at: None}, synchronize_session=False)
+        db.commit()
+    except Exception as exc:
+        db.rollback()
+        logger.warning("Could not clear the transcription claim of session %s: %s", session_id, type(exc).__name__)
+
+
 def submit_answer(db, session: VoiceSession, position: int, audio: bytes, mime_type: str,
                   decide_followup: FOLLOWUP_HOOK | None = None) -> SessionState:
     """Take one answer. Idempotent per (session, position): an answered position returns the state and changes nothing.
 
     Discards anything pending in `db` and commits. The row lock is held only to check and to store, never during AI
-    calls, so an upload that overlaps this one waits briefly at most. Each re-checks under the lock before storing, so
-    the first to finish wins; files are written only then, so the stored audio always matches the stored transcript.
-    Raises SessionGone if the application was deleted, including during the AI calls: no file has been written by then.
+    calls. Before them the position is claimed (`stt_started_at`), so a second upload of it is refused with
+    TranscriptionInFlight instead of paying again; the re-check under the lock before storing still keeps one winner if
+    a claim ever expires under a slow call. Files are written only then, so the stored audio always matches the stored
+    transcript. Raises SessionGone if the application was deleted, including during the AI calls: no file has been
+    written by then. Raises AudioTooLong if the provider measured more than MAX_ANSWER_AUDIO_SECONDS.
     """
     suffix = ALLOWED_AUDIO.get(mime_type)
     if suffix is None:
         raise UnsupportedAudio(mime_type)
-    if len(audio) > MAX_AUDIO_BYTES:
+    if len(audio) > max_audio_bytes(mime_type):
         raise AudioTooLarge
 
     session_id = session.id
     session = _lock(db, session_id)
     if session.status in TERMINAL_STATUSES:
         return _released_state(db, session)
-    if _apply_clock(db, session):
-        return _state(db, session)
+    if _apply_clock(db, session, upload=True):
+        return _state(db, session, NOTICE_TIME_UP if session.status == COMPLETED else None)
     turns = _turns(db, session_id)
     wanted = next((turn for turn in turns if turn.position == position), None)
     if wanted is not None and wanted.transcript_status in ANSWERED_STATUSES:
@@ -529,6 +595,13 @@ def submit_answer(db, session: VoiceSession, position: int, audio: bytes, mime_t
     if current is None or current.position != position:
         db.rollback()
         raise PositionNotCurrent
+
+    now = _now().replace(microsecond=0)
+    started = current.stt_started_at
+    if started is not None and (now - _naive_utc(started)).total_seconds() < STT_CLAIM_SECONDS:
+        db.rollback()
+        raise TranscriptionInFlight
+    current.stt_started_at = claim = now
 
     rules = _rules(session)
     hook = decide_followup or rules.decide_followup
@@ -539,9 +612,21 @@ def submit_answer(db, session: VoiceSession, position: int, audio: bytes, mime_t
     info = _info(session)
     question = AnsweredTurn(current.position, current.question_text, current.question_source, current.source_ref,
                             bool(current.is_followup), current.parent_position, "")
-    db.rollback()
+    db.commit()  # the claim and the time counted so far; nothing is held during the AI calls
 
+    try:
+        return _transcribe_and_store(db, info, question, position, audio, mime_type, suffix, hook, may_follow_up, closing)
+    except BaseException:
+        _release_claim(db, session_id, position, claim)
+        raise
+
+
+def _transcribe_and_store(db, info: SessionInfo, question: AnsweredTurn, position: int, audio: bytes, mime_type: str,
+                          suffix: str, hook: FOLLOWUP_HOOK, may_follow_up: bool, closing: bool) -> SessionState:
+    session_id = info.id
     result = _transcribe(audio, mime_type, info.language, info.company_id)
+    if result is not None and result.usage.audio_seconds > MAX_ANSWER_AUDIO_SECONDS:
+        raise AudioTooLong
     text = result.text.strip() if result is not None else ""
     followup = None
     if text and may_follow_up:
@@ -553,6 +638,7 @@ def submit_answer(db, session: VoiceSession, position: int, audio: bytes, mime_t
         return _released_state(db, session)  # another upload of this position finished first
 
     _count_activity(session, _now())
+    turn.stt_started_at = None
     old_path = turn.audio_path
     path = recordings.save_turn_audio(session.company_id, _owner_key(session), position, audio, suffix)
     turn.audio_path = path
@@ -581,3 +667,69 @@ def submit_answer(db, session: VoiceSession, position: int, audio: bytes, mime_t
     if completed:
         _after_complete(info)
     return _state(db, session, notice)
+
+
+# One spoken question is made once per turn. Two requests for the same turn share a lock (striped, so none are kept
+# for good), and the second finds the first's file.
+_QUESTION_LOCKS = [threading.Lock() for _ in range(64)]
+
+
+def _question_lock(session_id: int, position: int) -> threading.Lock:
+    return _QUESTION_LOCKS[zlib.crc32(f"{session_id}:{position}".encode()) % len(_QUESTION_LOCKS)]
+
+
+def _read_cached_question(path: str | None) -> tuple[bytes, str] | None:
+    if not path:
+        return None
+    try:
+        data = recordings.read(path)
+    except OSError:
+        return None  # the file is gone: make it again
+    suffix = "." + path.rsplit(".", 1)[-1]
+    mime = next((m for m, s in QUESTION_AUDIO_SUFFIXES.items() if s == suffix), "application/octet-stream")
+    return data, mime
+
+
+def _cached_question_path(db, session_id: int, position: int) -> str | None:
+    db.rollback()  # a fresh look: another request may have committed the file since this one began
+    return db.query(VoiceTurn.question_audio_path).filter_by(session_id=session_id, position=position).scalar()
+
+
+def question_audio(db, session_id: int, position: int) -> tuple[bytes, str]:
+    """The spoken question of a turn: from disk if it was made before, else made once through the gateway.
+
+    Raises SessionEnded for a finished session (even if the audio is cached), NoSuchTurn, SessionGone, and AIError when
+    the vendor fails or the company is over budget. Holds no transaction during the vendor call. Commits.
+    """
+    db.rollback()
+    session = db.query(VoiceSession).filter(VoiceSession.id == session_id).populate_existing().one()
+    if session.status in TERMINAL_STATUSES:
+        db.rollback()
+        raise SessionEnded
+    turn = db.query(VoiceTurn).filter_by(session_id=session_id, position=position).first()
+    if turn is None or not turn.question_text:
+        db.rollback()
+        raise NoSuchTurn
+    text, language, company_id = turn.question_text, session.language, session.company_id
+    owner_key, cached_path = _owner_key(session), turn.question_audio_path
+    db.rollback()
+    if (cached := _read_cached_question(cached_path)) is not None:
+        return cached
+    with _question_lock(session_id, position):
+        if (cached := _read_cached_question(_cached_question_path(db, session_id, position))) is not None:
+            return cached
+        result = gateway.synthesize(text, language, None, "session_tts", company_id)
+        suffix = QUESTION_AUDIO_SUFFIXES.get(result.mime_type, ".bin")
+        path = recordings.save_question_audio(company_id, owner_key, position, result.audio, suffix)
+        try:
+            _lock(db, session_id)
+            row = db.query(VoiceTurn).filter_by(session_id=session_id, position=position).populate_existing().first()
+            if row is None:
+                raise NoSuchTurn
+            row.question_audio_path = path
+            db.commit()
+        except (SessionGone, NoSuchTurn):
+            db.rollback()
+            recordings.delete(path)  # the application was deleted meanwhile: nothing of it may stay
+            raise
+    return result.audio, result.mime_type

@@ -3,6 +3,7 @@ from functools import lru_cache
 from pathlib import Path
 
 import yaml
+from sqlalchemy import func
 
 from app.ai.types import Usage
 from app.database.database import SessionLocal
@@ -60,3 +61,22 @@ def log_usage(*, feature, slot, provider, model, company_id, usage, latency_ms, 
             session.close()
     except Exception:
         logger.exception("Could not write ai_usage_logs row for feature %s", feature)
+
+
+def spent_today_usd(company_id: int) -> float:
+    """What the company has spent today, from the usage rows. A call with no price counts as 0. Uses its own session, so
+    the caller's transaction is untouched. Fails open: a database error must not stop the product, and is logged."""
+    try:
+        session = SessionLocal()
+        try:
+            total = (
+                session.query(func.coalesce(func.sum(AIUsageLog.estimated_cost_usd), 0.0))
+                .filter(AIUsageLog.company_id == company_id, AIUsageLog.created_at >= func.current_date())
+                .scalar()
+            )
+            return float(total or 0.0)
+        finally:
+            session.close()
+    except Exception:
+        logger.exception("Could not read today's AI spend for company %s", company_id)
+        return 0.0

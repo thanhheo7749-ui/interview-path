@@ -36,7 +36,7 @@ from .database.database import SessionLocal
 from .auth.security import get_password_hash
 from .ai.config import load_config
 from .ai.providers import get_provider
-from .ai.types import AIOutputError, AIProviderError
+from .ai.types import AIOutputError, AIProviderError, BudgetExceeded
 
 def seed_admin():
     """Create the admin account if configured and absent. Never modifies an existing user."""
@@ -102,6 +102,13 @@ def create_app(legacy_b2c: bool | None = None) -> FastAPI:
     @app.exception_handler(AIProviderError)
     async def _ai_provider_error(_request, _exc):
         return JSONResponse(status_code=503, content={"detail": "The AI service is temporarily unavailable. Please try again."})
+
+    @app.exception_handler(BudgetExceeded)
+    async def _ai_budget_exceeded(_request, _exc):
+        return JSONResponse(status_code=429, content={
+            "detail": "This company has reached its daily AI limit. Please try again tomorrow.",
+            "code": "ai_budget_exceeded",
+        })
 
     @app.exception_handler(AIOutputError)
     async def _ai_output_error(_request, _exc):

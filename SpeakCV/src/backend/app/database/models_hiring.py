@@ -95,6 +95,7 @@ class Application(Base):
     final_outcome = Column(String(30), nullable=True)
     is_simulated = Column(Boolean, nullable=False, default=False)
     anonymized_at = Column(DateTime(timezone=True), nullable=True)
+    start_claimed_at = Column(DateTime(timezone=True), nullable=True)  # a start is planning (it pays for AI once)
     created_at = _created_at()
 
 
@@ -176,6 +177,8 @@ class VoiceTurn(Base):
     stt_failures = Column(Integer, nullable=False, default=0)
     created_at = _created_at()
     answered_at = Column(DateTime(timezone=True), nullable=True)
+    question_audio_path = Column(String(500), nullable=True)  # the spoken question, made once and kept for this turn
+    stt_started_at = Column(DateTime(timezone=True), nullable=True)  # an upload of this position is being transcribed
 
 
 class CultureNote(Base):
