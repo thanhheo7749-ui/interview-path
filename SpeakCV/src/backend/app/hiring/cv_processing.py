@@ -24,6 +24,25 @@ class _NoLongerProcessing(Exception):
     """The application left cv_processing while this job ran, so this job gives way."""
 
 
+# What the candidate may be told about a failed CV: a fixed code per kind of failure, never the text of the failure.
+# The app turns the code into its own words. A message not listed here is "unknown".
+_FAILURE_KINDS = (
+    ("consent_withdrawn", ("withdrew consent",)),
+    ("no_text", ("no extractable text",)),
+    ("unreadable", ("could not read this file", "cannot be read", "not utf-8 text")),
+    ("too_large", ("pages. please upload a shorter", "when unpacked")),
+    ("try_again", (TRY_AGAIN.lower(),)),
+    ("interrupted", (INTERRUPTED.lower(),)),
+)
+
+
+def failure_reason(message: str | None) -> str | None:
+    if not message:
+        return None
+    lowered = message.lower()
+    return next((kind for kind, needles in _FAILURE_KINDS if any(needle in lowered for needle in needles)), "unknown")
+
+
 def _locked(db, application_id: int) -> Application | None:
     # A locking read returns the latest committed row, not this transaction's snapshot.
     return (
@@ -39,8 +58,11 @@ def _locked_processing(db, application_id: int) -> Application:
     return application
 
 
-def _claim(db, application_id: int) -> bool:
-    """Only one job may process an application. A second task for it finds the stage moved on, and stops."""
+def _claim(db, application_id: int, keep_text: bool = False) -> bool:
+    """Only one job may process an application. A second task for it finds the stage moved on, and stops.
+
+    `keep_text` is for an invitation from the talent pool, whose masked text and flags were set when it was created.
+    """
     application = _locked(db, application_id)
     # The lock comes first in this transaction, so the read of the consent sees a withdrawal committed before it.
     if application is None or application.anonymized_at is not None or consents.was_withdrawn(db, application_id, "cv_processing"):
@@ -54,12 +76,25 @@ def _claim(db, application_id: int) -> bool:
     application.processing_error = None
     application.cv_status = None
     application.cv_status_reason = None
-    application.cv_text_raw = None
-    application.cv_text_blind = None
-    application.cv_blind_hash = None
-    application.hidden_text_detected = False
+    if not keep_text:
+        application.cv_text_raw = None
+        application.cv_text_blind = None
+        application.cv_blind_hash = None
+        application.hidden_text_detected = False
     db.commit()
     return True
+
+
+def _assess_and_label(db, application, application_id: int) -> Application:
+    """Leaves the application invited, with the transaction open for the caller to finish and commit."""
+    result = screening.assess(db, application)
+    status, reasons = screening.label(result.requirements, result.assessed_requirements)
+
+    application = _locked_processing(db, application_id)
+    application.cv_status = status
+    application.cv_status_reason = reasons
+    advance(application, "invited")
+    return application
 
 
 def _process(db, application_id: int) -> None:
@@ -79,13 +114,7 @@ def _process(db, application_id: int) -> None:
     application.hidden_text_detected = cv.hidden_detected
     db.commit()
 
-    result = screening.assess(db, application)
-    status, reasons = screening.label(result.requirements, result.assessed_requirements)
-
-    application = _locked_processing(db, application_id)
-    application.cv_status = status
-    application.cv_status_reason = reasons
-    advance(application, "invited")
+    application = _assess_and_label(db, application, application_id)
     job = db.get(Job, application.job_id)
     company = db.get(Company, application.company_id)
     if application.candidate_user_id is not None:
@@ -93,6 +122,16 @@ def _process(db, application_id: int) -> None:
         subject, body = INVITATION[language]
         notify.enqueue(db, application.company_id, application.candidate_user_id, "invited", language,
                        subject.format(title=job.title), body.format(title=job.title), application_id=application_id)
+    db.commit()
+
+
+def _process_blind_text(db, application_id: int, blind_text: str) -> None:
+    """Masking is skipped, as the text is already masked. The candidate was told when HR sent the invitation."""
+    application = _locked_processing(db, application_id)
+    application.cv_text_blind = blind_text
+    application.cv_blind_hash = identity.hash_of(blind_text)
+    db.commit()
+    _assess_and_label(db, application, application_id)
     db.commit()
 
 
@@ -107,13 +146,23 @@ def _fail(db, application_id: int, message: str) -> None:
 
 
 def run(application_id: int) -> None:
+    _run(application_id, _process)
+
+
+def run_from_blind_text(application_id: int, blind_text: str) -> None:
+    """For an invitation from the talent pool: no upload and no masking, then assess, label and invite."""
+    _run(application_id, lambda db, target: _process_blind_text(db, target, blind_text), keep_text=True)
+
+
+def _run(application_id: int, process, keep_text: bool = False) -> None:
     """Never raises. Exception text can quote the CV or the model's output, so only its type is logged."""
     db = SessionLocal()
     try:
-        if not _claim(db, application_id):
+        if not _claim(db, application_id, keep_text=keep_text):
             return
         try:
-            _process(db, application_id)
+            process(db, application_id)
+            notify.deliver_pending()  # the invitation leaves now, not at the next daily run; never raises
         except (_NoLongerProcessing, screening.ApplicationDeleted):
             db.rollback()
         except (NoExtractableText, CvTooLarge) as exc:

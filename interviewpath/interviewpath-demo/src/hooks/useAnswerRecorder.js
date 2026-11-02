@@ -13,6 +13,7 @@ const pickMime = () => MIME_CANDIDATES.find((type) => window.MediaRecorder.isTyp
 export function useAnswerRecorder(stream, onBlob) {
   const [isRecording, setIsRecording] = useState(false);
   const [elapsed, setElapsed] = useState(0);
+  const [limitSeconds, setLimitSeconds] = useState(MAX_ANSWER_SECONDS);
   const [error, setError] = useState(false);
   const recorderRef = useRef(null);
   const timerRef = useRef(null);
@@ -33,8 +34,10 @@ export function useAnswerRecorder(stream, onBlob) {
     if (recorder && recorder.state !== 'inactive') recorder.stop();
   }, []);
 
-  const start = useCallback(() => {
+  // Stops and sends itself after `maxSeconds`: the 3 minute limit, or the time left in the session if that is less.
+  const start = useCallback((maxSeconds = MAX_ANSWER_SECONDS) => {
     if (!stream || recorderRef.current) return;
+    const limit = Math.max(1, Math.min(MAX_ANSWER_SECONDS, Math.floor(maxSeconds)));
     setError(false);
     try {
       const mimeType = pickMime();
@@ -57,12 +60,13 @@ export function useAnswerRecorder(stream, onBlob) {
       recorderRef.current = recorder;
       recorder.start();
       setElapsed(0);
+      setLimitSeconds(limit);
       setIsRecording(true);
       const startedAt = Date.now();
       timerRef.current = setInterval(() => {
         const seconds = Math.floor((Date.now() - startedAt) / 1000);
         setElapsed(seconds);
-        if (seconds >= MAX_ANSWER_SECONDS) stop();
+        if (seconds >= limit) stop();
       }, 250);
     } catch {
       recorderRef.current = null;
@@ -81,5 +85,5 @@ export function useAnswerRecorder(stream, onBlob) {
     [clearTimer],
   );
 
-  return { isRecording, elapsed, error, start, stop };
+  return { isRecording, elapsed, limitSeconds, error, start, stop };
 }

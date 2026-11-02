@@ -16,7 +16,7 @@ from app.database import models_hiring
 from app.database.database import Base
 from app.database.sql_models import (
     Application, AssistantQuestion, AuditLog, Company, CompanyMember, Consent, CultureNote, CvClaim, Job, JobRequirement,
-    KbNode, Notification, ReapplyGuard, RequirementResult, ScreeningCache, VoiceSession, VoiceTurn,
+    KbNode, Notification, ReapplyGuard, RejectionFeedback, RequirementResult, ScreeningCache, VoiceSession, VoiceTurn,
 )
 from app.hiring import notify, retention
 from tests.helpers import auth_header, make_user
@@ -366,6 +366,17 @@ def test_a_candidate_who_is_also_a_member_keeps_their_hr_actions(db, world):
     assert db.query(AuditLog).filter_by(action="job_published").one().actor_user_id == world.candidate_id
     assert db.query(AuditLog).filter_by(target_type="application", target_id=item.id,
                                         actor_user_id=world.candidate_id).count() == 0
+
+
+def test_anonymizing_clears_the_rejection_draft_and_keeps_its_status(db, world):
+    item = full_application(db, world, **decided(world, RETENTION_DAYS + 1, decision="rejected"))
+    db.add(RejectionFeedback(company_id=world.company_id, application_id=item.id, language="vi", status="sent",
+                             draft=f"{CANARY} draft quoting an answer"))
+    db.commit()
+    retention.run(db)
+    db.expire_all()
+    row = db.query(RejectionFeedback).filter_by(application_id=item.id).one()
+    assert (row.draft, row.status, row.language) == ("", "sent", "vi")
 
 
 # 4. What stays

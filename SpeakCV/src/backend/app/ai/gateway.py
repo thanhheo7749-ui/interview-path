@@ -10,6 +10,7 @@ from app.ai.providers import get_provider
 from app.ai.types import (
     AIOutputError,
     AIProviderError,
+    BudgetExceeded,
     AudioResult,
     EmbeddingResult,
     StructuredResult,
@@ -17,7 +18,8 @@ from app.ai.types import (
     TranscriptResult,
     Usage,
 )
-from app.ai.usage import log_usage
+from app.ai.usage import log_usage, spent_today_usd
+from app.core import settings
 
 STRUCTURED_ATTEMPTS = 2
 
@@ -31,6 +33,9 @@ def _call(slot_name: str, feature: str, company_id: int | None, invoke: Callable
     slot = get_config().slot(slot_name)
     started = time.perf_counter()
     common = {"feature": feature, "slot": slot_name, "provider": slot.provider, "model": slot.model, "company_id": company_id}
+    if company_id is not None and spent_today_usd(company_id) >= settings.ai_company_daily_budget_usd():
+        log_usage(**common, usage=Usage(), latency_ms=0, success=False, error_type="BudgetExceeded")
+        raise BudgetExceeded(f"Company {company_id} has reached its daily AI budget")
     try:
         provider = get_provider(slot.provider)
         if slot.provider == "fake":

@@ -1,14 +1,14 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-  CONSENT_WITHDRAWN, correctCvStatus, decide, fastTrack, grantRestart, retryAnalysis, revealIdentity,
+  correctCvStatus, decide, fastTrack, grantRestart, inviteAnyway, retryAnalysis, retryTranscription, revealIdentity,
 } from '../../lib/board.js';
 import { ErrorAlert, inputClass, primaryButton, secondaryButton } from '../KbFeedback.jsx';
 
 // Every action here is a human choice. AI output never reaches these buttons.
 function DecisionBar({ companyId, detail, onChanged }) {
   const { t } = useTranslation();
-  const [mode, setMode] = useState(null); // 'reveal' | 'cv' | null
+  const [mode, setMode] = useState(null); // 'reveal' | 'cv' | 'reject' | null
   const [reason, setReason] = useState('');
   const [reasonError, setReasonError] = useState(false);
   const [identity, setIdentity] = useState(null);
@@ -18,8 +18,9 @@ function DecisionBar({ companyId, detail, onChanged }) {
   const appId = detail.id;
   const awaiting = detail.stage === 'ready_for_hr' && detail.hr_decision === 'pending';
   const failed = detail.stage === 'ready_for_hr' && detail.analysis_status === 'failed';
+  const untranscribed = detail.stage === 'ready_for_hr' && detail.analysis_status === 'transcription_failed';
+  const cvFailed = detail.stage === 'cv_failed' && !detail.cv_consent_withdrawn;
   const invited = detail.stage === 'invited';
-  const canRestart = detail.analysis_status !== CONSENT_WITHDRAWN;
   const otherLabel = detail.cv_status === 'meets' ? 'not_met' : 'meets';
 
   const run = async (action, after) => {
@@ -70,7 +71,7 @@ function DecisionBar({ companyId, detail, onChanged }) {
             <button type="button" disabled={busy} onClick={() => run(() => decide(companyId, appId, 'approved'))} className={primaryButton}>
               {t('board.actions.approve')}
             </button>
-            <button type="button" disabled={busy} onClick={() => run(() => decide(companyId, appId, 'rejected'))} className={secondaryButton}>
+            <button type="button" disabled={busy} onClick={() => openMode('reject')} className={secondaryButton}>
               {t('board.actions.reject')}
             </button>
             {detail.cv_status && (
@@ -78,7 +79,7 @@ function DecisionBar({ companyId, detail, onChanged }) {
                 {t('board.actions.correctCv')}
               </button>
             )}
-            {canRestart && (
+            {detail.restart_available && (
               <button type="button" disabled={busy} onClick={() => run(() => grantRestart(companyId, appId))} className={secondaryButton}>
                 {t('board.actions.restart')}
               </button>
@@ -95,12 +96,34 @@ function DecisionBar({ companyId, detail, onChanged }) {
             {t('board.actions.retry')}
           </button>
         )}
+        {untranscribed && (
+          <button type="button" disabled={busy} onClick={() => run(() => retryTranscription(companyId, appId))} className={secondaryButton}>
+            {t('board.actions.retryTranscription')}
+          </button>
+        )}
+        {cvFailed && (
+          <button type="button" disabled={busy} onClick={() => run(() => inviteAnyway(companyId, appId))} className={primaryButton}>
+            {t('board.actions.inviteAnyway')}
+          </button>
+        )}
         {!identity && (
           <button type="button" disabled={busy} onClick={() => openMode('reveal')} className={secondaryButton}>
             {t('board.actions.reveal')}
           </button>
         )}
       </div>
+
+      {mode === 'reject' && (
+        <div role="alertdialog" aria-label={t('board.actions.reject')} className="space-y-2 rounded-xl border border-amber-200 bg-amber-50 p-3">
+          <p className="text-sm font-semibold text-amber-900">{t('board.actions.rejectConfirm')}</p>
+          <div className="flex gap-2">
+            <button type="button" disabled={busy} onClick={() => run(() => decide(companyId, appId, 'rejected'), () => setMode(null))} className={primaryButton}>
+              {t('board.actions.rejectConfirmButton')}
+            </button>
+            <button type="button" onClick={() => setMode(null)} className={secondaryButton}>{t('common.cancel')}</button>
+          </div>
+        </div>
+      )}
 
       {mode === 'reveal' && (
         <div role="alertdialog" aria-label={t('board.reveal.title')} className="space-y-2 rounded-xl border border-amber-200 bg-amber-50 p-3">

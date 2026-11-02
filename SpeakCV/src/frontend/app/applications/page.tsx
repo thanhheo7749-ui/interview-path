@@ -3,20 +3,38 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
-import { Strings, useLang } from "@/lib/i18n";
-import { Application, CV_CONSENT_WITHDRAWN, errorCode, HiringError, listMyApplications, reuploadCv } from "@/services/hiring";
-import { LangToggle } from "@/components/Hiring/SampleNotice";
+import { Strings, format, useLang } from "@/lib/i18n";
+import { Application, CV_CONSENT_WITHDRAWN, errorCode, HiringError, listMyApplications, reuploadCv, withdrawApplication } from "@/services/hiring";
+import { ConfirmDialog, LangToggle } from "@/components/Hiring/SampleNotice";
 
 const POLL_MS = 3000;
+
+// One fixed message per kind of failure, from the code the server sends. An unknown code falls back to the general one.
+function failureText(a: Application, t: Strings): string {
+  switch (a.failure_reason) {
+    case "no_text": return t.failNoText;
+    case "unreadable": return t.failUnreadable;
+    case "too_large": return t.failTooLarge;
+    case "try_again": return t.failTryAgain;
+    case "interrupted": return t.failInterrupted;
+    case "consent_withdrawn": return t.cvConsentWithdrawn;
+    default: return t.statusUnreadable;
+  }
+}
+
+// Email is only mentioned when this deployment can send it.
+function approvedText(a: Application, t: Strings): string {
+  return a.email_enabled && a.contact_email ? format(t.statusApproved, { email: a.contact_email }) : t.statusApprovedNoEmail;
+}
 
 function statusText(a: Application, t: Strings): string {
   switch (a.status) {
     case "reading_cv": return t.statusReading;
-    case "cv_unreadable": return t.statusUnreadable;
+    case "cv_unreadable": return failureText(a, t);
     case "invited": return t.statusInvited;
     case "interview_in_progress": return t.statusInterview;
     case "with_hr": return t.statusWithHr;
-    case "decided": return a.decision === "approved" ? t.statusApproved : t.statusRejected;
+    case "decided": return a.decision === "approved" ? approvedText(a, t) : t.statusRejected;
     case "withdrawn": return t.statusWithdrawn;
     default: return "";
   }
@@ -57,6 +75,58 @@ function Reupload({ id, onDone }: { id: number; onDone: () => void }) {
       </label>
       {error && <p role="alert" className="mt-1 text-sm text-red-400">{error}</p>}
     </div>
+  );
+}
+
+function WithdrawUnreadable({ id, onDone }: { id: number; onDone: () => void }) {
+  const { t } = useLang();
+  const [open, setOpen] = useState(false);
+  const [reason, setReason] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  const confirm = async () => {
+    setBusy(true);
+    setError("");
+    try {
+      await withdrawApplication(id, reason);
+      setOpen(false);
+      onDone();
+    } catch {
+      setError(t.genericError);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <>
+      <button onClick={() => setOpen(true)} className="mt-2 block text-sm text-blue-400 underline">
+        {t.withdraw}
+      </button>
+      {open && (
+        <ConfirmDialog
+          title={t.withdrawTitle}
+          body={t.withdrawBody}
+          confirmLabel={busy ? t.withdrawing : t.withdraw}
+          busy={busy}
+          error={error}
+          onConfirm={confirm}
+          onCancel={() => setOpen(false)}
+        >
+          <label className="block text-sm text-theme-text-secondary">
+            {t.withdrawReason}
+            <textarea
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              maxLength={2000}
+              rows={3}
+              className="mt-1 w-full rounded-lg border border-theme-border bg-theme-surface p-2 text-theme-text"
+            />
+          </label>
+        </ConfirmDialog>
+      )}
+    </>
   );
 }
 
@@ -119,7 +189,12 @@ export default function ApplicationsPage() {
                 {a.is_sample ? ` (${t.sampleTag})` : ""}
               </p>
               <p className="mt-2 text-sm text-theme-text">{statusText(a, t)}</p>
-              {a.status === "cv_unreadable" && <Reupload id={a.id} onDone={load} />}
+              {a.status === "cv_unreadable" && (
+                <>
+                  {a.failure_reason !== "consent_withdrawn" && <Reupload id={a.id} onDone={load} />}
+                  <WithdrawUnreadable id={a.id} onDone={load} />
+                </>
+              )}
               {a.status === "invited" && (
                 <Link href={`/applications/${a.id}/fit`} className="mt-2 inline-block text-sm text-blue-400 underline">
                   {t.seeFit}

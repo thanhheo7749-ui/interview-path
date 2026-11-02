@@ -251,10 +251,20 @@ export function ScreeningRoom({ applicationId }: { applicationId: number }) {
     };
   }, [sessionId, position]);
 
+  // The recorder stops and sends itself at 3 minutes, or when the time left reaches 0, whichever is first.
   const startRecording = () => {
     audioRef.current?.pause();
-    recorder.start();
+    recorder.start(Math.min(MAX_ANSWER_SECONDS, remaining));
   };
+
+  // Time ran out while nothing was recording or being sent: ask the server, which finishes the interview.
+  const { isRecording } = recorder;
+  useEffect(() => {
+    if (phase !== "session" || remaining > 0 || uploading || isRecording) return;
+    const current = sessionRef.current;
+    if (!current || !ACTIVE.includes(current.status)) return;
+    getSessionState(current.session_id).then(applyState, () => undefined);
+  }, [phase, remaining, uploading, isRecording, applyState]);
 
   const back = (
     <Link href="/applications" className="mt-6 inline-block rounded-xl bg-blue-600 px-4 py-2 font-bold text-white hover:bg-blue-700">
@@ -372,6 +382,11 @@ export function ScreeningRoom({ applicationId }: { applicationId: number }) {
   if (state.status === "completed") {
     return shell(
       <div data-testid="session-complete">
+        {state.notice === "time_up" && (
+          <p role="status" data-testid="time-up-notice" className="mb-2 rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+            {text.timeUp}
+          </p>
+        )}
         <p role="status">{text.completed}</p>
         {back}
       </div>,
@@ -386,8 +401,12 @@ export function ScreeningRoom({ applicationId }: { applicationId: number }) {
     );
   }
 
-  const notice =
-    state.status === "paused" ? text.paused : state.status === "closing" ? text.closing : state.notice === "repeat" ? text.repeat : state.notice === "retry" ? text.retry : null;
+  // The state of the interview and what happened to the answer just sent can both apply, so both are shown: a failed
+  // recording while the interview is wrapping up must not look like nothing happened.
+  const notices = [
+    state.status === "paused" ? text.paused : state.status === "closing" ? text.closing : null,
+    state.notice === "repeat" ? text.repeat : state.notice === "retry" ? text.retry : null,
+  ].filter((item): item is string => item !== null);
   const busy = uploading || recorder.isRecording;
   const answeredIndex = state.position;
 
@@ -422,11 +441,11 @@ export function ScreeningRoom({ applicationId }: { applicationId: number }) {
         )}
       </section>
 
-      {notice && (
-        <p role="status" className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+      {notices.map((notice) => (
+        <p key={notice} role="status" data-testid="session-notice" className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
           {notice}
         </p>
-      )}
+      ))}
 
       {!stream && <MicCheck text={text} onStream={adoptStream} />}
 
@@ -448,7 +467,7 @@ export function ScreeningRoom({ applicationId }: { applicationId: number }) {
             onClick={recorder.stop}
             className="rounded-xl bg-red-600 px-5 py-3 font-bold text-white hover:bg-red-700"
           >
-            {text.stop} ({formatClock(recorder.elapsed)} / {formatClock(MAX_ANSWER_SECONDS)})
+            {text.stop} ({formatClock(recorder.elapsed)} / {formatClock(recorder.limitSeconds)})
           </button>
         )}
         {uploadFailed && pendingRef.current && (

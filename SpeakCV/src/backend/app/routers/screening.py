@@ -1,7 +1,9 @@
 """Candidate routes for the recorded interview. Every lookup filters on the signed-in user; no response holds a label."""
+import logging
 from dataclasses import asdict
+from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, File, HTTPException, Response, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, Request, Response, UploadFile
 from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel, Field
 from sqlalchemy import func
@@ -10,6 +12,7 @@ from sqlalchemy.orm import Session
 from app.ai import gateway
 from app.ai.types import AIError
 from app.auth.dependencies import get_authenticated_user
+from app.core.rate_limit import VOICE_ANSWER_LIMIT, VOICE_QUESTION_AUDIO_LIMIT, VOICE_START_LIMIT, limiter, user_key
 from app.core.uploads import CHUNK_SIZE
 from app.database.database import get_db
 from app.database.sql_models import Application, Company, Job, User, VoiceSession, VoiceTurn
@@ -17,11 +20,14 @@ from app.hiring import audit, consents, planner, voice
 from app.hiring.state import advance
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 PURPOSE = "screening"
 CONSENT_PURPOSE = "recording_screening"
 CV_CONSENT_PURPOSE = "cv_processing"
 NOT_FOUND = "Not found"
+START_CLAIM_SECONDS = 120  # planning calls AI: one start pays for it, and a claim left by a crash expires
+TOO_LONG = "This recording is longer than 3 minutes. Please record a shorter answer."
 
 
 class StartIn(BaseModel):
@@ -104,8 +110,43 @@ def _check_can_start(db: Session, application: Application) -> None:
         raise HTTPException(status_code=409, detail="This interview cannot be started now")
 
 
+def _release_start_claim(db: Session, application_id: int, claim: datetime) -> None:
+    """Clear this request's claim. Only its own: one that expired and was taken over stays."""
+    try:
+        db.rollback()
+        db.query(Application).filter(Application.id == application_id, Application.start_claimed_at == claim).update(
+            {Application.start_claimed_at: None}, synchronize_session=False)
+        db.commit()
+    except Exception as exc:
+        db.rollback()
+        logger.warning("Could not clear the start claim of application %s: %s", application_id, type(exc).__name__)
+
+
+def _claim_start(db: Session, user_id: int, application_id: int):
+    """Claim the right to plan (which calls AI) under the lock. Returns (claim, None), or (None, state) if a session is
+    already running. A second start while one is planning gets 409 instead of paying again."""
+    db.rollback()
+    application = _owned_application(db, user_id, application_id, lock=True)
+    active = _active_session(db, application_id)
+    if active is not None and (resumed := _resume(db, active)) is not None:
+        return None, resumed
+    _check_can_start(db, application)
+    now = datetime.now(timezone.utc).replace(tzinfo=None, microsecond=0)
+    started = application.start_claimed_at
+    if started is not None:
+        started = started.astimezone(timezone.utc).replace(tzinfo=None) if started.tzinfo else started
+        if (now - started).total_seconds() < START_CLAIM_SECONDS:
+            db.rollback()
+            raise HTTPException(status_code=409, detail="Your interview is being prepared. Please wait a moment.")
+    application.start_claimed_at = now
+    db.commit()
+    return now, None
+
+
 @router.post("/api/screening/{application_id}/start", response_model=StateOut)
-def start(application_id: int, body: StartIn, user: User = Depends(get_authenticated_user), db: Session = Depends(get_db)):
+@limiter.limit(VOICE_START_LIMIT, key_func=user_key)
+def start(request: Request, application_id: int, body: StartIn, user: User = Depends(get_authenticated_user),
+          db: Session = Depends(get_db)):
     user_id = user.id
     application = _owned_application(db, user_id, application_id)
     active = _active_session(db, application_id)
@@ -121,6 +162,16 @@ def start(application_id: int, body: StartIn, user: User = Depends(get_authentic
     if body.language not in allowed:
         raise HTTPException(status_code=422, detail="This language is not offered for this job")
 
+    claim, resumed = _claim_start(db, user_id, application_id)
+    if resumed is not None:
+        return resumed
+    try:
+        return _plan_and_start(db, user_id, application_id, application, body)
+    finally:
+        _release_start_claim(db, application_id, claim)
+
+
+def _plan_and_start(db: Session, user_id: int, application_id: int, application: Application, body: StartIn) -> StateOut:
     plan = planner.build_plan(db, application, body.language)
 
     # Planning took a while with no lock held, so another request may have started this session. The rollback ends this
@@ -168,11 +219,12 @@ async def _read_audio(file: UploadFile) -> tuple[bytes, str]:
     mime_type = (file.content_type or "").split(";")[0].strip().lower()
     if mime_type not in voice.ALLOWED_AUDIO:
         raise HTTPException(status_code=415, detail="This audio type is not accepted")
+    limit = voice.max_audio_bytes(mime_type)  # what 200 seconds can weigh in this type, never over the file limit
     chunks, total = [], 0
     while chunk := await file.read(CHUNK_SIZE):
         total += len(chunk)
-        if total > voice.MAX_AUDIO_BYTES:
-            raise HTTPException(status_code=413, detail="This recording is too large")
+        if total > limit:
+            raise HTTPException(status_code=413, detail=TOO_LONG)
         chunks.append(chunk)
     if not total:
         raise HTTPException(status_code=422, detail="This recording is empty")
@@ -199,6 +251,12 @@ def _submit(db: Session, user_id: int, session_id: int, position: int, audio: by
         raise _recording_consent_withdrawn() from exc
     except voice.PositionNotCurrent as exc:
         raise HTTPException(status_code=409, detail="This is not the current question") from exc
+    except voice.TranscriptionInFlight as exc:
+        raise HTTPException(
+            status_code=409, detail="Your recording of this answer is still being processed. Please wait a moment.",
+        ) from exc
+    except voice.AudioTooLong as exc:
+        raise HTTPException(status_code=413, detail=TOO_LONG) from exc
     except voice.SessionGone as exc:
         raise _not_found() from exc
 
@@ -211,7 +269,9 @@ async def _answer(db: Session, user_id: int, session_id: int, position: int, fil
 
 # Declares only the file: a transcript or history sent by the client has nowhere to go.
 @router.post("/api/voice/{session_id}/turns/{position}/answer", response_model=StateOut)
+@limiter.limit(VOICE_ANSWER_LIMIT, key_func=user_key)
 async def submit_voice_answer(
+    request: Request,
     session_id: int,
     position: int,
     file: UploadFile = File(...),
@@ -222,7 +282,9 @@ async def submit_voice_answer(
 
 
 @router.post("/api/screening/{session_id}/turns/{position}/answer", response_model=StateOut)
+@limiter.limit(VOICE_ANSWER_LIMIT, key_func=user_key)
 async def submit_answer(
+    request: Request,
     session_id: int,
     position: int,
     file: UploadFile = File(...),
@@ -234,24 +296,27 @@ async def submit_answer(
 
 def _question_audio(db: Session, user_id: int, session_id: int, position: int, purpose: str | None):
     session = _owned_session(db, user_id, session_id, purpose)
-    turn = db.query(VoiceTurn).filter_by(session_id=session.id, position=position).first()
-    if turn is None or not turn.question_text:
-        raise _not_found()
-    text, language, company_id = turn.question_text, session.language, session.company_id
-    db.rollback()  # hold no snapshot during a slow call
+    session_id = session.id
     try:
-        result = gateway.synthesize(text, language, None, "session_tts", company_id)
+        audio, mime_type = voice.question_audio(db, session_id, position)
+    except (voice.NoSuchTurn, voice.SessionGone) as exc:
+        raise _not_found() from exc
+    except voice.SessionEnded as exc:
+        raise HTTPException(status_code=409, detail="This interview has ended") from exc
     except AIError:
         return Response(status_code=204)
-    return Response(content=result.audio, media_type=result.mime_type, headers={"Cache-Control": "no-store"})
+    return Response(content=audio, media_type=mime_type, headers={"Cache-Control": "no-store"})
 
 
 @router.get("/api/voice/{session_id}/turns/{position}/question-audio")
-def voice_question_audio(session_id: int, position: int, user: User = Depends(get_authenticated_user),
+@limiter.limit(VOICE_QUESTION_AUDIO_LIMIT, key_func=user_key)
+def voice_question_audio(request: Request, session_id: int, position: int, user: User = Depends(get_authenticated_user),
                          db: Session = Depends(get_db)):
     return _question_audio(db, user.id, session_id, position, None)
 
 
 @router.get("/api/screening/{session_id}/turns/{position}/question-audio")
-def question_audio(session_id: int, position: int, user: User = Depends(get_authenticated_user), db: Session = Depends(get_db)):
+@limiter.limit(VOICE_QUESTION_AUDIO_LIMIT, key_func=user_key)
+def question_audio(request: Request, session_id: int, position: int, user: User = Depends(get_authenticated_user),
+                   db: Session = Depends(get_db)):
     return _question_audio(db, user.id, session_id, position, PURPOSE)

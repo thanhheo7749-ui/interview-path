@@ -3,13 +3,14 @@
 What the candidate said is masked at read time until this HR member has made a logged reveal. A quote must still be
 found in the transcript shown beside it, so it is checked against the masked text, and left out if it no longer fits.
 """
+from datetime import timezone
+
 from app.brain.text import quote_in
 from app.database.sql_models import (
     Application, AuditLog, CandidateBrief, CultureNote, CvClaim, Job, KbNode, RequirementResult, User, VoiceSession, VoiceTurn,
 )
-from app.hiring import identity, jobs
-from app.hiring.decisions import REVEAL_ACTION
-from app.hiring.state import CONSENT_WITHDRAWN, NOT_TAKEN
+from app.hiring import consents, decisions, identity, jobs
+from app.hiring.state import CONSENT_WITHDRAWN, NOT_TAKEN, TRANSCRIPTION_FAILED
 
 CELLS = {
     ("meets", "many"): "priority",
@@ -17,7 +18,7 @@ CELLS = {
     ("not_met", "many"): "hidden_gem",
     ("not_met", "few"): "not_enough_evidence",
 }
-LANES = ("not_interviewed", "refused_recording", "withdrawn", "analysis_failed", "analyzing")
+LANES = ("not_interviewed", "refused_recording", "withdrawn", "analysis_failed", "analyzing", "transcription_failed", "cv_failed")
 NOT_ENOUGH_EVIDENCE = "not_enough_evidence"
 NOT_TAKEN_NOTE = "did not take the interview"
 CONSENT_WITHDRAWN_NOTE = "withdrew consent to recording"
@@ -31,6 +32,8 @@ def cell_for(application) -> str | None:
         return None
     if application.analysis_status in NO_EVIDENCE_NOTES:  # whatever the CV label says: the interview gave no evidence
         return NOT_ENOUGH_EVIDENCE
+    if application.analysis_status == TRANSCRIPTION_FAILED:  # the candidate spoke: never in a cell HR can reject in bulk
+        return None
     return CELLS.get((application.cv_status, application.interview_band))
 
 
@@ -46,6 +49,8 @@ def _lane_for(application, refused_ids=frozenset()) -> str | None:
         return "withdrawn"
     if stage == "declined_recording" or (stage == "ready_for_hr" and application.id in refused_ids):
         return "refused_recording"
+    if stage == "cv_failed":
+        return "cv_failed"
     if stage in NOT_INTERVIEWED:
         return "not_interviewed"
     if stage in ANALYZING:
@@ -53,7 +58,15 @@ def _lane_for(application, refused_ids=frozenset()) -> str | None:
     if stage == "ready_for_hr":
         if application.analysis_status == "failed":
             return "analysis_failed"
-        if application.fast_tracked or cell_for(application) is None:
+        if application.analysis_status == "running":
+            return "analyzing"
+        if application.analysis_status == TRANSCRIPTION_FAILED:
+            return "transcription_failed"
+        if application.fast_tracked:
+            return "not_interviewed"
+        if application.cv_status is None:  # invited although the CV could not be processed, so no cell can hold it
+            return "cv_failed"
+        if cell_for(application) is None:
             return "not_interviewed"
     return None
 
@@ -76,9 +89,8 @@ def card(application) -> dict:
 
 def job_board(db, company_id: int, job_id: int) -> dict:
     query = db.query(Application).filter(Application.company_id == company_id, Application.job_id == job_id,
-                                         Application.anonymized_at.is_(None))  # nothing is left to review or decide
-    if hasattr(Application, "is_simulated"):
-        query = query.filter(Application.is_simulated.is_(False))
+                                         Application.anonymized_at.is_(None),  # nothing is left to review or decide
+                                         Application.is_simulated.is_(False))
     cells = {name: [] for name in CELLS.values()}
     lanes = {name: [] for name in LANES}
     refused_ids = {
@@ -119,11 +131,27 @@ def _brief_status(db, application) -> str | None:
     return row[0] if row else None
 
 
+LONG_PAUSE_SECONDS = 10 * 60
+
+
+def long_pause(turns) -> bool:
+    """A neutral note for HR: some question waited over ten minutes for its answer. Offline time is not counted by the
+    interview clock, so this is how HR can see it. It touches no label, band or cell and implies nothing."""
+    def naive(value):
+        return value.replace(tzinfo=None) if value.tzinfo is None else value.astimezone(timezone.utc).replace(tzinfo=None)
+
+    return any(
+        turn.answered_at is not None and turn.created_at is not None
+        and (naive(turn.answered_at) - naive(turn.created_at)).total_seconds() > LONG_PAUSE_SECONDS
+        for turn in turns
+    )
+
+
 def _has_revealed(db, application, viewer_id: int | None) -> bool:
     if viewer_id is None:
         return False
     return db.query(AuditLog.id).filter(
-        AuditLog.company_id == application.company_id, AuditLog.action == REVEAL_ACTION, AuditLog.target_type == "application",
+        AuditLog.company_id == application.company_id, AuditLog.action == decisions.REVEAL_ACTION, AuditLog.target_type == "application",
         AuditLog.target_id == application.id, AuditLog.actor_user_id == viewer_id,
     ).first() is not None
 
@@ -170,7 +198,7 @@ def detail(db, application, viewer_id: int | None = None) -> dict:
             "cv": evidence(results.get((requirement.id, "cv")), False),
             "interview": evidence(results.get((requirement.id, "interview")), True),
         }
-        for requirement in jobs.active_requirements(db, application.job_id)
+        for requirement in jobs.requirements_for(db, application)
     ]
     claims = [
         {"id": c.id, "text": c.text, "quote": c.quote, "status": c.status,
@@ -204,6 +232,9 @@ def detail(db, application, viewer_id: int | None = None) -> dict:
         "brief_status": _brief_status(db, application),
         "hr_decided_at": application.hr_decided_at.isoformat() if application.hr_decided_at else None,
         "fast_tracked": bool(application.fast_tracked),
+        "restart_available": decisions.restart_available(db, application),
+        "cv_consent_withdrawn": consents.was_withdrawn(db, application.id, "cv_processing"),
+        "long_pause": long_pause(turns),
         "hidden_text_detected": bool(application.hidden_text_detected),
         "cv_text_blind": application.cv_text_blind,
         "requirements": requirements,

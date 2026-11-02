@@ -4,7 +4,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useCompany } from '../company/CompanyContext.jsx';
 import { EmptyState, ErrorAlert, cardClass, inputClass, primaryButton, secondaryButton } from '../components/KbFeedback.jsx';
 import {
-  createHiringRequest, generateDraft, listDepartments, listHiringRequests, listMembers, rememberDraft, rememberedDraft,
+  createHiringRequest, generateDraft, listDepartments, listHiringRequests, listMembers,
 } from '../lib/bridges.js';
 import { listRoleOptions } from '../lib/jobs.js';
 
@@ -102,14 +102,13 @@ function DraftActions({ companyId, request, roles }) {
   const [roleId, setRoleId] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const existing = rememberedDraft(companyId, request.id);
+  const existing = request.latest_draft_id;
 
   const generate = async () => {
     setError('');
     setBusy(true);
     try {
       const draft = await generateDraft(companyId, request.id, roleId === '' ? null : Number(roleId));
-      rememberDraft(companyId, request.id, draft.id);
       navigate(`/jd-studio/${draft.id}`);
     } catch (err) {
       setError(err.message);
@@ -136,13 +135,31 @@ function DraftActions({ companyId, request, roles }) {
         <button type="button" disabled={busy} onClick={generate} className={primaryButton}>
           {t('bridges.requests.generateDraft')}
         </button>
-        {existing && (
-          <Link to={`/jd-studio/${existing}`} className={secondaryButton}>
+        {existing != null && (
+          <Link to={`/jd-studio/${existing}`} data-testid="open-draft" className={secondaryButton}>
             {t('bridges.requests.openDraft')}
           </Link>
         )}
       </div>
       <ErrorAlert message={error} />
+    </div>
+  );
+}
+
+// A manager reaches the draft of their own request here; it says so when their approval is what the draft waits for.
+function ManagerDraftLink({ request }) {
+  const { t } = useTranslation();
+  const waiting = request.latest_draft_status === 'manager_review';
+  return (
+    <div className="flex flex-wrap items-center gap-3">
+      {waiting && (
+        <span data-testid="awaiting-approval" className="rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-900">
+          {t('bridges.requests.awaitingApproval')}
+        </span>
+      )}
+      <Link to={`/jd-studio/${request.latest_draft_id}`} data-testid="open-draft" className={waiting ? primaryButton : secondaryButton}>
+        {t('bridges.requests.openDraft')}
+      </Link>
     </div>
   );
 }
@@ -203,6 +220,7 @@ function HiringRequestsPage() {
                 </p>
               </div>
               {isHr && <DraftActions companyId={companyId} request={request} roles={roles} />}
+              {!isHr && request.latest_draft_id != null && <ManagerDraftLink request={request} />}
               {!isHr && INTAKE_OPEN.includes(request.status) && (
                 <Link to={`/intake/${request.id}`} className={primaryButton}>
                   {request.status === 'intake_in_progress' ? t('bridges.requests.resumeIntake') : t('bridges.requests.startIntake')}

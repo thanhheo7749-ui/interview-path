@@ -55,6 +55,9 @@ function CandidateCard({ card, selected, checked, onToggle, onClick }) {
           {card.analysis_status === CONSENT_WITHDRAWN && (
             <p data-testid="interview-note" className="mt-2 text-xs font-semibold text-amber-800">{t('board.consentWithdrawn')}</p>
           )}
+          {card.analysis_status === 'transcription_failed' && (
+            <p data-testid="transcription-note" className="mt-2 text-xs font-semibold text-amber-800">{t('board.lanes.transcription_failed')}</p>
+          )}
           <p className="mt-2 text-xs font-semibold text-slate-500">{t(`board.stage.${card.stage}`, { defaultValue: card.stage })}</p>
           {card.hidden_text_detected && <p className="mt-2 text-xs text-slate-500">{t('board.hiddenText')}</p>}
         </button>

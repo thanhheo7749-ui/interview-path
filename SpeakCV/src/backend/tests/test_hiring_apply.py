@@ -766,7 +766,7 @@ def test_application_response_holds_exactly_the_agreed_fields(client, world):
     application_id = apply(client).json()["id"]
     body = client.get(f"/api/applications/{application_id}", headers=auth_header(CANDIDATE)).json()
     assert set(body) == {"id", "alias", "status", "job_title", "company_name", "company_slug", "is_sample", "created_at",
-                         "withdraw_reason", "processing_error", "interview_languages", "decision"}
+                         "withdraw_reason", "processing_error", "interview_languages", "decision", "failure_reason", "email_enabled", "contact_email", "feedback"}
     assert body["alias"] == "#A1" and body["job_title"] == "Backend Developer" and body["company_name"] == "Acme"
     assert body["company_slug"] == "acme" and body["interview_languages"] == ["en"]
     assert body["is_sample"] is False and body["status"] == "invited"
@@ -895,10 +895,20 @@ def test_withdraw_needs_no_reason(client, world, db):
 
 
 def test_withdraw_from_another_stage_gets_409(client, world, db):
-    application_id = apply(client, data=make_pdf([]), name="cv.pdf", content_type="application/pdf").json()["id"]
+    application_id = apply(client).json()["id"]
+    fresh(db, application_id).stage = "ready_for_hr"
+    db.commit()
     assert client.post(f"/api/applications/{application_id}/withdraw", json={"reason": "x"}, headers=auth_header(CANDIDATE)).status_code == 409
     application = fresh(db, application_id)
-    assert application.stage == "cv_failed" and application.withdraw_reason is None
+    assert application.stage == "ready_for_hr" and application.withdraw_reason is None
+
+
+def test_withdraw_while_the_cv_could_not_be_processed(client, world, db):
+    application_id = apply(client, data=make_pdf([]), name="cv.pdf", content_type="application/pdf").json()["id"]
+    assert fresh(db, application_id).stage == "cv_failed"
+    assert client.post(f"/api/applications/{application_id}/withdraw", json={"reason": "x"}, headers=auth_header(CANDIDATE)).status_code == 200
+    application = fresh(db, application_id)
+    assert application.stage == "withdrawn" and application.withdraw_reason == "x"
 
 
 def test_withdraw_reason_has_a_length_limit(client, world):

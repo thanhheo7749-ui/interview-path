@@ -14,9 +14,10 @@ from app.core.rate_limit import limiter, user_key
 from app.core.uploads import CV_UPLOAD_TYPES, read_upload
 from app.database.database import get_db
 from app.database.sql_models import Application, Company, Job, RequirementResult, User
-from app.hiring import applications, audit, consents, cv_processing, decisions, jobs
+from app.hiring import applications, audit, consents, cv_processing, decisions, jobs, notify
 from app.hiring import retention
 from app.hiring.state import InvalidTransition, advance
+from app.posthire import feedback as rejection_feedback
 
 router = APIRouter()
 
@@ -35,6 +36,7 @@ FRIENDLY_STATUS = {
     "withdrawn": "withdrawn",
 }
 FIT_WORDS = {"met": "matches", "partial": "partly", "not_found": "not_seen"}
+NOT_ASSESSED = "not_assessed"  # HR invited this candidate although their CV could not be processed
 FIT_NOT_READY = {"submitted", "cv_processing", "cv_failed"}
 STYLE_TYPES = ("value", "behavior")
 NOT_FOUND = "Application not found"
@@ -54,6 +56,26 @@ class ApplicationOut(BaseModel):
     withdraw_reason: str | None
     processing_error: str | None  # holds only the fixed messages written by cv_processing
     decision: str | None = None  # approved or rejected once HR has decided; never a reason, label or band
+    failure_reason: str | None = None  # a fixed code for why the CV failed; the app words it
+    email_enabled: bool = False  # whether this deployment can send email at all
+    contact_email: str | None = None  # the candidate's own account email, only once they are approved
+    feedback: "FeedbackOut | None" = None  # only what HR approved and sent
+
+
+class LearningItem(BaseModel):
+    id: int
+    title: str
+    url: str
+    provider: str
+    language: str
+
+
+class FeedbackOut(BaseModel):
+    application_id: int
+    language: str
+    message: str
+    learning: list[LearningItem]
+    sent_at: str | None
 
 
 class FitItem(BaseModel):
@@ -99,11 +121,17 @@ def _out(db: Session, application: Application, **overrides) -> ApplicationOut:
         "created_at": application.created_at.isoformat() if application.created_at else None,
         "withdraw_reason": application.withdraw_reason,
         "processing_error": application.processing_error,
+        "failure_reason": cv_processing.failure_reason(application.processing_error),
+        "email_enabled": notify.is_configured(),
     }
     decision = decisions.visible_to_candidate(application)
     if decision is not None:
         fields["status"] = "decided"
         fields["decision"] = decision
+        if decision == "approved" and application.candidate_user_id is not None:
+            owner = db.get(User, application.candidate_user_id)
+            fields["contact_email"] = owner.email if owner is not None else None
+        fields["feedback"] = rejection_feedback.candidate_view(db, application)
     return ApplicationOut(**{**fields, **overrides})
 
 
@@ -193,6 +221,14 @@ def get_application(application_id: int, user: User = Depends(get_authenticated_
     return _out(db, _owned(db, user, application_id))
 
 
+@router.get("/api/applications/{application_id}/feedback", response_model=FeedbackOut)
+def get_feedback(application_id: int, user: User = Depends(get_authenticated_user), db: Session = Depends(get_db)):
+    view = rejection_feedback.candidate_view(db, _owned(db, user, application_id))
+    if view is None:  # a draft looks exactly like no feedback at all
+        raise HTTPException(status_code=404, detail="Feedback not found")
+    return view
+
+
 def _team_style(db: Session, job: Job) -> list[StyleItem]:
     candidate = audience.candidate(job.company_id)
     profile = retriever.role_profile(db, candidate, job.role_node_id) if job.role_node_id is not None else None
@@ -214,8 +250,8 @@ def get_fit(application_id: int, user: User = Depends(get_authenticated_user), d
         for row in db.query(RequirementResult).filter_by(application_id=application.id, source="cv")
     }
     requirements = [
-        FitItem(requirement_id=row.id, text=row.text, fit=FIT_WORDS.get(statuses.get(row.id), "not_seen"))
-        for row in jobs.active_requirements(db, application.job_id)
+        FitItem(requirement_id=row.id, text=row.text, fit=FIT_WORDS.get(statuses.get(row.id), NOT_ASSESSED))
+        for row in jobs.requirements_for(db, application)
         if row.visibility == "public"
     ]
     return FitOut(requirements=requirements, team_style=_team_style(db, db.get(Job, application.job_id)))

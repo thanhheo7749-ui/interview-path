@@ -10,10 +10,12 @@ from app.core import storage
 from app.database.database import SessionLocal
 from app.database.sql_models import (
     Application, AssistantQuestion, AuditLog, CandidateBrief, Company, CompanyMember, Consent, CultureNote, CvClaim,
-    InterviewScorecard, Job, Notification, ReapplyGuard, RequirementResult, ScreeningCache, VoiceSession, VoiceTurn,
+    InterviewScorecard, Job, Notification, ReapplyGuard, RejectionFeedback, RequirementResult, ScreeningCache, VoiceSession,
+    VoiceTurn,
 )
 from app.hiring import audit, consents, notify, reapply_guard, voice
 from app.hiring.state import advance
+from app.posthire import feedback
 
 logger = logging.getLogger(__name__)
 
@@ -41,13 +43,18 @@ ERASED = {
     "requirement_results": ("quote",),
     "cv_claims": ("text", "quote", "evidence_quote"),
     "voice_sessions": ("owner_user_id", "plan"),  # the plan holds question text, which quotes the CV
-    "voice_turns": ("question_text", "source_ref", "audio_path", "transcript"),
+    "voice_turns": ("question_text", "source_ref", "audio_path", "question_audio_path", "transcript"),
     "culture_notes": ("note", "quote"),
     "consents": ("user_id",),
     "candidate_briefs": ("content",),  # original quotes and recording times
     "interview_scorecards": ("requirement_scores", "notes"),
     # Not tied to one application: cleared on the candidate's last deletion at the company, and by age. See _erase_question.
     "assistant_questions": ("user_id", "question", "embedding"),
+    "rejection_feedbacks": ("draft",),  # it quotes the candidate's answers
+    # Nothing is cleared on these three. Each one's own rules decide how long it stays: see KEPT.
+    "talent_pool_entries": (),
+    "onboarding_plans": (),
+    "probation_outcomes": (),
 }
 # Whole rows go. A notification's user_id cannot be NULL, and a cache row is nothing but quotes and claims.
 DELETED_ROWS = ("screening_cache", "notifications")
@@ -74,11 +81,17 @@ KEPT = {
     ),
     "assistant_questions": ("audience", "language", "state", "top_score", "embedding_model"),  # no content once cleared
     "reapply_guards": ("key_hash",),  # a keyed hash, stated in the consent text; removed after REAPPLY_DAYS
+    "rejection_feedbacks": ("language", "status", "approved_by"),
+    # A separate talent_pool consent keeps these until the entry ends, whatever happens to the application.
+    "talent_pool_entries": ("candidate_user_id", "retained_cv_text", "embedding_model", "status"),
+    "onboarding_plans": ("employee_user_id", "status", "approved_by"),  # an employee's plan, not candidate evidence
+    "probation_outcomes": ("result", "recorded_by"),  # feeds Reality Check, and holds no personal content
 }
 
 
 def has_extension(db, application) -> bool:
-    """Whether a consent extends this application's retention. Block 5's talent pool and onboarding change this body."""
+    """Whether a consent extends this application's retention. The talent pool does not: its consent keeps a masked copy
+    on the entry, and audio and transcripts still go on time. See app.posthire.talent_pool."""
     return False
 
 
@@ -233,20 +246,40 @@ def _delete_files(cv_path: str | None, audio_paths: list[str]) -> None:
             recordings.delete(path)
 
 
-def anonymize_application(db, application, *, trigger: str = TRIGGER_RETENTION, only_if=None) -> bool:
-    """Commits. Files go after the rows are flushed and before the commit: if a file cannot be deleted, the caller
-    rolls back and the paths survive for a retry, and a file already deleted is no obstacle to that retry.
+def _settle_talent_pool(db, application, user_id: int | None, trigger: str) -> None:
+    from app.posthire import talent_pool  # Imported here: talent_pool is built on this module.
+
+    talent_pool.on_application_anonymized(db, application, user_id, by_candidate=trigger == TRIGGER_CANDIDATE)
+
+
+def _expire_talent_pool(db) -> int:
+    from app.posthire import talent_pool
+
+    return talent_pool.expire(db)
+
+
+def anonymize_application(db, application, *, trigger: str = TRIGGER_RETENTION, only_if=None, commit: bool = True) -> bool:
+    """Commits, unless the caller owns the transaction and the application has no file to delete. Files go after the rows
+    are flushed and before the commit: if a file cannot be deleted, the caller rolls back and the paths survive for a
+    retry, and a file already deleted is no obstacle to that retry.
 
     Discards anything pending and ends the session's snapshot before locking, as `voice._lock` does. Under MySQL's
     REPEATABLE READ the plain reads below would otherwise come from a snapshot older than an answer stored while this
     waited for the lock, and the audio and transcript would stay for good. Any check of the caller's must be repeated
-    under this lock, so it is passed as `only_if`. Returns whether this call anonymized the application.
+    under this lock, so it is passed as `only_if`. With commit=False the caller's own work is in this transaction and it
+    has locked the row, so neither happens. Returns False if `only_if` refused; an application already gone counts as done.
     """
     application_id = application.id
-    db.rollback()
-    application = _locked(db, application_id)
-    if application is None or application.anonymized_at is not None or (only_if is not None and not only_if(application)):
+    if commit:
         db.rollback()
+        application = _locked(db, application_id)
+    if application is None or application.anonymized_at is not None:
+        if commit:
+            db.rollback()
+        return only_if is None
+    if only_if is not None and not only_if(application):
+        if commit:
+            db.rollback()
         return False
     user_id = application.candidate_user_id
     blind_hash = application.cv_blind_hash
@@ -254,13 +287,11 @@ def anonymize_application(db, application, *, trigger: str = TRIGGER_RETENTION, 
     sessions = db.query(VoiceSession).filter_by(application_id=application_id).all()
     session_ids = [session.id for session in sessions]
     turns = db.query(VoiceTurn).filter(VoiceTurn.session_id.in_(session_ids)).all() if session_ids else []
-    audio_paths = [turn.audio_path for turn in turns if turn.audio_path]
+    audio_paths = [path for turn in turns for path in (turn.audio_path, turn.question_audio_path) if path]
     if user_id is not None:
         _guard_reapply(db, application, user_id, bool(session_ids))
-        if trigger == TRIGGER_CANDIDATE:
-            _forget_questions(db, application, user_id)
 
-    for model in (RequirementResult, CvClaim, CultureNote, Consent, CandidateBrief, InterviewScorecard):
+    for model in (RequirementResult, CvClaim, CultureNote, Consent, CandidateBrief, InterviewScorecard, RejectionFeedback):
         for row in db.query(model).filter_by(application_id=application_id):
             _erase(row)
     for session in sessions:
@@ -269,7 +300,10 @@ def anonymize_application(db, application, *, trigger: str = TRIGGER_RETENTION, 
     for row in (*sessions, *turns):
         _erase(row)
     _delete_notifications(db, application, user_id)
+    _settle_talent_pool(db, application, user_id, trigger)
     if user_id is not None:
+        if trigger == TRIGGER_CANDIDATE:
+            _forget_questions(db, application, user_id)  # after the pool: an invitation it retracts no longer counts as live
         _unlink_audit(db, application, user_id)
     _strip_audit_reasons(db, application_id)
     _stop_cv_job(application)
@@ -279,7 +313,8 @@ def anonymize_application(db, application, *, trigger: str = TRIGGER_RETENTION, 
     db.flush()
     _delete_cache(db, application_id, blind_hash)
     _delete_files(cv_path, audio_paths)
-    db.commit()
+    if commit:
+        db.commit()
     return True
 
 
@@ -367,9 +402,10 @@ def run(db, now=None) -> int:
 def counts(db, company, now=None) -> dict:
     now = _naive_utc(now)
     due_ids = _due_ids(db, company.id, company.retention_days, now)
-    due = db.query(Application).filter(Application.id.in_(due_ids)).all() if due_ids else []
-    live = db.query(Application.id).filter(Application.company_id == company.id, Application.anonymized_at.is_(None)).count()
-    gone = db.query(Application.id).filter(Application.company_id == company.id, Application.anonymized_at.isnot(None)).count()
+    due = db.query(Application).filter(Application.id.in_(due_ids), Application.is_simulated.is_(False)).all() if due_ids else []
+    real = db.query(Application.id).filter(Application.company_id == company.id, Application.is_simulated.is_(False))
+    live = real.filter(Application.anonymized_at.is_(None)).count()
+    gone = real.filter(Application.anonymized_at.isnot(None)).count()
     return {
         "retention_days": company.retention_days,
         "undecided_retention_days": UNDECIDED_RETENTION_DAYS,
@@ -437,7 +473,8 @@ def send_reminders(db, now=None) -> int:
 def _daily_pass() -> None:
     db = SessionLocal()
     try:
-        for step in (voice.sweep_abandoned, run, send_reminders, notify.send_pending):
+        for step in (voice.sweep_abandoned, run, _expire_talent_pool, send_reminders, feedback.send_overdue_notices,
+                     notify.send_pending):
             try:
                 step(db)
             except Exception as exc:

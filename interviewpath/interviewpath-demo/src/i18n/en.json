@@ -7,7 +7,8 @@
     "remove": "Remove",
     "rename": "Rename",
     "none": "None",
-    "genericError": "Something went wrong. Please try again."
+    "genericError": "Something went wrong. Please try again.",
+    "aiBudgetExceeded": "This company has reached its daily AI limit. Please try again tomorrow."
   },
   "login": {
     "title": "Sign in to InterviewPath",
@@ -370,7 +371,10 @@
       "consent_withdrawn": "Consent withdrawn",
       "application_withdrawn": "Application withdrawn",
       "application_anonymized": "Application anonymized",
-      "reminder_queued": "Reminder queued"
+      "reminder_queued": "Reminder queued",
+      "invited_without_cv": "Invited without a CV result",
+      "transcription_retried": "Transcription retried",
+      "transcription_failed": "Transcription failed"
     },
     "retention": {
       "period": "Retention period",
@@ -430,7 +434,7 @@
     "roleHint": "Choosing a role fills in the title, description and requirements from the company knowledge. You can edit everything.",
     "jobTitle": "Job title",
     "description": "Description",
-    "descriptionHint": "JD Studio, which will help write job descriptions, arrives later. For now, write or edit the description here.",
+    "descriptionHint": "Write or edit the description here. To draft one from the company knowledge, open a hiring request and use JD Studio.",
     "languages": "Interview languages",
     "language": {
       "vi": "Vietnamese",
@@ -465,7 +469,8 @@
     "addChannel": "Add channel",
     "channelInvalid": "Use 1 to 50 lowercase letters, digits or underscores.",
     "colBoard": "Candidates",
-    "openBoard": "Open board"
+    "openBoard": "Open board",
+    "noPublicRequirement": "This job has no public requirement. The interview has nothing to measure, so every candidate's evidence band will be low."
   },
   "board": {
     "eyebrow": "Candidate board",
@@ -521,6 +526,7 @@
     "fastTrackedNote": "This candidate was fast-tracked without an interview, so there is no interview evidence.",
     "notTaken": "Did not take the interview",
     "consentWithdrawn": "Withdrew consent to recording",
+    "cvConsentWithdrawn": "This candidate withdrew consent to CV processing, so AI no longer works on this CV and they cannot be invited to the interview.",
     "anonymizedNotice": "This candidate's data has been deleted. There is nothing left to review and no action is available.",
     "analysisFailed": "The analysis of this interview failed. You can retry it.",
     "hiddenText": "Note: the CV file contained hidden text, which was ignored.",
@@ -542,7 +548,9 @@
       "analysis_failed": "Analysis failed",
       "not_interviewed": "Not interviewed",
       "refused_recording": "Refused recording",
-      "withdrawn": "Withdrawn"
+      "withdrawn": "Withdrawn",
+      "transcription_failed": "Technical problem: audio available",
+      "cv_failed": "CV could not be processed"
     },
     "bulk": {
       "button": "Reject {{count}} selected",
@@ -583,7 +591,8 @@
         "explained": "Explained",
         "partly": "Partly explained",
         "not_explained": "Not explained"
-      }
+      },
+      "cvSays": "What the CV says"
     },
     "culture": {
       "title": "Culture notes",
@@ -607,7 +616,11 @@
       "restart": "Grant a restart",
       "fastTrack": "Fast-track",
       "retry": "Retry analysis",
-      "reveal": "Reveal identity"
+      "reveal": "Reveal identity",
+      "retryTranscription": "Retry transcription",
+      "inviteAnyway": "Invite to interview anyway",
+      "rejectConfirm": "Reject this candidate? The candidate will be told that the hiring team decided not to move forward. This cannot be undone.",
+      "rejectConfirmButton": "Yes, reject"
     },
     "reveal": {
       "title": "Reveal identity",
@@ -623,7 +636,10 @@
       "submit": "Save correction",
       "corrected": "CV label corrected by HR",
       "reasonShown": "Correction reason: {{reason}}"
-    }
+    },
+    "transcriptionFailed": "This candidate answered, but speech-to-text failed. The audio is available. This is a technical problem, not a missing interview. You can retry the transcription.",
+    "cvFailed": "This candidate's CV could not be processed, so AI has not looked at it. You can invite them to the interview anyway.",
+    "longPause": "Long pause during the interview"
   },
   "bridges": {
     "nav": {
@@ -653,7 +669,8 @@
       "roleLabel": "Role to write about",
       "anyRole": "No specific role",
       "generateDraft": "Generate draft",
-      "openDraft": "Open draft"
+      "openDraft": "Open draft",
+      "awaitingApproval": "Awaiting your approval"
     },
     "intake": {
       "title": "Manager intake",
@@ -821,7 +838,7 @@
     "noLines": "This draft has no lines yet.",
     "lineText": "Text of line {{number}}",
     "emptyInLanguage": "(nothing written in this language)",
-    "sourceNode": "Source #{{id}}",
+    "restrictedSource": "Restricted source",
     "unsourced": "No source",
     "confirmedByHr": "Confirmed by HR",
     "mustHave": "Must-have",
@@ -889,6 +906,7 @@
       "copyFailed": "Could not copy. Select the text and copy it by hand."
     },
     "isRequirementLine": "Line {{number}} is a requirement",
-    "isMustHaveLine": "Line {{number}} is a must-have"
+    "isMustHaveLine": "Line {{number}} is a must-have",
+    "sourceNode": "Source #{{id}}"
   }
 }

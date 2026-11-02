@@ -123,9 +123,10 @@ def test_requirements_that_are_met_or_not_must_have_are_not_asked(db):
     assert "Docker" not in asked and "Niceskill" not in asked
 
 
-def test_inactive_requirements_are_not_asked(db):
+def test_requirements_retired_before_the_cv_was_assessed_are_not_asked(db):
     world = build_world(db, "gamma", "Dev", "", [], [], [("Retiredskill", True, "public")])
     world.requirements[0].active = False
+    db.query(RequirementResult).delete()
     db.commit()
     assert "Retiredskill" not in " ".join(item.text for item in planner.build_plan(db, world.application, "en"))
 

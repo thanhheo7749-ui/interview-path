@@ -9,6 +9,9 @@ import pdfplumber
 from docx.oxml.ns import qn
 from docx.table import Table
 from docx.text.hyperlink import Hyperlink
+from pdfminer.converter import PDFPageAggregator
+from pdfminer.layout import LTChar
+from pdfminer.pdfinterp import PDFPageInterpreter, PDFResourceManager
 
 from app.core.text_extract import NoExtractableText, extract_pages
 
@@ -67,6 +70,69 @@ def _visibility_filter(page):
     return keep
 
 
+INVISIBLE_RENDER_MODES = (3, 7)  # neither filled nor stroked: invisible in any colour
+
+
+class _RenderModeTracker(PDFPageAggregator):
+    """Walks a page's text operators and notes where each character sits when its render mode is invisible."""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.mode = 0
+        self.invisible: set[tuple] = set()
+
+    def render_string(self, textstate, seq, ncs, graphicstate):
+        self.mode = textstate.render
+        super().render_string(textstate, seq, ncs, graphicstate)
+
+    def render_char(self, matrix, font, fontsize, scaling, rise, cid, ncs, graphicstate):
+        before = len(self.cur_item._objs)
+        advance = super().render_char(matrix, font, fontsize, scaling, rise, cid, ncs, graphicstate)
+        if self.mode in INVISIBLE_RENDER_MODES:
+            self.invisible.update(
+                _char_key(item.x0, item.y0, item.get_text()) for item in self.cur_item._objs[before:] if isinstance(item, LTChar)
+            )
+        return advance
+
+
+def _char_key(x0: float, y0: float, text: str) -> tuple:
+    return round(x0, 1), round(y0, 1), text
+
+
+def _invisible_chars(page) -> set[tuple]:
+    """Where the page draws text in an invisible render mode. Best effort: a page the walk cannot read reports none."""
+    try:
+        manager = PDFResourceManager()
+        tracker = _RenderModeTracker(manager, laparams=None)
+        PDFPageInterpreter(manager, tracker).process_page(page.page_obj)
+    except Exception:  # noqa: BLE001 - a damaged page must not stop the CV from being read
+        return set()
+    return tracker.invisible
+
+
+def _page_text(page) -> tuple[str, bool]:
+    """The page's visible text, and whether it draws any invisible text.
+
+    Invisible text is removed when the page has other text: it is what a reader cannot see. A scan's OCR layer is
+    invisible too, and the only text on its page, so it stays. Either way the page is flagged, and the flag draws no
+    conclusion on intent."""
+    invisible = _invisible_chars(page)
+    keep = _visibility_filter(page)
+
+    def key(obj: dict) -> tuple:
+        return _char_key(obj["x0"], obj["y0"], obj["text"])
+
+    visible_elsewhere = any(
+        key(char) not in invisible and char["text"].strip() and keep(char) for char in page.chars
+    ) if invisible else False
+    drop = invisible if visible_elsewhere else set()
+
+    def kept(obj: dict) -> bool:
+        return keep(obj) and not (obj.get("object_type") == "char" and key(obj) in drop)
+
+    return (page.filter(kept).extract_text() or "").strip(), bool(invisible)
+
+
 def _without_whitespace(text: str) -> str:
     return "".join(text.split())
 
@@ -76,9 +142,10 @@ def _extract_pdf(data: bytes) -> CvText:
         if len(pdf.pages) > MAX_PDF_PAGES:
             raise CvTooLarge(f"This PDF has more than {MAX_PDF_PAGES} pages. Please upload a shorter CV.")
         unfiltered = "\n".join(text for _, text in extract_pages(data, ".pdf"))
-        pages = [(page.filter(_visibility_filter(page)).extract_text() or "").strip() for page in pdf.pages]
-    text = "\n".join(page for page in pages if page)
-    return CvText(text=text, hidden_detected=_without_whitespace(text) != _without_whitespace(unfiltered))
+        extracted = [_page_text(page) for page in pdf.pages]
+    text = "\n".join(page for page, _ in extracted if page)
+    drew_invisible = any(found for _, found in extracted)
+    return CvText(text=text, hidden_detected=drew_invisible or _without_whitespace(text) != _without_whitespace(unfiltered))
 
 
 def _has_visible_shading(properties) -> bool:

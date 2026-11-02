@@ -108,6 +108,7 @@ def upgrade() -> None:
     sa.Column('final_outcome', sa.String(length=30), nullable=True),
     sa.Column('is_simulated', sa.Boolean(), nullable=False),
     sa.Column('anonymized_at', sa.DateTime(timezone=True), nullable=True),
+    sa.Column('start_claimed_at', sa.DateTime(timezone=True), nullable=True),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('(CURRENT_TIMESTAMP)'), nullable=False),
     sa.ForeignKeyConstraint(['candidate_user_id'], ['users.id'], ondelete='SET NULL'),
     sa.ForeignKeyConstraint(['company_id'], ['companies.id'], ondelete='CASCADE'),
@@ -266,6 +267,8 @@ def upgrade() -> None:
     sa.Column('stt_failures', sa.Integer(), nullable=False),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('(CURRENT_TIMESTAMP)'), nullable=False),
     sa.Column('answered_at', sa.DateTime(timezone=True), nullable=True),
+    sa.Column('question_audio_path', sa.String(length=500), nullable=True),
+    sa.Column('stt_started_at', sa.DateTime(timezone=True), nullable=True),
     sa.ForeignKeyConstraint(['session_id'], ['voice_sessions.id'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('session_id', 'position', name='uq_voice_turn_position')

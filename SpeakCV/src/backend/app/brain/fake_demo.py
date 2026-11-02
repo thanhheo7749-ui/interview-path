@@ -122,8 +122,56 @@ def _channel_content(_system, messages, _schema) -> str:
     return json.dumps({"body": "[Demo AI] " + " ".join(lines) + "\n\n{link}"}, ensure_ascii=False)
 
 
+_ONBOARDING_NODE = re.compile(r"^\[n(\d+)\] (.*)$", re.MULTILINE)
+
+
+def _onboarding_plan(_system, messages, _schema) -> str:
+    """One item per phase, each citing the first node in the context."""
+    match = _ONBOARDING_NODE.search(messages[-1]["content"])
+    if not match:
+        return json.dumps({"items": []})
+    items = [{"phase": phase, "title": f"[Demo AI] Day {phase}: {match.group(2)[:60]}",
+              "source_node_id": int(match.group(1)), "learning_resource_id": 0} for phase in (30, 60, 90)]
+    return json.dumps({"items": items}, ensure_ascii=False)
+
+
+_FEEDBACK_ITEM = re.compile(r'<item ref="(\w+)" section="(\w+)">\nlabel: (.*)\nquote: (.*)\n</item>')
+_FEEDBACK_LEARNING = re.compile(r"^- id=(\d+): ", re.MULTILINE)
+
+
+def _rejection_feedback(_system, messages, _schema) -> str:
+    """One neutral sentence, one point from the first verified quote, and one from the first gap."""
+    content = messages[-1]["content"]
+    language = (_LANGUAGE.search(content) or [None, "en"])[1]
+    items = _FEEDBACK_ITEM.findall(content)
+    good = [item for item in items if item[1] == "went_well"][:1]
+    gaps = [item for item in items if item[1] == "to_build"][:1]
+    learning = content.split("<learning>")[1] if "<learning>" in content else ""
+    return json.dumps({
+        "went_well": [{"ref": ref, "text": f"[Demo AI] {label}", "quote": quote} for ref, _, label, quote in good],
+        "to_build": [{"ref": ref, "text": f"[Demo AI] {label}", "quote": ""} for ref, _, label, _ in gaps],
+        "learning_ids": [int(found) for found in _FEEDBACK_LEARNING.findall(learning)],
+        "message": f"[Demo AI] ({language}) Thank you for the time you gave us.",
+    }, ensure_ascii=False)
+
+
 def _same_topic_no(_system, _messages, _schema) -> str:
     return json.dumps({"same_topic": False})
+
+
+_TABLE = re.compile(r"<table>\n(.*)\n</table>", re.DOTALL)
+
+
+def _channel_commentary(_system, messages, _schema) -> str:
+    """One sentence per row, quoting applications and the approval rate exactly as given."""
+    match = _TABLE.search(messages[-1]["content"])
+    rows = json.loads(match.group(1)) if match else []
+    lines = []
+    for row in rows:
+        rate = row["approval_rate_pct"]
+        shown = "no approval rate yet" if rate is None else f"{rate}% approved"
+        lines.append(f"[Demo AI] {row['channel']}: {row['applications']} applications, {shown}.")
+    return json.dumps({"observations": lines}, ensure_ascii=False)
 
 
 def install() -> None:
@@ -134,8 +182,11 @@ def install() -> None:
         fake.register("discrimination_check", _not_discriminating)
         fake.register("lint_conflict_check", _same_topic_no)
         fake.register("channel_content", _channel_content)
+        fake.register("channel_commentary", _channel_commentary)
+        fake.register("rejection_feedback", _rejection_feedback)
     if config.slot("reasoning").provider == "fake":
         fake.register("copilot_answer", _copilot)
         fake.register("candidate_brief", _candidate_brief)
         fake.register("jd_generate", _jd_generate)
         fake.register("jd_assistant", _jd_assistant)
+        fake.register("onboarding_plan", _onboarding_plan)

@@ -50,9 +50,15 @@ export interface Application {
   withdraw_reason: string | null;
   processing_error: string | null;
   decision: "approved" | "rejected" | null;
+  /** A fixed code for why the CV failed, never the text of the failure. */
+  failure_reason: string | null;
+  /** Whether this deployment can send email at all. */
+  email_enabled: boolean;
+  /** The candidate's own account email, only once approved. */
+  contact_email: string | null;
 }
 
-export interface FitItem { requirement_id: number; text: string; fit: "matches" | "partly" | "not_seen" }
+export interface FitItem { requirement_id: number; text: string; fit: "matches" | "partly" | "not_seen" | "not_assessed" }
 export interface StyleItem { type: string; title: string; body: string }
 export interface Fit { requirements: FitItem[]; team_style: StyleItem[] }
 /** `language` is the language of `text`, which may not be the one asked for. It is what the consent ledger records. */

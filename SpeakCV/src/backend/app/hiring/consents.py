@@ -10,6 +10,7 @@ REAPPLY_DAYS = 90
 # Sent to the candidate app in a 409, which shows its own message and offers no retry.
 RECORDING_CONSENT_WITHDRAWN = "recording_consent_withdrawn"
 CV_CONSENT_WITHDRAWN = "cv_consent_withdrawn"
+TALENT_POOL = "talent_pool"
 
 
 @dataclass(frozen=True)
@@ -66,20 +67,45 @@ CONSENT_TEXTS = {
         "분석하지 않습니다. 녹음은 결정 후 {retention_days}일 동안 보관되며, 결정이 내려지지 않으면 지원 후 {undecided_days}일 "
         "동안 보관됩니다."
     ),
+    ("onboarding_use", "en"): (
+        "If you are hired, the company may use the gaps found in your interview to plan your first 90 days. "
+        "The plan names skills to build, never your answers. Your interview data is not used for anything else, "
+        "and you can withdraw this at any time from My data. If you decline, the plan uses only the team's knowledge."
+    ),
+    ("onboarding_use", "vi"): (
+        "Nếu bạn được tuyển, công ty có thể dùng các khoảng trống phát hiện trong buổi phỏng vấn để lập kế hoạch "
+        "90 ngày đầu của bạn. Kế hoạch chỉ nêu kỹ năng cần xây dựng, không nêu câu trả lời của bạn. Dữ liệu phỏng "
+        "vấn không được dùng cho mục đích nào khác, và bạn có thể rút lại bất cứ lúc nào trong mục Dữ liệu của tôi. "
+        "Nếu bạn từ chối, kế hoạch chỉ dùng kiến thức của đội ngũ."
+    ),
+    ("talent_pool", "en"): (
+        "If you agree, this company keeps the masked version of your CV, with identifying details removed, for "
+        "12 months. The purpose is to consider you for future jobs at this company: AI compares the masked CV with "
+        "new jobs, and HR may invite you to apply. An invitation means a new application and a new interview, and "
+        "your earlier answers are not reused. Your audio and transcripts are still deleted after the normal retention "
+        "period. You can leave at any time from My data, and the kept CV is then deleted at once."
+    ),
+    ("talent_pool", "vi"): (
+        "Nếu bạn đồng ý, công ty này sẽ lưu bản CV đã che thông tin nhận dạng của bạn trong 12 tháng. Mục đích là "
+        "xem xét bạn cho các công việc sau này tại công ty: AI đối chiếu CV đã che với các vị trí mới, và HR có thể "
+        "mời bạn ứng tuyển. Lời mời đồng nghĩa với một hồ sơ mới và một buổi phỏng vấn mới, câu trả lời trước đây "
+        "không được dùng lại. Âm thanh và bản ghi của bạn vẫn bị xóa sau thời hạn lưu trữ thông thường. Bạn có thể "
+        "rời đi bất cứ lúc nào trong mục Dữ liệu của tôi, và CV đã lưu sẽ bị xóa ngay lập tức."
+    ),
 }
 PURPOSES = tuple(sorted({purpose for purpose, _ in CONSENT_TEXTS}))
 FALLBACK_LANGUAGE = "en"
 
 
-def text_language(language: str | None) -> str:
-    """The language a text comes back in: the one asked for if a text exists in it, otherwise English."""
-    return language if (PURPOSES[0], language) in CONSENT_TEXTS else FALLBACK_LANGUAGE
+def text_language(purpose: str, language: str | None) -> str:
+    """The language a text comes back in: the one asked for if this purpose has a text in it, otherwise English."""
+    return language if (purpose, language) in CONSENT_TEXTS else FALLBACK_LANGUAGE
 
 
 def current_text(purpose: str, language: str, retention_days: int = DEFAULT_RETENTION_DAYS) -> ConsentText:
     if purpose not in PURPOSES:
         raise ValueError(f"Unknown consent purpose: {purpose}")
-    used = text_language(language)
+    used = text_language(purpose, language)
     text = CONSENT_TEXTS[(purpose, used)].format(
         retention_days=retention_days, undecided_days=UNDECIDED_RETENTION_DAYS, reapply_days=REAPPLY_DAYS,
     )
@@ -90,7 +116,7 @@ def record(db, user_id, company_id, application_id, purpose, text_version, langu
     if purpose not in PURPOSES:
         raise ValueError(f"Unknown consent purpose: {purpose}")
     consent = Consent(user_id=user_id, company_id=company_id, application_id=application_id,
-                      purpose=purpose, text_version=text_version, language=text_language(language) if language else None)
+                      purpose=purpose, text_version=text_version, language=text_language(purpose, language) if language else None)
     db.add(consent)
     db.flush()
     return consent
@@ -124,4 +150,8 @@ def withdraw(db, consent_id, user_id) -> Consent:
     if consent.withdrawn_at is None:
         consent.withdrawn_at = datetime.now(timezone.utc)
         db.flush()
+        if consent.purpose == TALENT_POOL:
+            from app.posthire import talent_pool  # Imported here: talent_pool is built on this module.
+
+            talent_pool.end_for_withdrawn_consent(db, consent)
     return consent

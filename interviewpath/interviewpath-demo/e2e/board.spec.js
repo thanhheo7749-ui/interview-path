@@ -130,6 +130,9 @@ test('rejecting shows the decided state and leaves the undecided count', async (
   await openCard(page, '#P2');
   const panel = page.getByTestId('detail-panel');
   await panel.getByRole('button', { name: 'Reject', exact: true }).click();
+  await expect(panel.getByRole('alertdialog')).toContainText('cannot be undone');
+  await expect(panel.getByTestId('decided-state')).toHaveCount(0);
+  await panel.getByRole('button', { name: 'Yes, reject', exact: true }).click();
   await expect(panel.getByTestId('decided-state')).toHaveText('Rejected');
   await expect(card(page, '#P2').getByTestId('decided-badge')).toHaveText('Rejected');
   await expect(count(page, 'priority')).toHaveText('3 to decide');

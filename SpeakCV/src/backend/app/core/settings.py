@@ -9,6 +9,7 @@ logger = logging.getLogger(__name__)
 
 MIN_SECRET_LENGTH = 32
 DEFAULT_MAX_UPLOAD_MB = 20
+DEFAULT_AI_COMPANY_DAILY_BUDGET_USD = 25.0
 
 
 class ConfigError(RuntimeError):
@@ -73,3 +74,17 @@ def allowed_origins() -> list[str]:
     if not origins:
         logger.warning("ALLOWED_ORIGINS is blank, so browsers on every other origin will be refused.")
     return origins
+
+
+def ai_company_daily_budget_usd() -> float:
+    """What one company may spend on AI in a day (the database's calendar day, summed from ai_usage_logs). Calls with no price count as 0."""
+    value = os.environ.get("AI_COMPANY_DAILY_BUDGET_USD", "").strip()
+    if not value:
+        return DEFAULT_AI_COMPANY_DAILY_BUDGET_USD
+    try:
+        budget = float(value)
+    except ValueError:
+        budget = float("nan")
+    if not budget > 0 or budget == float("inf"):
+        raise ConfigError("AI_COMPANY_DAILY_BUDGET_USD must be a positive number of US dollars.")
+    return budget

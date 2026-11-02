@@ -3,7 +3,7 @@ from dataclasses import dataclass, field
 from sqlalchemy import and_, false, func, not_, or_, select, true
 from sqlalchemy.orm import Session
 
-from app.database.sql_models import CompanyMember, Department, KbChunk, KbDocument, KbNode, KbNodeSource
+from app.database.sql_models import CompanyMember, Department, Job, JobRequirement, KbChunk, KbDocument, KbNode, KbNodeSource
 
 KINDS = ("candidate", "employee", "manager", "hr")
 WITHDRAWN_NODE_STATUSES = ("rejected", "superseded")
@@ -83,6 +83,14 @@ def document_filter(audience: Audience):
         KbDocument.company_id == audience.company_id,
         KbDocument.status == "published",
         _layer_filter(audience, KbDocument.visibility, KbDocument.department_id),
+    )
+
+
+def requirement_filter(audience: Audience):
+    """A job requirement belongs to its job's department. The caller joins Job."""
+    return and_(
+        JobRequirement.company_id == audience.company_id,
+        _layer_filter(audience, JobRequirement.visibility, Job.department_id),
     )
 
 

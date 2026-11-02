@@ -120,8 +120,8 @@ def _verified(output: AssessOutput, requirements: tuple[AssessedRequirement, ...
         verified.append({"requirement_id": requirement.id, "status": status, "quote": quote})
     claims = []
     for claim in output.claims:
-        if not _is_evidence(claim.quote, blind_text):
-            failures += 1
+        if not _is_evidence(claim.quote, blind_text) or _DIRECTIVE.search(normalise_for_match(claim.text)):
+            failures += 1  # the claim's own words are free model output that HR may read, so they are checked too
         elif claim.text.strip():
             claims.append({"text": claim.text, "quote": claim.quote})
     return {"requirements": verified, "claims": claims[:MAX_CLAIMS], "verification_failures": failures}
@@ -137,32 +137,13 @@ def _cached(db, key: dict) -> dict | None:
     return row.result if row is not None else None
 
 
-def assess(db, application) -> ScreeningResult:
-    """Assess on the blind text, from the cache when an identical CV was already assessed.
+def _payload(db, key, requirements, blind_text, company_id, still_wanted) -> tuple[dict, bool, str]:
+    """The verified result, from the cache when an identical CV was already assessed. Commits around the AI call.
 
-    Commits: the transaction ends before the AI call and again around the cache write, so the caller must have
-    nothing pending that it may yet discard. Rows for the application are added and flushed; the caller commits.
-    Raises ApplicationDeleted if the application was deleted during the AI call: a cache row holds quotes from the CV.
+    `still_wanted` runs after the call and takes the owner's lock: a cache row holds quotes from the CV, so it is
+    written only if the text's owner still exists. Raises ApplicationDeleted if it does not.
     """
-    db.commit()
-    blind_text = application.cv_text_blind
-    if not blind_text:
-        raise ValueError("Application has no blind text to assess")
-    blind_hash = application.cv_blind_hash
-    application_id = application.id
-    company_id = application.company_id
-    job_version = db.get(Job, application.job_id).version
-    requirements = tuple(
-        AssessedRequirement(row.id, row.text, bool(row.must_have))
-        for row in jobs.active_requirements(db, application.job_id)
-    )
-    slot = get_config().slot("bulk")
-    key = {
-        "blind_hash": blind_hash, "job_id": application.job_id, "job_version": job_version,
-        "prompt_version": PROMPT_VERSION, "model": slot.model,
-    }
-
-    provider = slot.provider
+    provider = get_config().slot("bulk").provider
     payload = _cached(db, key)
     cache_hit = payload is not None
     if payload is None:
@@ -173,11 +154,7 @@ def assess(db, application) -> ScreeningResult:
         )
         provider = response.provider
         payload = _verified(response.value, requirements, blind_text)
-        locked = (
-            db.query(Application).filter(Application.id == application_id)
-            .populate_existing().with_for_update().first()
-        )
-        if locked is None or locked.anonymized_at is not None:
+        if not still_wanted(db):
             db.rollback()
             raise ApplicationDeleted
         db.add(ScreeningCache(**key, result=payload))
@@ -190,6 +167,67 @@ def assess(db, application) -> ScreeningResult:
             winner = _cached(db, key)
             if winner is not None:
                 payload, cache_hit = winner, True
+    return payload, cache_hit, provider
+
+
+def _key_and_requirements(db, job_id: int, blind_hash: str) -> tuple[dict, tuple[AssessedRequirement, ...]]:
+    requirements = tuple(
+        AssessedRequirement(row.id, row.text, bool(row.must_have))
+        for row in jobs.active_requirements(db, job_id)
+    )
+    key = {
+        "blind_hash": blind_hash, "job_id": job_id, "job_version": db.get(Job, job_id).version,
+        "prompt_version": PROMPT_VERSION, "model": get_config().slot("bulk").model,
+    }
+    return key, requirements
+
+
+def _result(payload: dict, cache_hit: bool, provider: str, requirements) -> ScreeningResult:
+    return ScreeningResult(
+        requirements=[RequirementAssessment(**item) for item in payload["requirements"]],
+        claims=[ClaimItem(**item) for item in payload["claims"]],
+        verification_failures=payload["verification_failures"],
+        cache_hit=cache_hit,
+        provider=provider,
+        model=get_config().slot("bulk").model,
+        prompt_version=PROMPT_VERSION,
+        assessed_requirements=requirements,
+    )
+
+
+def assess_text(db, job_id: int, company_id: int, blind_text: str, blind_hash: str, still_wanted) -> ScreeningResult:
+    """The same assessment for masked text that belongs to no application: it writes no evidence rows. Commits."""
+    db.commit()
+    key, requirements = _key_and_requirements(db, job_id, blind_hash)
+    payload, cache_hit, provider = _payload(db, key, requirements, blind_text, company_id, still_wanted)
+    return _result(payload, cache_hit, provider, requirements)
+
+
+def assess(db, application) -> ScreeningResult:
+    """Assess on the blind text, from the cache when an identical CV was already assessed.
+
+    Commits: the transaction ends before the AI call and again around the cache write, so the caller must have
+    nothing pending that it may yet discard. Rows for the application are added and flushed; the caller commits.
+    Raises ApplicationDeleted if the application was deleted during the AI call: a cache row holds quotes from the CV.
+    """
+    db.commit()
+    blind_text = application.cv_text_blind
+    if not blind_text:
+        raise ValueError("Application has no blind text to assess")
+    application_id = application.id
+    company_id = application.company_id
+    key, requirements = _key_and_requirements(db, application.job_id, application.cv_blind_hash)
+    job_version = key["job_version"]
+    slot = get_config().slot("bulk")
+
+    def still_wanted(session) -> bool:
+        locked = (
+            session.query(Application).filter(Application.id == application_id)
+            .populate_existing().with_for_update().first()
+        )
+        return locked is not None and locked.anonymized_at is None
+
+    payload, cache_hit, provider = _payload(db, key, requirements, blind_text, company_id, still_wanted)
 
     application.job_version = job_version
     db.query(RequirementResult).filter_by(application_id=application.id, source="cv").delete(synchronize_session=False)
@@ -205,13 +243,4 @@ def assess(db, application) -> ScreeningResult:
         ai_provider=provider, ai_model=slot.model, prompt_version=PROMPT_VERSION,
     )
     db.flush()
-    return ScreeningResult(
-        requirements=[RequirementAssessment(**item) for item in payload["requirements"]],
-        claims=[ClaimItem(**item) for item in payload["claims"]],
-        verification_failures=payload["verification_failures"],
-        cache_hit=cache_hit,
-        provider=provider,
-        model=slot.model,
-        prompt_version=PROMPT_VERSION,
-        assessed_requirements=requirements,
-    )
+    return _result(payload, cache_hit, provider, requirements)

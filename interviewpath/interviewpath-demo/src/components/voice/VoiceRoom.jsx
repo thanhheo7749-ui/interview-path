@@ -242,7 +242,7 @@ function VoiceRoom({ initialState, stream, completedMessage, onFinished }) {
             data-testid="record-answer"
             onClick={() => {
               audioRef.current?.pause();
-              recorder.start();
+              recorder.start(Math.min(MAX_ANSWER_SECONDS, remaining));
             }}
             disabled={!stream || uploading || uploadFailed}
             className="rounded-xl bg-blue-600 px-5 py-3 font-bold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
@@ -256,7 +256,7 @@ function VoiceRoom({ initialState, stream, completedMessage, onFinished }) {
             onClick={recorder.stop}
             className="rounded-xl bg-red-600 px-5 py-3 font-bold text-white hover:bg-red-700"
           >
-            {t('bridges.voice.stop')} ({formatClock(recorder.elapsed)} / {formatClock(MAX_ANSWER_SECONDS)})
+            {t('bridges.voice.stop')} ({formatClock(recorder.elapsed)} / {formatClock(recorder.limitSeconds)})
           </button>
         )}
         {uploadFailed && (

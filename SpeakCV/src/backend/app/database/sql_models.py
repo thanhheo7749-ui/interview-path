@@ -263,6 +263,9 @@ class Company(Base):
     kb_version = Column(Integer, nullable=False, default=0)
     band_must_have_pct = Column(Integer, nullable=False, default=70, server_default="70")
     band_claims_pct = Column(Integer, nullable=False, default=50, server_default="50")
+    reality_low_pct = Column(Integer, nullable=False, default=30, server_default="30")
+    reality_high_pct = Column(Integer, nullable=False, default=70, server_default="70")
+    reality_min_hired = Column(Integer, nullable=False, default=10, server_default="10")
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
 
@@ -294,3 +297,4 @@ class CompanyMember(Base):
 from .models_brain import *  # noqa: F401,F403,E402
 from .models_hiring import *  # noqa: F401,F403,E402
 from .models_bridges import *  # noqa: F401,F403,E402
+from .models_insights import *  # noqa: F401,F403,E402

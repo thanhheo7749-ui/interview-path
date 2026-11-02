@@ -7,7 +7,8 @@
     "remove": "Xóa",
     "rename": "Đổi tên",
     "none": "Không có",
-    "genericError": "Đã xảy ra lỗi. Vui lòng thử lại."
+    "genericError": "Đã xảy ra lỗi. Vui lòng thử lại.",
+    "aiBudgetExceeded": "Công ty này đã đạt giới hạn AI trong ngày. Vui lòng thử lại vào ngày mai."
   },
   "login": {
     "title": "Đăng nhập InterviewPath",
@@ -369,7 +370,10 @@
       "consent_withdrawn": "Rút sự đồng ý",
       "application_withdrawn": "Rút hồ sơ",
       "application_anonymized": "Đã ẩn danh hồ sơ",
-      "reminder_queued": "Đã xếp lịch nhắc"
+      "reminder_queued": "Đã xếp lịch nhắc",
+      "invited_without_cv": "Đã mời khi chưa có kết quả CV",
+      "transcription_retried": "Đã thử lại chuyển giọng nói",
+      "transcription_failed": "Chuyển giọng nói thất bại"
     },
     "retention": {
       "period": "Thời hạn lưu trữ",
@@ -429,7 +433,7 @@
     "roleHint": "Chọn vai trò sẽ điền sẵn tiêu đề, mô tả và yêu cầu từ tri thức công ty. Bạn có thể sửa mọi thứ.",
     "jobTitle": "Tiêu đề việc làm",
     "description": "Mô tả",
-    "descriptionHint": "JD Studio, công cụ hỗ trợ viết mô tả công việc, sẽ có sau. Hiện tại hãy tự viết hoặc sửa mô tả tại đây.",
+    "descriptionHint": "Hãy viết hoặc sửa mô tả tại đây. Để soạn bản nháp từ kiến thức của công ty, hãy mở một yêu cầu tuyển dụng và dùng JD Studio.",
     "languages": "Ngôn ngữ phỏng vấn",
     "language": {
       "vi": "Tiếng Việt",
@@ -464,7 +468,8 @@
     "addChannel": "Thêm kênh",
     "channelInvalid": "Dùng 1 đến 50 chữ thường, chữ số hoặc dấu gạch dưới.",
     "colBoard": "Ứng viên",
-    "openBoard": "Mở bảng"
+    "openBoard": "Mở bảng",
+    "noPublicRequirement": "Việc làm này không có yêu cầu công khai nào. Buổi phỏng vấn không có gì để đo, nên mức bằng chứng của mọi ứng viên sẽ ở mức thấp."
   },
   "board": {
     "eyebrow": "Bảng ứng viên",
@@ -520,6 +525,7 @@
     "fastTrackedNote": "Ứng viên này được đi tắt, không qua phỏng vấn, nên không có bằng chứng phỏng vấn.",
     "notTaken": "Không tham gia phỏng vấn",
     "consentWithdrawn": "Đã rút đồng ý ghi âm",
+    "cvConsentWithdrawn": "Ứng viên này đã rút đồng ý xử lý CV, nên AI không còn xử lý CV này và không thể mời họ phỏng vấn.",
     "anonymizedNotice": "Dữ liệu của ứng viên này đã bị xóa. Không còn gì để xem xét và không có hành động nào khả dụng.",
     "analysisFailed": "Phân tích buổi phỏng vấn này không thành công. Bạn có thể thử lại.",
     "hiddenText": "Lưu ý: tệp CV có chứa văn bản ẩn và phần này đã bị bỏ qua.",
@@ -541,7 +547,9 @@
       "analysis_failed": "Phân tích thất bại",
       "not_interviewed": "Chưa phỏng vấn",
       "refused_recording": "Từ chối ghi âm",
-      "withdrawn": "Đã rút hồ sơ"
+      "withdrawn": "Đã rút hồ sơ",
+      "transcription_failed": "Lỗi kỹ thuật: vẫn có bản ghi âm",
+      "cv_failed": "Không xử lý được CV"
     },
     "bulk": {
       "button": "Loại {{count}} đã chọn",
@@ -582,7 +590,8 @@
         "explained": "Đã giải thích",
         "partly": "Giải thích một phần",
         "not_explained": "Chưa được giải thích"
-      }
+      },
+      "cvSays": "Điều CV nêu"
     },
     "culture": {
       "title": "Ghi chú văn hóa",
@@ -606,7 +615,11 @@
       "restart": "Cho phỏng vấn lại",
       "fastTrack": "Đi tắt",
       "retry": "Phân tích lại",
-      "reveal": "Tiết lộ danh tính"
+      "reveal": "Tiết lộ danh tính",
+      "retryTranscription": "Thử lại chuyển giọng nói",
+      "inviteAnyway": "Vẫn mời phỏng vấn",
+      "rejectConfirm": "Từ chối ứng viên này? Ứng viên sẽ được báo rằng đội ngũ tuyển dụng quyết định không tiếp tục. Không thể hoàn tác.",
+      "rejectConfirmButton": "Có, từ chối"
     },
     "reveal": {
       "title": "Tiết lộ danh tính",
@@ -622,7 +635,10 @@
       "submit": "Lưu chỉnh sửa",
       "corrected": "Nhãn CV đã được HR chỉnh sửa",
       "reasonShown": "Lý do chỉnh sửa: {{reason}}"
-    }
+    },
+    "transcriptionFailed": "Ứng viên này đã trả lời, nhưng chuyển giọng nói thành văn bản bị lỗi. Bản ghi âm vẫn còn. Đây là lỗi kỹ thuật, không phải ứng viên bỏ phỏng vấn. Bạn có thể thử lại.",
+    "cvFailed": "Không xử lý được CV của ứng viên này, nên AI chưa đọc CV. Bạn vẫn có thể mời họ phỏng vấn.",
+    "longPause": "Có khoảng dừng dài trong buổi phỏng vấn"
   },
   "bridges": {
     "nav": {
@@ -652,7 +668,8 @@
       "roleLabel": "Vị trí để viết mô tả",
       "anyRole": "Không chọn vị trí cụ thể",
       "generateDraft": "Tạo bản nháp",
-      "openDraft": "Mở bản nháp"
+      "openDraft": "Mở bản nháp",
+      "awaitingApproval": "Đang chờ bạn duyệt"
     },
     "intake": {
       "title": "Phỏng vấn đầu vào với quản lý",
@@ -820,7 +837,7 @@
     "noLines": "Bản nháp này chưa có dòng nào.",
     "lineText": "Nội dung dòng {{number}}",
     "emptyInLanguage": "(chưa viết gì bằng ngôn ngữ này)",
-    "sourceNode": "Nguồn #{{id}}",
+    "restrictedSource": "Nguồn bị hạn chế",
     "unsourced": "Không có nguồn",
     "confirmedByHr": "HR đã xác nhận",
     "mustHave": "Bắt buộc",
@@ -888,6 +905,7 @@
       "copyFailed": "Không sao chép được. Hãy chọn văn bản và sao chép thủ công."
     },
     "isRequirementLine": "Dòng {{number}} là một yêu cầu",
-    "isMustHaveLine": "Dòng {{number}} là yêu cầu bắt buộc"
+    "isMustHaveLine": "Dòng {{number}} là yêu cầu bắt buộc",
+    "sourceNode": "Nguồn #{{id}}"
   }
 }

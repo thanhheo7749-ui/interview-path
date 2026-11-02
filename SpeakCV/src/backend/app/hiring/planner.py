@@ -30,9 +30,14 @@ SYSTEM = (
 
 _SECTION_TAG = re.compile(r"<\s*/?\s*(?:items|language)\b[^>]*>", re.IGNORECASE)
 
+# What a CV result lets a question say. `not_found` may say the CV does not mention it; the others must not.
+REQUIREMENT_TEMPLATE = {"partial": "requirement_partial", None: "requirement_unread"}
+
 TEMPLATES = {
     "en": {
         "requirement": "Your CV does not mention {text}. Have you worked with it, and in which project?",
+        "requirement_partial": "Your CV touches on {text}. Can you tell us more about what you did with it, and in which project?",
+        "requirement_unread": "Have you worked with {text}, and in which project?",
         "claim": "Your CV says: \"{quote}\". How did you do that, and how did you measure the result?",
         "culture": "Our team values {title}. Tell me about a time this was tested for you. What did you do?",
         "role_detail": "The {role} role here involves this: {body} Which part of it have you already done?",
@@ -48,6 +53,8 @@ TEMPLATES = {
         ),
         "why": {
             "requirement": "Your CV does not mention this requirement.",
+            "requirement_partial": "We would like more detail on this requirement.",
+            "requirement_unread": "This is one of the requirements of the role.",
             "claim": "You mention this in your CV, and we would like to hear more.",
             "culture": "This is about how the team works together.",
             "role": "This helps us understand your interest in the role.",
@@ -55,6 +62,8 @@ TEMPLATES = {
     },
     "vi": {
         "requirement": "CV của bạn chưa nhắc đến {text}. Bạn đã từng làm việc với nó chưa, và trong dự án nào?",
+        "requirement_partial": "CV của bạn có đề cập một phần đến {text}. Bạn có thể kể thêm bạn đã làm gì với nó, và trong dự án nào không?",
+        "requirement_unread": "Bạn đã từng làm việc với {text} chưa, và trong dự án nào?",
         "claim": "CV của bạn viết: \"{quote}\". Bạn đã làm việc đó như thế nào, và đo lường kết quả ra sao?",
         "culture": "Đội ngũ của chúng tôi coi trọng {title}. Hãy kể về một lần điều này được thử thách với bạn. Bạn đã làm gì?",
         "role_detail": "Vị trí {role} ở đây bao gồm: {body} Bạn đã từng làm phần nào trong đó?",
@@ -70,6 +79,8 @@ TEMPLATES = {
         ),
         "why": {
             "requirement": "CV của bạn chưa nhắc đến yêu cầu này.",
+            "requirement_partial": "Chúng tôi muốn biết thêm chi tiết về yêu cầu này.",
+            "requirement_unread": "Đây là một trong các yêu cầu của vị trí.",
             "claim": "Bạn có nhắc đến điều này trong CV, và chúng tôi muốn nghe thêm.",
             "culture": "Câu hỏi này liên quan đến cách đội ngũ làm việc cùng nhau.",
             "role": "Câu hỏi này giúp chúng tôi hiểu mối quan tâm của bạn với vị trí.",
@@ -77,6 +88,8 @@ TEMPLATES = {
     },
     "ko": {
         "requirement": "이력서에 {text}에 대한 언급이 없습니다. 사용해 본 경험이 있다면 어떤 프로젝트였나요?",
+        "requirement_partial": "이력서에 {text}에 관한 내용이 일부 있습니다. 어떤 프로젝트에서 무엇을 하셨는지 더 자세히 말씀해 주시겠어요?",
+        "requirement_unread": "{text}을(를) 사용해 본 경험이 있으신가요? 있다면 어떤 프로젝트였나요?",
         "claim": "이력서에 \"{quote}\"라고 적혀 있습니다. 어떻게 하셨고, 결과는 어떻게 측정하셨나요?",
         "culture": "저희 팀은 {title}을(를) 중요하게 생각합니다. 이것이 시험받았던 경험을 말씀해 주세요. 어떻게 하셨나요?",
         "role_detail": "이곳의 {role} 직무에는 다음이 포함됩니다: {body} 이 중 어떤 부분을 해 보셨나요?",
@@ -92,6 +105,8 @@ TEMPLATES = {
         ),
         "why": {
             "requirement": "이력서에 이 요건에 대한 언급이 없습니다.",
+            "requirement_partial": "이 요건에 대해 더 자세히 듣고 싶습니다.",
+            "requirement_unread": "이 직무의 요건 중 하나입니다.",
             "claim": "이력서에 적으신 내용이라 더 듣고 싶습니다.",
             "culture": "팀이 함께 일하는 방식에 관한 질문입니다.",
             "role": "직무에 대한 관심을 이해하기 위한 질문입니다.",
@@ -138,13 +153,11 @@ def _select(db, application, job, words: dict) -> list[PlannedQuestion]:
         row.requirement_id: row.status
         for row in db.query(RequirementResult).filter_by(application_id=application.id, source="cv")
     }
-    missing = [
-        row for row in jobs.active_requirements(db, job.id)
-        if row.visibility == "public" and row.must_have and cv_status.get(row.id) != "met"
-    ]
+    missing = [row for row in jobs.scored_requirements(db, application) if cv_status.get(row.id) != "met"]
     for row in missing[:MAX_REQUIREMENTS]:
-        selected.append(PlannedQuestion(words["requirement"].format(text=_requirement_text(row.text)), "requirement",
-                                        f"requirement:{row.id}", why["requirement"]))
+        kind = REQUIREMENT_TEMPLATE.get(cv_status.get(row.id), "requirement")
+        selected.append(PlannedQuestion(words[kind].format(text=_requirement_text(row.text)), "requirement",
+                                        f"requirement:{row.id}", why[kind]))
 
     claims = db.query(CvClaim).filter_by(application_id=application.id).order_by(CvClaim.id).limit(MAX_CLAIMS)
     for row in claims:

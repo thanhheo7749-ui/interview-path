@@ -38,6 +38,9 @@ fi
 # A company for the intake spec, so it leaves the temporary password of the login spec's user unchanged.
 INTAKE_PASSWORD=$($PY -m app.cli create-company --slug intake --name "Intake Company" --hr-email intake-hr@e2e.test --hr-name "Intake HR" | awk '/Temporary password/ {print $NF}')
 printf '%s' "$INTAKE_PASSWORD" > "$E2E_TMP/portal_e2e_intake_password"
+# A company for the Bridges loop spec, which publishes knowledge from an intake and then runs a job to its outcome.
+LOOP_PASSWORD=$($PY -m app.cli create-company --slug loop --name "Loop Company" --hr-email loop-hr@e2e.test --hr-name "Loop HR" | awk '/Temporary password/ {print $NF}')
+printf '%s' "$LOOP_PASSWORD" > "$E2E_TMP/portal_e2e_loop_password"
 # One user in two companies, to test that nothing from the previous company survives a switch.
 SWITCH_PASSWORD=$($PY -m app.cli create-company --slug switch-a --name "Switch Alpha" --hr-email switch-hr@e2e.test --hr-name "Switch HR" | awk '/Temporary password/ {print $NF}')
 printf '%s' "$SWITCH_PASSWORD" > "$E2E_TMP/portal_e2e_switch_password"

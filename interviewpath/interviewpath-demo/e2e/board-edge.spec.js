@@ -97,3 +97,24 @@ test('before a reveal the panel says what is hidden and that spoken details may 
   await expect(panel.getByTestId('transcript')).toContainText('0901234567');
   expect(real).toBe(false);
 });
+
+test('a long pause is a neutral note, and Grant a restart shows only where the server says it can work', async ({ page }) => {
+  await signIn(page, BOARD_USER);
+  let restartAvailable = true;
+  await page.route('**/api/companies/*/applications/*', async (route) => {
+    if (!/applications\/\d+$/.test(route.request().url()) || route.request().method() !== 'GET') return route.fallback();
+    const response = await route.fetch();
+    const body = await response.json();
+    return route.fulfill({ headers: CORS, json: { ...body, long_pause: true, restart_available: restartAvailable } });
+  });
+  await page.goto(`/jobs/${seed.job_id}/board`);
+  await page.getByTestId('cell-priority').getByRole('button', { name: /#P1/ }).click();
+  const panel = page.getByTestId('detail-panel');
+  await expect(panel.getByTestId('long-pause-note')).toHaveText('Long pause during the interview');
+  await expect(panel.getByRole('button', { name: 'Grant a restart' })).toBeVisible();
+  restartAvailable = false;
+  await panel.getByRole('button', { name: 'Close' }).click();
+  await page.getByTestId('cell-priority').getByRole('button', { name: /#P1/ }).click();
+  await expect(panel.getByTestId('long-pause-note')).toBeVisible();
+  await expect(panel.getByRole('button', { name: 'Grant a restart' })).toHaveCount(0);
+});

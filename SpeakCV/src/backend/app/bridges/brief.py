@@ -105,8 +105,7 @@ def collect_evidence(db, application) -> list[dict]:
     rows = (
         db.query(RequirementResult, JobRequirement)
         .join(JobRequirement, JobRequirement.id == RequirementResult.requirement_id)
-        .filter(RequirementResult.application_id == application.id, JobRequirement.job_id == application.job_id,
-                JobRequirement.active.is_(True))
+        .filter(RequirementResult.application_id == application.id, JobRequirement.job_id == application.job_id)
         .order_by(JobRequirement.position, RequirementResult.id).all()
     )
     for result, requirement in rows:

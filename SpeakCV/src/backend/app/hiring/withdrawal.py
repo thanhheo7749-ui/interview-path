@@ -11,13 +11,16 @@ in `retention.anonymize_application`: if one cannot be deleted, the rollback kee
 from datetime import datetime, timezone
 
 from app.database.sql_models import (
-    Application, CandidateBrief, Consent, CultureNote, CvClaim, RequirementResult, VoiceSession, VoiceTurn,
+    Application, CandidateBrief, Consent, CultureNote, CvClaim, Job, RejectionFeedback, RequirementResult, VoiceSession,
+    VoiceTurn,
 )
-from app.hiring import audit, recordings, voice
+from app.hiring import audit, consents, recordings, voice
 from app.hiring.state import CONSENT_WITHDRAWN, advance
 
 RECORDING = "recording_screening"
 CV_PROCESSING = "cv_processing"
+# Withdrawing these changes the application itself. Any other purpose keeps to its own rules, in consents.withdraw.
+LOCKS_APPLICATION = (RECORDING, CV_PROCESSING)
 CV_STOPPED = "You withdrew consent to CV processing, so we stopped reading this CV."
 
 
@@ -51,9 +54,9 @@ def _erase_recording(db, application) -> list[str]:
             session.status = voice.ABANDONED
             session.finished_at = now
     turns = db.query(VoiceTurn).filter(VoiceTurn.session_id.in_(session_ids)).all() if session_ids else []
-    paths = [turn.audio_path for turn in turns if turn.audio_path]
+    paths = [path for turn in turns for path in (turn.audio_path, turn.question_audio_path) if path]
     for turn in turns:
-        turn.audio_path = turn.transcript = turn.audio_seconds = None
+        turn.audio_path = turn.question_audio_path = turn.transcript = turn.audio_seconds = turn.stt_started_at = None
         if turn.is_followup:
             turn.question_text = ""  # written from the candidate's answer
     return paths
@@ -68,6 +71,21 @@ def _erase_results(db, application) -> None:
         claim.status = claim.evidence_quote = claim.voice_turn_id = None  # the claim itself comes from the CV, and stays
     application.interview_band = None
     application.ai_suggestion = None
+    _erase_feedback(db, application)
+
+
+def _erase_feedback(db, application) -> None:
+    """A rejection message quotes the answers. HR can draft again, from the CV alone. One already sent stays on record as
+    sent, in the plain wording, so no quote is left and the candidate's page still holds a message."""
+    from app.posthire import feedback  # Imported here: feedback is built on the hiring modules.
+
+    row = db.query(RejectionFeedback).filter_by(application_id=application.id).populate_existing().with_for_update().first()
+    if row is None:
+        return
+    if row.status == "sent":
+        row.draft = feedback.template(row.language, db.get(Job, application.job_id).title)
+    else:
+        db.delete(row)
 
 
 def _withdraw_recording(db, application) -> None:
@@ -93,17 +111,25 @@ def withdraw(db, consent_id: int, user_id: int) -> Consent | None:
     """None if this user holds no such consent. Withdrawing again changes nothing. Every consent of that purpose on the
     application goes together: a restarted interview has a second one, and either could otherwise keep the recording."""
     db.rollback()
-    found = db.query(Consent.application_id).filter(Consent.id == consent_id, Consent.user_id == user_id).first()
+    found = db.query(Consent.application_id, Consent.purpose).filter(Consent.id == consent_id, Consent.user_id == user_id).first()
     db.rollback()
     if found is None:
         return None
-    application = _lock_application(db, found.application_id)
+    application = _lock_application(db, found.application_id) if found.purpose in LOCKS_APPLICATION else None
     consent = (
         db.query(Consent).filter(Consent.id == consent_id, Consent.user_id == user_id)
         .populate_existing().with_for_update().first()
     )
     if consent is None or consent.withdrawn_at is not None:
         db.rollback()
+        return consent
+    company_id = consent.company_id
+    if found.purpose not in LOCKS_APPLICATION:
+        consents.withdraw(db, consent_id, user_id)
+        # A consent with no user left belongs to an anonymized application, so this row must not name them either.
+        audit.record(db, company_id, user_id if consent.user_id else None, "consent_withdrawn", "consent", consent_id,
+                     payload={"purpose": found.purpose})
+        db.commit()
         return consent
     now = _now()
     consent.withdrawn_at = now

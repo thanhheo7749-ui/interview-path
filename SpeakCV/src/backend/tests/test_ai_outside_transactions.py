@@ -17,11 +17,17 @@ from app.ai.types import AIProviderError
 from app.brain import fake_demo, ingestion, seed
 from app.database.database import Base, SessionLocal, engine
 from app.database.sql_models import (
-    AIUsageLog, AuditLog, ChannelContent, Company, CompanyMember, Job, JobChannelLink, JobDraft, JobDraftMessage,
-    JobRequirement, KbChunk, KbDocument, KbNode,
+    AIUsageLog, Application, AuditLog, ChannelContent, Company, CompanyMember, Job, JobChannelLink, JobDraft,
+    JobDraftMessage, JobRequirement, KbChunk, KbDocument, KbNode, RejectionFeedback, RequirementResult, User,
 )
+from app.hiring import consents, cv_processing
+from app.hiring import fake_demo as hiring_fake_demo
 from app.main import create_app
+from app.posthire import feedback, talent_pool
+from tests import helpers_board
 from tests.helpers import auth_header
+from tests.helpers_board import make_application, make_session
+from tests.helpers_board import make_world as make_board_world
 from tests.helpers_jd import ai_line, assistant_json, line, make_draft, make_world
 from tests.test_brain_ingestion import TEXT, TWO_CHUNKS, extraction, fact, real_extract
 from tests.test_brain_review import World as ReviewWorld
@@ -436,6 +442,21 @@ def test_channel_generate(api, db, world, probe):
     probe.assert_clean("channel_content")
 
 
+def test_channel_commentary(api, db, world, probe):
+    job = Job(company_id=world.company.id, title="Backend", slug="backend-ch", status="published", version=1,
+              interview_languages=["en"])
+    db.add(job)
+    db.commit()
+    db.add(Application(company_id=world.company.id, job_id=job.id, job_version=1, alias="#C1",
+                       source_channel="linkedin", stage="ready_for_hr", cv_status="meets", hr_decision="approved"))
+    db.commit()
+    probe.start()
+    response = api.post(_url(world, f"/jobs/{job.id}/channels/commentary"), headers=HR, json={})
+    assert response.status_code == 200, response.text
+    assert response.json()["observations"]
+    probe.assert_clean("channel_commentary")
+
+
 def test_channel_generate_saves_nothing_when_the_ai_fails(api, db, world, monkeypatch):
     draft = _approved(api, db, world)
     assert api.post(_url(world, f"/job-drafts/{draft.id}/publish"), headers=HR).status_code == 200
@@ -452,6 +473,57 @@ def test_channel_generate_saves_nothing_when_the_ai_fails(api, db, world, monkey
     db.expire_all()
     assert db.query(ChannelContent).count() == 0
     assert db.query(JobChannelLink).filter_by(job_id=job_id).count() == 0
+
+
+# --- rejection feedback ----------------------------------------------------------------------------------------------
+
+def _interviewed_application(db):
+    board = make_board_world(db)
+    application = make_application(db, board["job"], cv_status="not_met")
+    make_session(db, application, [(1, "Q", "I built a FastAPI service used by three teams", None)])
+    db.add(RequirementResult(application_id=application.id, requirement_id=board["requirements"][0].id,
+                             source="interview", status="evidence", quote="I built a FastAPI service"))
+    db.commit()
+    return board, application.id
+
+
+def test_rejecting_drafts_feedback_in_the_background(api, db, probe):
+    board, application_id = _interviewed_application(db)
+    path = f"/api/companies/{board['company'].id}/applications/{application_id}/decision"
+    headers = board["people"]["hr"]["headers"]
+    probe.start()
+    response = api.post(path, headers=headers, json={"decision": "rejected"})
+    assert response.status_code == 200, response.text
+    probe.assert_clean("rejection_feedback")
+    db.rollback()
+    assert db.query(RejectionFeedback).filter_by(application_id=application_id).one().status == "draft"
+
+
+def test_hr_drafting_feedback_holds_no_write(api, db, probe):
+    board, application_id = _interviewed_application(db)
+    application = db.get(Application, application_id)
+    application.hr_decision = "rejected"
+    db.commit()
+    path = f"/api/companies/{board['company'].id}/applications/{application_id}/feedback/draft"
+    headers = board["people"]["hr"]["headers"]
+    probe.start()
+    response = api.post(path, headers=headers)
+    assert response.status_code == 200, response.text
+    assert response.json()["source"] == "ai"
+    probe.assert_clean("rejection_feedback")
+
+
+def test_a_refused_feedback_draft_retries_holding_no_write(db, probe):
+    _, application_id = _interviewed_application(db)
+    application = db.get(Application, application_id)
+    application.hr_decision = "rejected"
+    db.commit()
+    fake_demo.install()
+    fake.enqueue("rejection_feedback", '{"went_well": [], "to_build": [], "learning_ids": [], "message": "not_met"}')
+    probe.start()
+    feedback.create_draft_for(application_id)
+    assert probe.calls["rejection_feedback"] == 2
+    probe.assert_clean("rejection_feedback")
 
 
 # --- ingestion -------------------------------------------------------------------------------------------------------
@@ -559,3 +631,67 @@ def test_seeding_a_sample_company(db, probe):
     assert db.query(Job).filter_by(status="published").count() == 1
     assert db.query(CompanyMember).count() > 0
     probe.assert_clean("kb_embed", "discrimination_check")
+
+
+def test_onboarding_plan_is_built_outside_a_transaction(api, db, probe):
+    from tests.test_posthire_onboarding import build, create_url
+
+    hire = build(db)
+    probe.start()
+    response = api.post(create_url(hire), headers=HR)
+    assert response.status_code == 200, response.text
+    probe.assert_clean("onboarding_plan")
+    assert db.query(AuditLog).filter_by(action="onboarding.created").count() == 1
+
+
+# The talent pool
+
+
+def _pool_world(db):
+    hiring_fake_demo.install()
+    world = helpers_board.make_world(db)
+    application = helpers_board.make_application(db, world["job"], alias="#A1", hr_decision="rejected")
+    application.cv_text_blind = helpers_board.CV_BLIND
+    target = Job(company_id=world["company"].id, title="Platform", slug="platform", status="published", version=1,
+                 interview_languages=["en"])
+    db.add(target)
+    db.commit()
+    db.add(JobRequirement(company_id=target.company_id, job_id=target.id, text="FastAPI", must_have=True, position=0))
+    db.commit()
+    return application, target, world
+
+
+def _join_pool(db, application):
+    user = db.get(User, application.candidate_user_id)
+    talent_pool.give_consent(db, application, user, consents.VERSION)
+    return talent_pool.opt_in(db, application, user)
+
+
+def test_talent_pool_opt_in(db, probe):
+    application, _, _ = _pool_world(db)
+    probe.start()
+    entry = _join_pool(db, application)
+    assert entry.embedding is not None
+    probe.assert_clean("talent_pool_embed")
+
+
+def test_talent_pool_matches(db, probe):
+    application, target, world = _pool_world(db)
+    entry = _join_pool(db, application)
+    entry.embedding = None  # so matching embeds it as well
+    db.commit()
+    probe.start()
+    assert len(talent_pool.matches(db, world["company"].id, target.id)) == 1
+    probe.assert_clean("talent_pool_query", "talent_pool_embed", "cv_assess")
+
+
+def test_talent_pool_invitation_job(db, probe):
+    application, target, world = _pool_world(db)
+    entry = _join_pool(db, application)
+    invited = talent_pool.invite(db, entry, target, world["people"]["hr"]["id"])
+    invited_id = invited.id
+    probe.start()
+    cv_processing.run_from_blind_text(invited_id, helpers_board.CV_BLIND)
+    db.expire_all()
+    assert db.get(type(invited), invited_id).stage == "invited"
+    probe.assert_clean("cv_assess")

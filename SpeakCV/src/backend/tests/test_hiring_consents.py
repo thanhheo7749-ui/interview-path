@@ -152,3 +152,23 @@ def test_the_ledger_stores_english_for_a_language_with_no_text(db, owned):
 def test_the_application_consent_mentions_the_reapply_guard(language, words):
     text = consents.current_text("cv_processing", language).text
     assert words in text and "90" in text
+
+
+@pytest.mark.parametrize("purpose", ["talent_pool", "onboarding_use"])
+def test_a_purpose_with_no_korean_text_returns_english_and_says_so(client, owned, db, purpose):
+    response = client.get(f"/api/consents/{purpose}?language=ko", headers=auth_header("c@example.com"))
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["language"] == "en" and body["version"] == consents.VERSION
+    assert consents.CONSENT_TEXTS[(purpose, "en")] == body["text"]
+    application_route = client.get(consent_url(owned, purpose, "ko"), headers=auth_header("c@example.com"))
+    assert application_route.json()["language"] == "en"
+    row = consents.record(db, owned.user_id, owned.company_id, owned.id, purpose, consents.VERSION, language="ko")
+    assert row.language == "en"
+
+
+def test_every_text_formats_in_every_language_it_has():
+    for (purpose, language) in consents.CONSENT_TEXTS:
+        text = consents.current_text(purpose, language).text
+        assert "{" not in text and consents.current_text(purpose, language).language == language
+

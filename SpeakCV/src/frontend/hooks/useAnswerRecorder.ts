@@ -21,6 +21,7 @@ function pickMime(): string | undefined {
 export function useAnswerRecorder(stream: MediaStream | null, onBlob: (blob: Blob) => void) {
   const [isRecording, setIsRecording] = useState(false);
   const [elapsed, setElapsed] = useState(0);
+  const [limitSeconds, setLimitSeconds] = useState(MAX_ANSWER_SECONDS);
   const [error, setError] = useState(false);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -41,8 +42,10 @@ export function useAnswerRecorder(stream: MediaStream | null, onBlob: (blob: Blo
     if (recorder && recorder.state !== "inactive") recorder.stop();
   }, []);
 
-  const start = useCallback(() => {
+  /** Starts a recording that stops and sends itself after `maxSeconds`: the 3 minute limit, or the time left if less. */
+  const start = useCallback((maxSeconds: number = MAX_ANSWER_SECONDS) => {
     if (!stream || recorderRef.current) return;
+    const limit = Math.max(1, Math.min(MAX_ANSWER_SECONDS, Math.floor(maxSeconds)));
     setError(false);
     try {
       const mimeType = pickMime();
@@ -65,12 +68,13 @@ export function useAnswerRecorder(stream: MediaStream | null, onBlob: (blob: Blo
       recorderRef.current = recorder;
       recorder.start();
       setElapsed(0);
+      setLimitSeconds(limit);
       setIsRecording(true);
       const startedAt = Date.now();
       timerRef.current = setInterval(() => {
         const seconds = Math.floor((Date.now() - startedAt) / 1000);
         setElapsed(seconds);
-        if (seconds >= MAX_ANSWER_SECONDS) stop();
+        if (seconds >= limit) stop();
       }, 250);
     } catch {
       recorderRef.current = null;
@@ -88,5 +92,5 @@ export function useAnswerRecorder(stream: MediaStream | null, onBlob: (blob: Blo
     };
   }, [clearTimer]);
 
-  return { isRecording, elapsed, error, start, stop };
+  return { isRecording, elapsed, limitSeconds, error, start, stop };
 }

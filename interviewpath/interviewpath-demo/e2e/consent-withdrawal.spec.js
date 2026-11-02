@@ -113,7 +113,8 @@ test('HR sees the neutral note in Not enough evidence, cannot select it in bulk 
   const panel = page.getByTestId('detail-panel');
   await expect(panel.getByTestId('interview-note')).toHaveText('Withdrew consent to recording');
   await expect(panel.getByRole('button', { name: 'Approve' })).toBeVisible();
-  await expect(panel.getByRole('button', { name: /Restart/ })).toHaveCount(0);
+  await expect(panel.getByRole('button', { name: /restart/i })).toHaveCount(0);
   await panel.getByRole('button', { name: 'Reject', exact: true }).click();
+  await panel.getByRole('button', { name: 'Yes, reject', exact: true }).click();
   await expect(panel.getByTestId('decided-state')).toHaveText('Rejected');
 });

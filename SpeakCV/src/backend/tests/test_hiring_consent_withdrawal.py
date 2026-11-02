@@ -598,3 +598,217 @@ def test_no_reminder_invites_to_an_interview_that_can_no_longer_start(client, db
 def test_a_cv_consent_never_withdrawn_blocks_nothing(client, db, world):
     assert not consents.was_withdrawn(db, world.application_id, CV)
     start(client, world)
+
+
+# 6. Beside the technical-problem lane, the cost limits and rejection feedback
+
+
+def _with_failed_transcript(client, db, world, recordings_dir, analysis_status=None):
+    """An answer with audio and no transcript, in a session that has ended."""
+    from app.hiring import recordings
+
+    state = start(client, world)
+    path = recordings.save_turn_audio(world.company_id, world.application_id, 1, b"spoken", ".webm")
+    row = db.query(VoiceTurn).filter_by(session_id=state["session_id"], position=1).one()
+    row.audio_path, row.transcript_status = path, voice.STT_FAILED
+    db.query(VoiceSession).filter_by(id=state["session_id"]).update({"status": voice.COMPLETED})
+    db.query(Application).filter_by(id=world.application_id).update({"stage": "ready_for_hr", "analysis_status": analysis_status})
+    db.commit()
+    return state
+
+
+def test_withdrawing_moves_a_transcription_failure_out_of_its_lane_and_retry_is_refused(client, db, world, recordings_dir):
+    from app.hiring.state import TRANSCRIPTION_FAILED
+
+    _with_failed_transcript(client, db, world, recordings_dir, TRANSCRIPTION_FAILED)
+    db.rollback()
+    board = client.get(hr_url(world, f"/jobs/{world.job_id}/board"), headers=auth_header(HR)).json()
+    assert [card["id"] for card in board["lanes"]["transcription_failed"]] == [world.application_id]
+    assert withdraw(client, RECORDING).status_code == 200
+    db.rollback()
+    board = client.get(hr_url(world, f"/jobs/{world.job_id}/board"), headers=auth_header(HR)).json()
+    assert board["lanes"]["transcription_failed"] == []
+    assert [card["id"] for card in board["cells"][NOT_ENOUGH_EVIDENCE]] == [world.application_id]
+    retry = client.post(hr_url(world, f"/applications/{world.application_id}/transcription/retry"), headers=auth_header(HR))
+    assert retry.status_code == 409
+    assert files_in(recordings_dir) == []
+    detail = client.get(hr_url(world, f"/applications/{world.application_id}"), headers=auth_header(HR)).json()
+    assert detail["restart_available"] is False
+
+
+def test_a_withdrawal_during_hrs_transcription_retry_keeps_the_marker_and_stores_nothing(client, db, world, monkeypatch, recordings_dir):
+    state = _with_failed_transcript(client, db, world, recordings_dir, "running")
+    row_id = consent_id(client, RECORDING)
+
+    def withdraw_meanwhile(*_args, **_kwargs):
+        assert withdraw(client, RECORDING, row_id=row_id).status_code == 200
+        return TranscriptResult(text=SPOKEN, language="en", provider="fake", model="m", usage=Usage(audio_seconds=4.0), latency_ms=1)
+
+    monkeypatch.setattr(voice.gateway, "transcribe", withdraw_meanwhile)
+    analysis.retry_transcription(world.application_id)
+    assert application_row(db, world).analysis_status == CONSENT_WITHDRAWN
+    assert turns(db, state["session_id"])[0].transcript is None
+    assert files_in(recordings_dir) == []
+
+
+def test_analysis_meeting_a_failed_transcript_does_not_replace_the_marker(db, world, client, recordings_dir):
+    _with_failed_transcript(client, db, world, recordings_dir, CONSENT_WITHDRAWN)
+    analysis._record_transcription_failed(db, world.application_id)
+    assert application_row(db, world).analysis_status == CONSENT_WITHDRAWN
+
+
+def test_a_claim_on_the_position_ends_with_the_withdrawal(client, db, world, monkeypatch):
+    state = start(client, world)
+    row_id = consent_id(client, RECORDING)
+
+    def withdraw_meanwhile(*_args, **_kwargs):
+        assert withdraw(client, RECORDING, row_id=row_id).status_code == 200
+        return TranscriptResult(text=SPOKEN, language="en", provider="fake", model="m", usage=Usage(audio_seconds=4.0), latency_ms=1)
+
+    monkeypatch.setattr(voice.gateway, "transcribe", withdraw_meanwhile)
+    response = answer(client, state["session_id"], 1)
+    assert response.status_code == 409 and response.json()["detail"]["code"] == consents.RECORDING_CONSENT_WITHDRAWN
+    assert turns(db, state["session_id"])[0].stt_started_at is None
+
+
+def question_audio_url(session_id):
+    return f"/api/screening/{session_id}/turns/1/question-audio"
+
+
+def test_cached_question_audio_goes_with_the_recording(client, db, world, recordings_dir):
+    state = start(client, world)
+    assert client.get(question_audio_url(state["session_id"]), headers=auth_header(CANDIDATE)).status_code == 200
+    assert turns(db, state["session_id"])[0].question_audio_path is not None
+    assert files_in(recordings_dir)
+    assert withdraw(client, RECORDING).status_code == 200
+    assert turns(db, state["session_id"])[0].question_audio_path is None
+    assert files_in(recordings_dir) == []
+    assert client.get(question_audio_url(state["session_id"]), headers=auth_header(CANDIDATE)).status_code == 409
+
+
+def test_question_audio_being_made_during_a_withdrawal_is_not_kept(client, db, world, monkeypatch, recordings_dir):
+    state = start(client, world)
+    row_id = consent_id(client, RECORDING)
+    real = voice.gateway.synthesize
+
+    def withdraw_meanwhile(*args, **kwargs):
+        result = real(*args, **kwargs)
+        assert withdraw(client, RECORDING, row_id=row_id).status_code == 200
+        return result
+
+    monkeypatch.setattr(voice.gateway, "synthesize", withdraw_meanwhile)
+    assert client.get(question_audio_url(state["session_id"]), headers=auth_header(CANDIDATE)).status_code == 409
+    assert turns(db, state["session_id"])[0].question_audio_path is None
+    assert files_in(recordings_dir) == []
+
+
+def test_after_a_withdrawal_a_deleted_brief_reads_as_no_brief(client, db, world, analysed):
+    response = client.post(hr_url(world, f"/applications/{world.application_id}/decision"),
+                           json={"decision": "approved"}, headers=auth_header(HR))
+    assert response.status_code == 200
+    url = hr_url(world, f"/applications/{world.application_id}")
+    assert client.get(url, headers=auth_header(HR)).json()["brief_status"] == "draft"
+    assert withdraw(client, RECORDING).status_code == 200
+    db.rollback()
+    assert client.get(url, headers=auth_header(HR)).json()["brief_status"] is None
+    assert client.get(f"{url}/brief", headers=auth_header(HR)).status_code == 404
+
+
+def _feedback(db, world, status):
+    from app.database.sql_models import RejectionFeedback
+
+    db.query(Application).filter_by(id=world.application_id).update({"hr_decision": "rejected", "hr_decided_at": datetime.now(timezone.utc)})
+    db.query(RejectionFeedback).filter_by(application_id=world.application_id).delete()
+    db.add(RejectionFeedback(company_id=world.company_id, application_id=world.application_id, language="en",
+                             draft=f"You said: {SPOKEN}", status=status))
+    db.commit()
+
+
+def test_an_unsent_rejection_message_quoting_the_answers_goes_with_the_recording(client, db, world, analysed):
+    from app.database.sql_models import RejectionFeedback
+
+    _feedback(db, world, "draft")
+    assert withdraw(client, RECORDING).status_code == 200
+    db.rollback()
+    assert db.query(RejectionFeedback).filter_by(application_id=world.application_id).count() == 0
+    redraft = client.post(hr_url(world, f"/applications/{world.application_id}/feedback/draft"), headers=auth_header(HR))
+    assert redraft.status_code == 200, redraft.text
+    assert SPOKEN not in redraft.text and redraft.json()["source"] == "template_no_session"
+
+
+def test_a_sent_rejection_message_keeps_its_status_and_loses_its_quotes(client, db, world, analysed):
+    from app.database.sql_models import RejectionFeedback
+
+    _feedback(db, world, "sent")
+    assert withdraw(client, RECORDING).status_code == 200
+    db.rollback()
+    db.expire_all()
+    row = db.query(RejectionFeedback).filter_by(application_id=world.application_id).one()
+    assert row.status == "sent" and SPOKEN not in row.draft and row.draft
+
+
+def test_a_rejection_message_being_written_during_a_withdrawal_is_not_stored(client, db, world, analysed, monkeypatch):
+    from app.database.sql_models import RejectionFeedback
+    from app.posthire import feedback
+
+    db.query(Application).filter_by(id=world.application_id).update({"hr_decision": "rejected", "hr_decided_at": datetime.now(timezone.utc)})
+    db.commit()
+    row_id = consent_id(client, RECORDING)
+    real = feedback._generate
+
+    def withdraw_meanwhile(plan):
+        result = real(plan)
+        assert withdraw(client, RECORDING, row_id=row_id).status_code == 200
+        return result
+
+    monkeypatch.setattr(feedback, "_generate", withdraw_meanwhile)
+    response = client.post(hr_url(world, f"/applications/{world.application_id}/feedback/draft"), headers=auth_header(HR))
+    assert response.status_code == 409
+    db.rollback()
+    assert db.query(RejectionFeedback).filter_by(application_id=world.application_id).count() == 0
+
+
+# 7. Beside the CV lane
+
+
+def test_cv_consent_withdrawn_shows_in_the_cv_lane_with_no_invitation(client, db, world):
+    db.query(Application).filter_by(id=world.application_id).update({"stage": "submitted", "cv_status": None})
+    db.commit()
+    assert withdraw(client, CV).status_code == 200
+    db.rollback()
+    board = client.get(hr_url(world, f"/jobs/{world.job_id}/board"), headers=auth_header(HR)).json()
+    assert [card["id"] for card in board["lanes"]["cv_failed"]] == [world.application_id]
+    detail = client.get(hr_url(world, f"/applications/{world.application_id}"), headers=auth_header(HR)).json()
+    assert detail["cv_consent_withdrawn"] is True
+    invite = client.post(hr_url(world, f"/applications/{world.application_id}/invite-anyway"), headers=auth_header(HR))
+    assert invite.status_code == 409
+    assert application_row(db, world).stage == "cv_failed"
+
+
+def test_the_candidate_is_told_why_the_cv_stopped_and_can_still_withdraw_the_application(client, db, world):
+    db.query(Application).filter_by(id=world.application_id).update({"stage": "submitted", "cv_status": None})
+    db.commit()
+    assert withdraw(client, CV).status_code == 200
+    seen = client.get(f"/api/applications/{world.application_id}", headers=auth_header(CANDIDATE)).json()
+    assert seen["status"] == "cv_unreadable" and seen["failure_reason"] == "consent_withdrawn"
+    assert client.post(f"/api/applications/{world.application_id}/withdraw", headers=auth_header(CANDIDATE)).status_code == 200
+
+
+def test_a_cv_failure_with_consent_standing_can_still_be_invited(client, db, world):
+    db.query(Application).filter_by(id=world.application_id).update({"stage": "cv_failed", "cv_status": None})
+    db.commit()
+    db.rollback()
+    invite = client.post(hr_url(world, f"/applications/{world.application_id}/invite-anyway"), headers=auth_header(HR))
+    assert invite.status_code == 200, invite.text
+
+
+def test_recording_withdrawn_after_an_invitation_without_a_cv_goes_to_not_enough_evidence(client, db, world):
+    db.query(Application).filter_by(id=world.application_id).update({"cv_status": None})
+    db.commit()
+    start(client, world)
+    assert withdraw(client, RECORDING).status_code == 200
+    db.rollback()
+    board = client.get(hr_url(world, f"/jobs/{world.job_id}/board"), headers=auth_header(HR)).json()
+    assert [card["id"] for card in board["cells"][NOT_ENOUGH_EVIDENCE]] == [world.application_id]
+    assert board["lanes"]["cv_failed"] == []
+

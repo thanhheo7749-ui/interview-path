@@ -5,7 +5,7 @@ STAGES = (
 TRANSITIONS = {
     "submitted": {"cv_processing"},
     "cv_processing": {"invited", "cv_failed"},
-    "cv_failed": {"cv_processing"},
+    "cv_failed": {"cv_processing", "invited", "withdrawn"},  # invited by HR's hand only: the CV gave no label
     "invited": {"session_in_progress", "withdrawn", "declined_recording", "ready_for_hr"},
     "declined_recording": {"ready_for_hr"},
     "session_in_progress": {"session_completed", "ready_for_hr"},
@@ -18,6 +18,8 @@ TRANSITIONS = {
 NOT_TAKEN = "not_taken"
 # `analysis_status` once the candidate withdrew recording consent: nothing said is kept, and none of it is analysed.
 CONSENT_WITHDRAWN = "consent_withdrawn"
+# `analysis_status` when the candidate spoke and speech-to-text could not hear it: a technical problem, for HR to retry.
+TRANSCRIPTION_FAILED = "transcription_failed"
 
 
 class InvalidTransition(ValueError):
