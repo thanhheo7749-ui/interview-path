@@ -1,7 +1,7 @@
 import ast
 import inspect
 import json
-from dataclasses import asdict
+from dataclasses import asdict, replace
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -822,3 +822,33 @@ def test_company_with_only_unembedded_nodes_says_not_found_and_logs_a_gap(db, ap
     assert response.status_code == 200
     assert response.json()["state"] == "not_found" and "could not find" in response.json()["answer"]
     assert db.get(AssistantQuestion, response.json()["question_id"]).answered is False
+
+
+def test_the_model_is_not_called_when_withholding_leaves_only_irrelevant_items(db, monkeypatch):
+    """The relevant item is a side of an open conflict below the top three; what remains says nothing on the question."""
+    world = World(db)
+    question = "What is the annual leave entitlement?"
+    real_search = retriever.search
+
+    def relevant_side_withheld(session, audience, query, *args, **kwargs):
+        bundle = real_search(session, audience, query, *args, **kwargs)
+        kept = [replace(item, cosine=0.0, keyword_coverage=0.0, conflict_cosine=0.0, conflict_keyword_coverage=0.0)
+                for item in bundle.items]
+        relevant = replace(kept[0], ref="n999999", cosine=1.0, keyword_coverage=1.0)
+        return replace(bundle, items=(*kept[1:], relevant), conflicted_refs=frozenset({"n999999"}))
+
+    monkeypatch.setattr(retriever, "search", relevant_side_withheld)
+    monkeypatch.setattr(retriever, "visible_conflicts", lambda *_: {"n999999": ()})
+    called = []
+    fake.register("copilot_answer", lambda *_: called.append(True) or answer_json("n1"))
+    response = copilot.ask(db, world.employee_audience, question, world.employee_id)
+    assert response.state == "not_found"
+    assert called == []
+
+
+def test_the_model_is_still_called_when_a_relevant_item_survives_withholding(db):
+    world = World(db)
+    called = []
+    fake.register("copilot_answer", lambda *_: called.append(True) or answer_json(world.leave_ref))
+    response = copilot.ask(db, world.employee_audience, "How many annual leave days do I get?", world.employee_id)
+    assert response.state == "answered" and called

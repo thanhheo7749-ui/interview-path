@@ -569,7 +569,7 @@ def test_ai_failure_keeps_the_edit_and_returns_a_warning(client, w, steady_vecto
 
 
 def test_ai_failure_on_one_node_still_checks_the_next(client, w, monkeypatch):
-    first, second = fact(w, "One", "1"), fact(w, "Two", "2")
+    first, second = fact(w, "First", "1"), fact(w, "Second", "2")
     checked = []
 
     def check(_db, _company_id, node_ids, **_):
@@ -807,7 +807,7 @@ def test_unpublish_withdraws_the_document_and_its_sole_source_nodes(client, two_
     assert (body["rejected_nodes"], body["kept_nodes"]) == (2, 1)
     assert w.reload(w.doc).status == "withdrawn"
     assert (w.reload(w.sole).status, w.reload(w.sole_draft).status) == ("rejected", "rejected")
-    assert w.reload(w.shared).status == "published"
+    assert w.reload(w.shared).status == "draft"
     row = w.reload(conflict)
     assert (row.status, row.resolution) == ("dismissed", "node_rejected")
     assert w.reload(edge).status == "rejected"
@@ -824,7 +824,7 @@ def test_unpublish_removes_chunks_from_retrieval_and_sole_nodes_from_the_candida
     assert w.chunk.id not in {row.id for row in retriever._allowed_chunks(w.db, hr)}
     assert w.second_chunk.id in {row.id for row in retriever._allowed_chunks(w.db, hr)}
     titles = candidate_titles(w)
-    assert "Sole" not in titles and "Shared" in titles
+    assert "Sole" not in titles and "Shared" not in titles  # back with HR, for what it may still say of the withdrawn text
 
 
 def test_a_kept_node_stops_citing_the_withdrawn_document(client, two_documents):
@@ -837,7 +837,7 @@ def test_a_kept_node_stops_citing_the_withdrawn_document(client, two_documents):
 def test_withdrawing_each_source_in_turn_finally_rejects_the_node(client, two_documents):
     w = two_documents
     assert unpublish(client, w).status_code == 200
-    assert w.reload(w.shared).status == "published"
+    assert w.reload(w.shared).status == "draft"
     assert unpublish(client, w, w.second.id).status_code == 200
     assert w.reload(w.shared).status == "rejected"
 
@@ -969,3 +969,406 @@ def test_graph_returns_body_and_no_embeddings(client, graph):
 def test_graph_body_stays_within_the_audience(client, graph):
     body = get_graph(client, graph, "?view_as=candidate").json()
     assert all("Internal fact" not in n["body"] for n in body["nodes"])
+
+
+# N5: a kept node may still say what the withdrawn document said, and only HR can judge that.
+
+
+def test_a_kept_published_node_goes_back_to_draft_for_review(client, two_documents):
+    w = two_documents
+    assert unpublish(client, w).status_code == 200
+    node = w.reload(w.shared)
+    assert node.status == "draft" and node.approved_at is None and node.approved_by is None
+    queue = client.get(w.url("review"), headers=w.hr).json()
+    assert w.shared.id in [item["id"] for item in queue["nodes"]]
+    by_document = client.get(w.url(f"review?document_id={w.second.id}"), headers=w.hr).json()
+    assert w.shared.id in [item["id"] for item in by_document["nodes"]]
+    assert "Shared" not in candidate_titles(w)
+
+
+def test_a_kept_node_can_be_published_again_after_review(client, two_documents):
+    w = two_documents
+    assert unpublish(client, w).status_code == 200
+    assert decide(client, w, [{"action": "accept", "node_id": w.shared.id}]).status_code == 200
+    assert w.reload(w.shared).status == "published"
+
+
+@pytest.mark.parametrize("remaining,before,after", [
+    ("confidential", "public", "confidential"),
+    ("internal", "public", "internal"),
+    ("public", "internal", "internal"),  # tightens only
+    ("public", "public", "public"),
+])
+def test_a_kept_nodes_layer_tightens_to_its_strictest_remaining_source(client, two_documents, remaining, before, after):
+    w = two_documents
+    w.second.visibility = remaining
+    w.shared.visibility = before
+    w.db.commit()
+    assert unpublish(client, w).status_code == 200
+    assert w.reload(w.shared).visibility == after
+
+
+def test_the_strictest_of_several_remaining_sources_decides(client, two_documents):
+    w = two_documents
+    third = w.document("Third", status="published")
+    third.visibility = "confidential"
+    chunk = KbChunk(company_id=w.company.id, document_id=third.id, position=0, page=1, text="third")
+    w.db.add(chunk)
+    w.db.commit()
+    w.db.add(KbNodeSource(node_id=w.shared.id, chunk_id=chunk.id, quote="third quote"))
+    w.db.commit()
+    assert unpublish(client, w).status_code == 200
+    assert w.reload(w.shared).visibility == "confidential"
+
+
+def test_a_kept_draft_stays_a_draft_and_tightens(client, two_documents):
+    w = two_documents
+    w.shared.status = "draft"
+    w.second.visibility = "confidential"
+    w.db.commit()
+    assert unpublish(client, w).status_code == 200
+    node = w.reload(w.shared)
+    assert (node.status, node.visibility) == ("draft", "confidential")
+
+
+# N6: only a settled document can vouch for a node, and a published node never stays with no source.
+
+
+@pytest.mark.parametrize("status", ["processing", "failed", "withdrawn"])
+def test_a_source_in_an_unsettled_document_does_not_keep_a_node(client, two_documents, status):
+    w = two_documents
+    w.second.status = status
+    w.db.commit()
+    assert unpublish(client, w).status_code == 200
+    assert w.reload(w.shared).status == "rejected"
+
+
+@pytest.mark.parametrize("status", ["review", "published"])
+def test_a_source_in_a_settled_document_keeps_a_node(client, two_documents, status):
+    w = two_documents
+    w.second.status = status
+    w.db.commit()
+    assert unpublish(client, w).status_code == 200
+    assert w.reload(w.shared).status == "draft"
+
+
+def test_clearing_a_document_rejects_a_published_node_left_with_no_source(db, w):
+    from app.brain import ingestion
+
+    node, other = w.node("Lone", status="published"), w.node("Other side", status="published", doc=False)
+    row = conflict_between(w, node, other)
+    edge = w.edge(node, other, status="published")
+    start = set_version(w)
+    ingestion.clear_document_output(db, w.doc.id)
+    db.commit()
+    assert w.reload(node).status == "rejected"
+    assert (w.reload(row).status, w.reload(row).resolution) == ("dismissed", "node_rejected")
+    assert w.reload(edge).status == "rejected"
+    assert version(w) == start + 1
+
+
+def test_clearing_a_document_rejects_a_published_node_left_only_on_an_unsettled_document(db, two_documents):
+    from app.brain import ingestion
+
+    w = two_documents
+    w.second.status = "processing"
+    w.db.commit()
+    ingestion.clear_document_output(db, w.doc.id)
+    db.commit()
+    assert w.reload(w.shared).status == "rejected"
+
+
+def test_clearing_a_document_keeps_a_published_node_with_a_settled_source(db, two_documents):
+    from app.brain import ingestion
+
+    w = two_documents
+    ingestion.clear_document_output(db, w.doc.id)
+    db.commit()
+    assert w.reload(w.shared).status == "published"
+
+
+def test_clearing_a_document_still_deletes_a_draft_left_with_no_source(db, w):
+    from app.brain import ingestion
+
+    node_id = w.node("Lone draft").id
+    ingestion.clear_document_output(db, w.doc.id)
+    db.commit()
+    db.expire_all()
+    assert db.get(KbNode, node_id) is None
+
+
+def test_the_review_queue_does_not_offer_drafts_of_a_document_still_processing(client, w):
+    hidden = w.node("Still processing")
+    other = w.node("Elsewhere", doc=False)
+    w.edge(hidden, other)
+    w.doc.status = "processing"
+    w.db.commit()
+    queue = client.get(w.url("review"), headers=w.hr).json()
+    assert hidden.id not in [item["id"] for item in queue["nodes"]]
+    assert other.id in [item["id"] for item in queue["nodes"]]  # no source at all: nothing is pending on it
+    assert queue["edges"] == []
+    by_document = client.get(w.url(f"review?document_id={w.doc.id}"), headers=w.hr).json()
+    assert by_document["nodes"] == []
+
+
+def test_the_review_queue_offers_a_draft_that_also_rests_on_a_settled_document(client, w):
+    node = w.node("Both")
+    settled = w.document("Settled", status="published")
+    chunk = KbChunk(company_id=w.company.id, document_id=settled.id, position=0, page=1, text="s")
+    w.db.add(chunk)
+    w.db.commit()
+    w.db.add(KbNodeSource(node_id=node.id, chunk_id=chunk.id, quote="q"))
+    w.doc.status = "processing"
+    w.db.commit()
+    assert node.id in [item["id"] for item in client.get(w.url("review"), headers=w.hr).json()["nodes"]]
+
+
+# N7: what the job could not read may hold the very thing HR would hide, so nothing opens until HR says so.
+
+
+def flagged_job(w, **fields):
+    job = KbIngestionJob(document_id=w.doc.id, status="review", progress=100, **fields)
+    w.db.add(job)
+    w.db.commit()
+    return job
+
+
+HOLDS = [{"dropped_items": 2}, {"failed_chunks": 1, "failed_chunk_ids": [1]},
+         {"failed_chunks": 1, "contradiction_check_failed": True}]
+
+
+@pytest.mark.parametrize("fields", HOLDS)
+def test_an_incomplete_document_stays_in_review_with_no_drafts_left(client, w, fields):
+    a = w.node("A")
+    flagged_job(w, **fields)
+    assert decide(client, w, [{"action": "accept", "node_id": a.id}]).status_code == 200
+    assert w.reload(w.doc).status == "review"
+    hr = aud.simulated(w.db, w.company.id, "hr", None)
+    assert w.chunk.id not in {row.id for row in retriever._allowed_chunks(w.db, hr)}
+
+
+@pytest.mark.parametrize("fields", HOLDS)
+def test_hr_publishes_an_incomplete_document_with_the_existing_action(client, w, fields):
+    flagged_job(w, **fields)
+    assert review.finish_document_if_decided(w.db, w.doc.id) is False
+    assert decide(client, w, [{"action": "publish_document", "document_id": w.doc.id}]).status_code == 200
+    assert w.reload(w.doc).status == "published"
+
+
+def test_publish_anyway_still_refuses_while_a_draft_remains(client, w):
+    w.node("Pending")
+    flagged_job(w, dropped_items=1)
+    assert decide(client, w, [{"action": "publish_document", "document_id": w.doc.id}]).status_code == 409
+    assert w.reload(w.doc).status == "review"
+
+
+def test_publish_anyway_refuses_while_a_job_is_running(client, w):
+    flagged_job(w, dropped_items=1)
+    w.db.add(KbIngestionJob(document_id=w.doc.id, status="running"))
+    w.db.commit()
+    assert decide(client, w, [{"action": "publish_document", "document_id": w.doc.id}]).status_code == 409
+
+
+def test_only_the_latest_job_decides_the_hold(client, w):
+    a = w.node("A")
+    flagged_job(w, dropped_items=3)
+    flagged_job(w)
+    assert decide(client, w, [{"action": "accept", "node_id": a.id}]).status_code == 200
+    assert w.reload(w.doc).status == "published"
+
+
+def test_a_document_with_no_job_is_not_held(client, w):
+    a = w.node("A")
+    assert decide(client, w, [{"action": "accept", "node_id": a.id}]).status_code == 200
+    assert w.reload(w.doc).status == "published"
+
+
+def test_the_api_states_why_a_document_is_held(client, w):
+    flagged_job(w, dropped_items=2, failed_chunks=2, failed_chunk_ids=[1], contradiction_check_failed=True)
+    [row] = [d for d in client.get(w.url("documents"), headers=w.hr).json() if d["id"] == w.doc.id]
+    assert row["publish_hold"] == {"dropped_items": 2, "failed_chunks": 2, "contradiction_check_failed": True,
+                                   "pending_drafts": False}
+    w.node("Pending")
+    [row] = [d for d in client.get(w.url("documents"), headers=w.hr).json() if d["id"] == w.doc.id]
+    assert row["publish_hold"]["pending_drafts"] is True
+
+
+def test_a_complete_or_published_document_shows_no_hold(client, w):
+    flagged_job(w)
+    [row] = [d for d in client.get(w.url("documents"), headers=w.hr).json() if d["id"] == w.doc.id]
+    assert row["publish_hold"] is None
+    flagged_job(w, dropped_items=1)
+    w.doc.status = "published"
+    w.db.commit()
+    [row] = [d for d in client.get(w.url("documents"), headers=w.hr).json() if d["id"] == w.doc.id]
+    assert row["publish_hold"] is None
+
+
+def test_auto_approve_leaves_an_incomplete_sample_document_in_review(db, w):
+    w.company.is_sample = True
+    w.node("A")
+    flagged_job(w, dropped_items=1)
+    review.auto_approve_document(db, w.doc.id, None)
+    assert w.reload(w.doc).status == "review"
+
+
+# Empty values
+
+
+@pytest.mark.parametrize("fields", [{"fact_value": ""}, {"fact_value": "   "}])
+def test_a_fact_cannot_lose_its_value(client, w, fields):
+    node = fact(w, "F", "12")
+    assert decide(client, w, [{"action": "edit", "node_id": node.id, **fields}]).status_code == 422
+    assert w.reload(node).fact_value == "12"
+
+
+def test_a_title_cannot_be_only_whitespace(client, w):
+    node = w.node("Title")
+    assert decide(client, w, [{"action": "edit", "node_id": node.id, "title": "   "}]).status_code == 422
+    assert w.reload(node).title == "Title"
+
+
+# N4: no AI call runs inside the locked transaction, and the decision stays atomic with its embedding.
+
+
+def test_embedding_runs_before_any_row_is_locked(client, w, monkeypatch):
+    from app.ai import gateway
+
+    node = w.node("A")
+    real_embed = gateway.embed
+    seen = []
+
+    def spy(texts, *args, **kwargs):
+        seen.append((list(texts), node_locked()))
+        return real_embed(texts, *args, **kwargs)
+
+    locked = []
+    real_lock = review.lock_for_nodes
+
+    def spy_lock(*args, **kwargs):
+        locked.append(True)
+        return real_lock(*args, **kwargs)
+
+    node_locked = lambda: bool(locked)
+    monkeypatch.setattr(gateway, "embed", spy)
+    monkeypatch.setattr(review, "lock_for_nodes", spy_lock)
+    assert decide(client, w, [{"action": "edit", "node_id": node.id, "body": "New body."}]).status_code == 200
+    assert seen and all(was_locked is False for _, was_locked in seen)
+    assert locked
+
+
+def test_a_failed_embedding_leaves_the_decision_undone(client, w, monkeypatch):
+    from app.ai import gateway
+
+    node = w.node("A")
+
+    def fail(*args, **kwargs):
+        raise AIError("down")
+
+    monkeypatch.setattr(gateway, "embed", fail)
+    with pytest.raises(AIError):
+        decide(client, w, [{"action": "accept", "node_id": node.id, "body": "New body."}])
+    assert w.reload(node).body == "A body" and w.reload(node).status == "draft"
+
+
+def test_a_text_changed_after_embedding_gets_a_conflict_not_a_wrong_vector(client, w, monkeypatch):
+    node = w.node("A")
+    real_lock = review.lock_for_nodes
+
+    def edit_elsewhere_first(session, *args, **kwargs):
+        session.query(KbNode).filter_by(id=node.id).update({"title": "Changed meanwhile"})
+        session.flush()
+        return real_lock(session, *args, **kwargs)
+
+    monkeypatch.setattr(review, "lock_for_nodes", edit_elsewhere_first)
+    assert decide(client, w, [{"action": "edit", "node_id": node.id, "body": "New body."}]).status_code == 409
+    assert w.reload(node).body == "A body"
+
+
+def test_a_closed_conflict_cannot_be_resolved_again_inside_the_lock(db, w):
+    from app.brain import contradiction
+
+    a, b = fact(w, "One", "12"), fact(w, "Two", "15")
+    row = conflict_between(w, a, b)
+    row.status = "resolved"
+    db.commit()
+    with pytest.raises(contradiction.ConflictClosed):
+        contradiction.resolve(db, row, "a", None)
+    db.rollback()
+
+
+# F4: why a node came back to the queue.
+
+
+def test_a_kept_node_says_why_it_came_back(client, two_documents):
+    w = two_documents
+    assert unpublish(client, w).status_code == 200
+    [item] = [n for n in client.get(w.url("review"), headers=w.hr).json()["nodes"] if n["id"] == w.shared.id]
+    assert item["review_reason"] == "document_withdrawn"
+    assert w.reload(w.shared).review_reason == "document_withdrawn"
+
+
+def test_an_ordinary_draft_has_no_review_reason(client, w):
+    node = w.node("Plain")
+    [item] = client.get(w.url("review"), headers=w.hr).json()["nodes"]
+    assert item["id"] == node.id and item["review_reason"] is None
+
+
+@pytest.mark.parametrize("action", ["accept", "reject", "merge"])
+def test_a_decision_clears_the_review_reason(client, two_documents, action):
+    w = two_documents
+    assert unpublish(client, w).status_code == 200
+    target = w.node("Target", status="published", doc=False)
+    item = {"action": action, "node_id": w.shared.id}
+    if action == "merge":
+        item["into_node_id"] = target.id
+    assert decide(client, w, [item]).status_code == 200
+    assert w.reload(w.shared).review_reason is None
+
+
+def test_an_edit_is_no_decision_and_keeps_the_review_reason(client, two_documents):
+    w = two_documents
+    assert unpublish(client, w).status_code == 200
+    assert decide(client, w, [{"action": "edit", "node_id": w.shared.id, "body": "Reworded."}]).status_code == 200
+    assert w.reload(w.shared).review_reason == "document_withdrawn"
+
+
+# F6
+
+
+def clearing_fact(w):
+    node = fact(w, "Leave days", "12")
+    node.body = "Leave is 12 days a year."
+    w.db.commit()
+    return node
+
+
+def test_the_response_warns_when_a_body_is_cleared(client, w):
+    node = clearing_fact(w)
+    response = decide(client, w, [{"action": "edit", "node_id": node.id, "fact_value": "15"}])
+    assert response.status_code == 200
+    assert w.reload(node).body == ""
+    [warning] = response.json()["warnings"]
+    assert "Leave days" in warning and "body" in warning
+
+
+def test_no_warning_when_the_body_is_rewritten_or_does_not_state_the_value(client, w):
+    node = clearing_fact(w)
+    response = decide(client, w, [{"action": "edit", "node_id": node.id, "fact_value": "15", "body": "Leave is 15 days."}])
+    assert response.json()["warnings"] == []
+    other = fact(w, "Sick days", "5")
+    other.body = "See the handbook."
+    w.db.commit()
+    assert decide(client, w, [{"action": "edit", "node_id": other.id, "fact_value": "6"}]).json()["warnings"] == []
+
+
+def test_a_cleared_body_is_warned_about_once_with_an_ai_warning_beside_it(client, w, monkeypatch):
+    node = clearing_fact(w)
+
+    def down(*_args, **_kwargs):
+        raise AIError("down")
+
+    monkeypatch.setattr(review.contradiction, "check_new_facts", down)
+    response = decide(client, w, [{"action": "edit", "node_id": node.id, "fact_value": "15"}])
+    warnings = response.json()["warnings"]
+    assert len(warnings) == 2 and sum("body" in text for text in warnings) == 1

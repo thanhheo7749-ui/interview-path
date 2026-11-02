@@ -6,7 +6,10 @@ import pytest
 from app import cli
 from app.ai.providers import fake
 from app.brain import audience as aud
-from app.brain import ingestion, retriever
+from app.brain import ingestion, retriever, review
+from app.brain.extraction import ExtractedNode
+from app.bridges import discrimination
+from app.database.database import SessionLocal
 from app.database.sql_models import (
     Company, CompanyMember, Department, KbChunk, KbConflict, KbDocument, KbEdge, KbIngestionJob, KbNode, KbNodeSource,
 )
@@ -402,7 +405,7 @@ def test_failed_chunks_stay_visible_on_a_finished_document(client, db, company, 
     fake.enqueue("kb_extract", "still not json")
     document = make_doc(db, company)
     job = run(db, document)
-    assert db.get(KbDocument, document.id).status == "published"
+    assert db.get(KbDocument, document.id).status == "review"  # the unread section may say what HR would hide
     assert job.status == "review" and job.failed_chunks == 1
     body = client.get(f"/api/companies/{company.id}/kb/jobs/{job.id}", headers=hr).json()
     assert body["failed_chunks"] == 1 and len(body["failed_chunk_ids"]) == 1
@@ -891,3 +894,161 @@ def test_two_values_of_one_title_embed_differently(db, company):
     run(db, make_doc(db, company, data=SECOND.encode()))
     first, second = facts(db)
     assert first.embedding != second.embedding
+
+
+# A node HR rejected while the job ran takes no more sources: the job starts a new draft instead.
+
+
+def test_a_node_rejected_during_the_job_gets_a_new_draft_and_no_new_source(db, company):
+    item = fact("Annual leave", "12 days of annual leave")
+    first = make_doc(db, company)
+    fake.enqueue("kb_extract", extraction([item]))
+    run(db, first)
+    original = db.query(KbNode).filter_by(title="Annual leave").one()
+    original_id = original.id
+    before = db.query(KbNodeSource).filter_by(node_id=original_id).count()
+
+    second = make_doc(db, company)
+    job = ingestion.start_job(db, second.id)
+
+    def reject_then_extract(*_):
+        rejecting = SessionLocal()
+        rejecting.get(KbNode, original_id).status = "rejected"
+        rejecting.commit()
+        rejecting.close()
+        return extraction([item])
+
+    fake.register("kb_extract", reject_then_extract)
+    ingestion.run_job(job.id)
+    db.expire_all()
+    assert db.get(KbNode, original_id).status == "rejected"
+    assert db.query(KbNodeSource).filter_by(node_id=original_id).count() == before
+    replacement = db.query(KbNode).filter(KbNode.title == "Annual leave", KbNode.id != original_id).one()
+    assert replacement.status == "draft"
+    assert db.query(KbNodeSource).filter_by(node_id=replacement.id).count() == 1
+
+
+def test_a_live_node_still_takes_the_source_during_a_job(db, company):
+    item = fact("Annual leave", "12 days of annual leave")
+    fake.enqueue("kb_extract", extraction([item]))
+    run(db, make_doc(db, company))
+    fake.enqueue("kb_extract", extraction([item]))
+    run(db, make_doc(db, company))
+    assert db.query(KbNode).filter_by(title="Annual leave").count() == 1
+
+
+def test_a_document_with_a_dropped_item_stays_in_review_after_the_job(db, company):
+    fake.enqueue("kb_extract", extraction([fact("Invented", "30 days of annual leave")]))
+    document = make_doc(db, company)
+    job = run(db, document)
+    assert job.dropped_items == 1 and job.status == "review"
+    assert db.get(KbDocument, document.id).status == "review"
+
+
+def test_a_retry_whose_merge_target_was_rejected_during_its_ai_calls_writes_nothing_and_can_retry(db, company, monkeypatch):
+    first = make_doc(db, company)
+    item = fact("Annual leave", "12 days of annual leave")
+    fake.enqueue("kb_extract", extraction([item]))
+    run(db, first)
+    target_id = db.query(KbNode).filter_by(title="Annual leave").one().id
+    db.commit()
+
+    second = make_doc(db, company)
+    fake.enqueue("kb_extract", "not json")
+    fake.enqueue("kb_extract", "still not json")
+    job = run(db, second)
+    assert job.failed_chunk_ids
+    job_id = job.id
+    ingestion.start_failed_retry(db, job)
+    real = ingestion._check_nodes
+
+    def reject_during_the_calls(nodes, company_id):
+        other = SessionLocal()
+        other.get(KbNode, target_id).status = "rejected"
+        other.commit()
+        other.close()
+        return real(nodes, company_id)
+
+    monkeypatch.setattr(ingestion, "_check_nodes", reject_during_the_calls)
+    fake.enqueue("kb_extract", extraction([item]))
+    ingestion.run_failed_retry(job_id)
+    db.expire_all()
+    assert db.get(KbIngestionJob, job_id).status == "failed"
+    assert db.query(KbNode).filter_by(title="Annual leave").count() == 1
+    monkeypatch.setattr(ingestion, "_check_nodes", real)
+    ingestion.start_failed_retry(db, db.get(KbIngestionJob, job_id))
+    fake.enqueue("kb_extract", extraction([item]))
+    ingestion.run_failed_retry(job_id)
+    db.expire_all()
+    replacement = db.query(KbNode).filter(KbNode.title == "Annual leave", KbNode.status == "draft").one()
+    assert replacement.id != target_id and replacement.embedding is not None
+
+
+# F1: a draft of a guarded type cannot be accepted between its commit and the end of its guard check.
+
+
+GUARDED_ITEM = {"ref": "Python", "type": "skill", "title": "Python", "body": "Python experience", "quote": "12 days of annual leave",
+                "fact_kind": "none", "fact_value": "", "fact_unit": "", "scope_text": "", "effective_date": ""}
+PLAIN_ITEM = GUARDED_ITEM | {"ref": "Leave", "type": "policy", "title": "Leave", "body": "Leave policy"}
+
+
+def seen_during_checks(monkeypatch, work):
+    """Runs work in another session while the job's AI checks run, when its drafts are committed and visible to HR."""
+    real, seen = ingestion._check_nodes, []
+
+    def spy(nodes, company_id):
+        other = SessionLocal()
+        try:
+            seen.append(work(other))
+        finally:
+            other.close()
+        return real(nodes, company_id)
+
+    monkeypatch.setattr(ingestion, "_check_nodes", spy)
+    return seen
+
+
+def test_a_new_guarded_draft_is_unchecked_until_its_check_is_stored(db, company, monkeypatch):
+    seen = seen_during_checks(monkeypatch, lambda other: {
+        node.title: (node.guard_category, node.guard_reason is not None) for node in other.query(KbNode).filter(
+            KbNode.title.in_(("Python", "Leave")))
+    })
+    fake.enqueue("kb_extract", extraction([GUARDED_ITEM, PLAIN_ITEM]))
+    run(db, make_doc(db, company))
+    assert seen == [{"Python": (discrimination.UNCHECKED, True), "Leave": (None, False)}]
+    python = db.query(KbNode).filter_by(title="Python").one()
+    assert python.guard_category is None and python.guard_reason is None  # the stored answer overwrote it
+
+
+def test_hr_cannot_accept_a_guarded_draft_during_its_check(db, company, monkeypatch):
+    def try_to_accept(other):
+        node = other.query(KbNode).filter_by(title="Python").one()
+        item = SimpleNamespace(action="accept", node_id=node.id, into_node_id=None, document_id=None, title=None, body=None,
+                               visibility=None, fact_value=None, fact_unit=None, scope_text=None)
+        with pytest.raises(review.ReviewError) as refused:
+            review.apply_decisions(other, company.id, None, [item])
+        other.rollback()
+        return refused.value.status_code
+
+    seen = seen_during_checks(monkeypatch, try_to_accept)
+    fake.enqueue("kb_extract", extraction([GUARDED_ITEM]))
+    run(db, make_doc(db, company))
+    assert seen == [409]
+    assert db.query(KbNode).filter_by(title="Python").one().status == "draft"
+
+
+def test_a_stored_flag_overwrites_the_unchecked_mark(db, company):
+    fake.register("discrimination_check", lambda *_: json.dumps({"flagged": True, "category": "age", "reason": "Asks an age"}))
+    fake.enqueue("kb_extract", extraction([GUARDED_ITEM]))
+    run(db, make_doc(db, company))
+    python = db.query(KbNode).filter_by(title="Python").one()
+    assert (python.guard_category, python.guard_reason) == ("age", "Asks an age")
+
+
+def test_a_guarded_draft_built_for_a_retry_is_unchecked_until_stored(db, company):
+    graph = SimpleNamespace(company_id=company.id, document=SimpleNamespace(
+        department_id=None, language="en", visibility="public", effective_date=None))
+    item = ExtractedNode.model_validate(GUARDED_ITEM)
+    assert ingestion._build_node(graph, item).guard_category == discrimination.UNCHECKED
+    plain = ExtractedNode.model_validate(PLAIN_ITEM)
+    assert ingestion._build_node(graph, plain).guard_category is None

@@ -92,6 +92,7 @@ def chunk_filter(audience: Audience):
     A public document can still say something HR classed as confidential or rejected, so the document's layer alone
     is not enough. The layer test goes through coalesce because it is NULL for a manager and a node with no department,
     and NOT NULL would let the chunk through. A draft node hides its chunk only when it is above this audience's layer.
+    A stale link hides the chunk from everyone, HR included: it still says a value HR has since corrected.
     """
     withheld = (
         select(KbNodeSource.id)
@@ -99,6 +100,7 @@ def chunk_filter(audience: Audience):
         .where(
             KbNodeSource.chunk_id == KbChunk.id,
             or_(
+                KbNodeSource.stale.is_(True),
                 KbNode.status.in_(WITHDRAWN_NODE_STATUSES),
                 not_(func.coalesce(_layer_filter(audience, KbNode.visibility, KbNode.department_id), false())),
             ),

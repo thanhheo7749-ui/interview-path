@@ -146,6 +146,11 @@
       "ko": "Korean"
     },
     "retryFailed": "Retry failed sections",
+    "held": "Not published yet, so its text stays out of answers: {{dropped}} items were dropped and {{failed}} sections or checks failed. What was not read may say something you would have hidden.",
+    "publishAnyway": "Publish anyway",
+    "publishAnywayConfirm": "Publish \"{{title}}\" anyway? {{dropped}} items were dropped and {{failed}} sections or checks failed, so nothing has reviewed that text, and all of it becomes readable.",
+    "publishAnywayYes": "Publish document",
+    "publishedAnyway": "\"{{title}}\" is published.",
     "conflictMessage": "This document has changed since the page loaded, so the action was not applied. The list is refreshed. ({{detail}})",
     "withdraw": "Withdraw",
     "withdrawConfirm": "Withdraw \"{{title}}\"? Its content stops being used by the Copilot and the graph, and knowledge items with no other source document are removed.",
@@ -153,6 +158,9 @@
     "withdrawn": "Document withdrawn. {{removed}} items removed, {{kept}} kept because another document supports them."
   },
   "review": {
+    "reasons": {
+      "document_withdrawn": "Back for review: a document it also came from was withdrawn. Check that its text does not repeat what that document said."
+    },
     "title": "Review",
     "empty": "Nothing to review. Upload a document and its extracted items will appear here.",
     "unknownDocument": "Unknown document",

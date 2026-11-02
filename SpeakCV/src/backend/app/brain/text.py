@@ -10,6 +10,7 @@ _VI_SPECIFIC = set("ăâđêôơưĂÂĐÊÔƠƯ")
 _VI_RANGE = re.compile("[ĨĩŨũẠ-ỹ]")
 MIN_QUOTE_CHARS = 12
 MIN_QUOTE_CHARS_KOREAN = 6
+MIN_SHARED_SPAN = 2  # Short on purpose: the tail may be just the number. One character says nothing, and matches by chance.
 
 K1 = 1.5
 B = 0.75
@@ -45,6 +46,22 @@ def quote_in(quote: str, source: str) -> bool:
     if not needle:
         return False
     return needle in normalise_for_match(source)
+
+
+def shares_span(quote: str, source: str) -> bool:
+    """Whether source says part of the quote: all of it, or a run of it at either edge, as an overlapping chunk does.
+
+    A chunk starts and ends wherever the window fell, so the shared run can begin in the middle of a word."""
+    needle, text = normalise_for_match(quote), normalise_for_match(source)
+    if not needle or not text:
+        return False
+    if needle in text or text in needle:
+        return True
+    longest = min(len(needle), len(text))
+    return any(
+        needle.endswith(text[:length]) or needle.startswith(text[-length:])
+        for length in range(MIN_SHARED_SPAN, longest + 1)
+    )
 
 
 def verified_quote(quote: str, source: str) -> bool:

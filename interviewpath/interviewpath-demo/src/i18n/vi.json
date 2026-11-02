@@ -146,6 +146,11 @@
       "ko": "Tiếng Hàn"
     },
     "retryFailed": "Thử lại các đoạn lỗi",
+    "held": "Chưa xuất bản nên nội dung chưa được dùng để trả lời: bỏ {{dropped}} mục và lỗi {{failed}} đoạn hoặc bước kiểm tra. Phần chưa đọc được có thể chứa nội dung bạn muốn ẩn.",
+    "publishAnyway": "Vẫn xuất bản",
+    "publishAnywayConfirm": "Vẫn xuất bản \"{{title}}\"? Đã bỏ {{dropped}} mục và lỗi {{failed}} đoạn hoặc bước kiểm tra, nên phần đó chưa được ai xem xét, và toàn bộ nội dung sẽ đọc được.",
+    "publishAnywayYes": "Xuất bản tài liệu",
+    "publishedAnyway": "Đã xuất bản \"{{title}}\".",
     "conflictMessage": "Tài liệu này đã thay đổi kể từ khi tải trang nên thao tác chưa được áp dụng. Danh sách đã được làm mới. ({{detail}})",
     "withdraw": "Thu hồi",
     "withdrawConfirm": "Thu hồi \"{{title}}\"? Nội dung sẽ không còn được Copilot và đồ thị sử dụng, và các mục tri thức không có tài liệu nguồn nào khác sẽ bị xóa.",
@@ -153,6 +158,9 @@
     "withdrawn": "Đã thu hồi tài liệu. Đã xóa {{removed}} mục, giữ lại {{kept}} mục vì còn tài liệu khác hỗ trợ."
   },
   "review": {
+    "reasons": {
+      "document_withdrawn": "Cần duyệt lại: một tài liệu nguồn của mục này đã bị thu hồi. Hãy kiểm tra nội dung không lặp lại những gì tài liệu đó đã nêu."
+    },
     "title": "Duyệt",
     "empty": "Không có gì cần duyệt. Hãy tải tài liệu lên, các mục được trích xuất sẽ xuất hiện ở đây.",
     "unknownDocument": "Tài liệu không rõ",

@@ -123,7 +123,8 @@ def list_documents(company_id: int, _: CompanyMember = Depends(require_member("h
             .order_by(KbIngestionJob.id.desc())
             .first()
         )
-        result.append({**_document_out(document), "job": _job_out(job)})
+        result.append({**_document_out(document), "job": _job_out(job),
+                       "publish_hold": review.publish_hold(db, document, job)})
     return result
 
 

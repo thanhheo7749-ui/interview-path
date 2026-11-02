@@ -1,9 +1,9 @@
 from sqlalchemy import JSON, Boolean, Column, Date, DateTime, ForeignKey, Index, Integer, LargeBinary, String, Text
-from sqlalchemy.sql import func
+from sqlalchemy.sql import false, func
 
 from .database import Base
 
-VISIBILITIES = ("public", "internal", "confidential")
+VISIBILITIES = ("public", "internal", "confidential")  # from most to least open
 NODE_TYPES = ("company", "department", "role", "requirement", "skill", "value", "behavior",
               "policy", "process", "fact", "private_note")
 EXTRACTABLE_NODE_TYPES = tuple(t for t in NODE_TYPES if t not in {"company", "department"})
@@ -15,8 +15,14 @@ DEFAULT_VISIBILITY_BY_TYPE = {
     "private_note": "confidential",
 }
 
+
+
+def stricter_layer(a: str, b: str) -> str:
+    return a if VISIBILITIES.index(a) >= VISIBILITIES.index(b) else b
+
+
 __all__ = [
-    "VISIBILITIES", "NODE_TYPES", "RELATIONS", "EXTRACTABLE_NODE_TYPES", "FACT_KINDS", "DEFAULT_VISIBILITY_BY_TYPE",
+    "stricter_layer", "VISIBILITIES", "NODE_TYPES", "RELATIONS", "EXTRACTABLE_NODE_TYPES", "FACT_KINDS", "DEFAULT_VISIBILITY_BY_TYPE",
     "KbDocument", "KbIngestionJob", "KbChunk", "KbNode", "KbNodeSource", "KbEdge", "KbConflict", "AssistantQuestion",
 ]
 
@@ -93,6 +99,8 @@ class KbNode(Base):
     # Set by the discrimination guard (app.bridges.discrimination): a category, or "unchecked" when the AI check failed.
     guard_category = Column(String(30), nullable=True)
     guard_reason = Column(Text, nullable=True)
+    # Why a node came back to the review queue, until HR decides on it: document_withdrawn.
+    review_reason = Column(String(30), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
 
@@ -103,6 +111,8 @@ class KbNodeSource(Base):
     node_id = Column(Integer, ForeignKey("kb_nodes.id", ondelete="CASCADE"), nullable=False, index=True)
     chunk_id = Column(Integer, ForeignKey("kb_chunks.id", ondelete="CASCADE"), nullable=False, index=True)
     quote = Column(Text, nullable=False)
+    # HR changed the claim this source was extracted for, so its chunk still says the old value and no audience reads it.
+    stale = Column(Boolean, nullable=False, default=False, server_default=false())
 
 
 class KbEdge(Base):

@@ -4,7 +4,7 @@ import { useCompany } from '../company/CompanyContext.jsx';
 import { ConfirmBar, EmptyState, ErrorAlert, cardClass, inputClass, primaryButton, secondaryButton } from '../components/KbFeedback.jsx';
 import { api } from '../lib/api.js';
 import {
-  getJob, listDocuments, notifyKbChanged, retryFailedSections, retryJob, unpublishDocument, uploadDocument,
+  decideReview, getJob, listDocuments, notifyKbChanged, retryFailedSections, retryJob, unpublishDocument, uploadDocument,
 } from '../lib/kb.js';
 
 const VISIBILITIES = ['public', 'internal', 'confidential'];
@@ -31,6 +31,7 @@ function DocumentsPage() {
   const [notice, setNotice] = useState('');
   const [working, setWorking] = useState({});
   const [withdrawing, setWithdrawing] = useState(null);
+  const [publishing, setPublishing] = useState(null);
   // A ref answers a double-click that lands before the next render.
   const inFlight = useRef(new Set());
 
@@ -171,6 +172,19 @@ function DocumentsPage() {
     );
   };
 
+  const publishAnyway = (document) => {
+    setPublishing(null);
+    return runOnce(
+      document,
+      () => decideReview(companyId, [{ action: 'publish_document', document_id: document.id }]),
+      () => {
+        setDocuments((current) => current.map((d) => (d.id === document.id ? { ...d, status: 'published', publish_hold: null } : d)));
+        setNotice(t('documents.publishedAnyway', { title: document.title }));
+        notifyKbChanged();
+      },
+    );
+  };
+
   const statusLabel = (document) => {
     const job = document.job;
     if (job && (document.status === 'processing' || ACTIVE_JOB.includes(job.status))) return t(`documents.job.${job.status}`, { defaultValue: job.status });
@@ -261,7 +275,9 @@ function DocumentsPage() {
                 const rowBusy = Boolean(working[document.id]);
                 const canRetryFailed =
                   job && !running && ['review', 'published'].includes(document.status) && (job.failed_chunks > 0 || job.contradiction_check_failed);
-                const partial = job && job.status !== 'failed' && (job.dropped_items > 0 || job.failed_chunks > 0);
+                const hold = document.publish_hold;
+                const partial = !hold && job && job.status !== 'failed' && (job.dropped_items > 0 || job.failed_chunks > 0);
+                const canPublishAnyway = hold && !hold.pending_drafts && !running;
                 return (
                   <tr key={document.id} className="border-b border-slate-100 align-top">
                     <td className="py-3 pr-3 font-semibold text-slate-900">{document.title}</td>
@@ -286,6 +302,11 @@ function DocumentsPage() {
                           {t('documents.partial', { dropped: job.dropped_items, failed: job.failed_chunks })}
                         </p>
                       )}
+                      {hold && (
+                        <p className="rounded-lg border border-amber-200 bg-amber-50 px-2 py-1 text-xs font-semibold text-amber-900">
+                          {t('documents.held', { dropped: hold.dropped_items, failed: hold.failed_chunks })}
+                        </p>
+                      )}
                       {canRetryFailed && (
                         <button type="button" disabled={rowBusy} onClick={() => retryFailed(document)} className={secondaryButton}>
                           {t('documents.retryFailed')}
@@ -296,10 +317,26 @@ function DocumentsPage() {
                           <p className="rounded-lg border border-red-200 bg-red-50 px-2 py-1 text-xs font-semibold text-red-800">
                             {job.error || t('common.genericError')}
                           </p>
-                          <button type="button" disabled={rowBusy} onClick={() => retry(document)} className={secondaryButton}>
-                            {t('documents.retry')}
-                          </button>
+                          {document.status === 'failed' && (
+                            <button type="button" disabled={rowBusy} onClick={() => retry(document)} className={secondaryButton}>
+                              {t('documents.retry')}
+                            </button>
+                          )}
                         </div>
+                      )}
+                      {canPublishAnyway && publishing !== document.id && (
+                        <button type="button" disabled={rowBusy} onClick={() => setPublishing(document.id)} className={secondaryButton}>
+                          {t('documents.publishAnyway')}
+                        </button>
+                      )}
+                      {publishing === document.id && (
+                        <ConfirmBar
+                          message={t('documents.publishAnywayConfirm', { title: document.title, dropped: hold?.dropped_items ?? 0, failed: hold?.failed_chunks ?? 0 })}
+                          confirmLabel={t('documents.publishAnywayYes')}
+                          busy={rowBusy}
+                          onConfirm={() => publishAnyway(document)}
+                          onCancel={() => setPublishing(null)}
+                        />
                       )}
                       {document.status === 'published' && withdrawing !== document.id && (
                         <button type="button" disabled={rowBusy} onClick={() => setWithdrawing(document.id)} className={secondaryButton}>

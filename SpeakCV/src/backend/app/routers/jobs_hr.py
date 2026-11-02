@@ -138,6 +138,13 @@ def patch_job(company_id: int, job_id: int, body: JobPatch, member: CompanyMembe
         except jobs.JobError as error:
             db.rollback()
             raise _translate(error) from error
+    # The AI call held nothing, so the job may have closed during it. Ending the transaction first means the reads below
+    # see what was committed before this lock was granted, not the snapshot from before the call.
+    db.rollback()
+    job = _lock_job(db, company_id, job_id)
+    if job.status == "closed":
+        db.rollback()
+        raise HTTPException(status_code=409, detail="A closed job cannot be edited")
     if "department_id" in fields:
         job.department_id = body.department_id
     if checked is not None:
@@ -155,6 +162,16 @@ def patch_job(company_id: int, job_id: int, body: JobPatch, member: CompanyMembe
     audit.record(db, company_id, member.user_id, "job.update", "job", job.id)
     db.commit()
     return _out(db, job, warnings)
+
+
+def _lock_job(db: Session, company_id: int, job_id: int) -> Job:
+    job = (
+        db.query(Job).filter(Job.id == job_id, Job.company_id == company_id)
+        .populate_existing().with_for_update().first()
+    )
+    if job is None:
+        raise HTTPException(status_code=404, detail="Job not found")
+    return job
 
 
 @router.post(JOBS + "/{job_id}/publish", response_model=JobOut)

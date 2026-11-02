@@ -115,11 +115,12 @@ def _role_node_id(db: Session, draft: JobDraft) -> int | None:
     return next((i for i in cited if i in nodes and nodes[i].type == "role"), None)
 
 
-def _existing_job(db: Session, draft: JobDraft, request: HiringRequest | None) -> Job | None:
+def _existing_job(db: Session, draft: JobDraft, request: HiringRequest | None, lock: bool = False) -> Job | None:
     job_id = draft.job_id or (request.job_id if request else None)
     if job_id is None:
         return None
-    job = db.query(Job).filter(Job.id == job_id, Job.company_id == draft.company_id).first()
+    query = db.query(Job).filter(Job.id == job_id, Job.company_id == draft.company_id)
+    job = (query.populate_existing().with_for_update() if lock else query).first()
     if job is None:
         raise PublishError(404, "The job of this draft no longer exists.")
     if job.status == "closed":
@@ -137,12 +138,29 @@ def _new_job(db: Session, draft: JobDraft, lang: str, user_id: int) -> Job:
     return job
 
 
+def _lock_for_publish(db: Session, draft: JobDraft, version: int) -> HiringRequest | None:
+    """Take the draft's row after the AI calls, and its request's, and read them as they are now. Raises PublishError(409)
+    if the draft was edited during the calls: what was checked is no longer what it says. A publish that got here first
+    has left a job on them, which the caller reuses."""
+    draft_id, request_id = draft.id, draft.hiring_request_id
+    # End the transaction, so the reads after this lock see what was committed before it was granted, not an old snapshot.
+    db.rollback()
+    db.query(JobDraft).filter(JobDraft.id == draft_id).populate_existing().with_for_update().one()
+    if draft.version != version or draft.status not in ("approved", "published"):
+        raise PublishError(409, "The draft changed while it was being checked. Please try again.")
+    if request_id is None:
+        return None
+    return db.query(HiringRequest).filter(HiringRequest.id == request_id, HiringRequest.company_id == draft.company_id) \
+        .populate_existing().with_for_update().first()
+
+
 def publish(db: Session, draft: JobDraft, user_id: int) -> tuple[Job, list[str]]:
     """Create or update the job from an approved draft. Returns the job and the requirement warnings.
 
     job.version rises only when the requirements changed, so an application in progress keeps its version."""
     if draft.status != "approved":
         raise PublishError(409, "The manager must approve the draft before it is published.")
+    version = draft.version
     _check_clean(db, draft)
     company = db.get(Company, draft.company_id)
     request = None
@@ -155,7 +173,8 @@ def publish(db: Session, draft: JobDraft, user_id: int) -> tuple[Job, list[str]]
         requirements = _requirements(db, draft, lang)
         # Before the first write: this can call the AI, and a vendor call must not hold locks.
         checked = jobs.check_requirements(db, draft.company_id, job.id if job else None, requirements)
-        job = job or _new_job(db, draft, lang, user_id)
+        request = _lock_for_publish(db, draft, version)
+        job = _existing_job(db, draft, request, lock=True) or _new_job(db, draft, lang, user_id)
         job.description = _description(draft, lang)
         warnings = jobs.update_requirements(db, job, requirements, checked)
         if job.status == "draft":

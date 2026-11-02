@@ -86,6 +86,7 @@ def upgrade() -> None:
     sa.Column('embedding_dim', sa.Integer(), nullable=True),
     sa.Column('approved_by', sa.Integer(), nullable=True),
     sa.Column('approved_at', sa.DateTime(timezone=True), nullable=True),
+    sa.Column('review_reason', sa.String(length=30), nullable=True),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('(CURRENT_TIMESTAMP)'), nullable=False),
     sa.ForeignKeyConstraint(['approved_by'], ['users.id'], ondelete='SET NULL'),
     sa.ForeignKeyConstraint(['company_id'], ['companies.id'], ondelete='CASCADE'),
@@ -181,6 +182,7 @@ def upgrade() -> None:
     sa.Column('node_id', sa.Integer(), nullable=False),
     sa.Column('chunk_id', sa.Integer(), nullable=False),
     sa.Column('quote', sa.Text(), nullable=False),
+    sa.Column('stale', sa.Boolean(), server_default=sa.false(), nullable=False),
     sa.ForeignKeyConstraint(['chunk_id'], ['kb_chunks.id'], ondelete='CASCADE'),
     sa.ForeignKeyConstraint(['node_id'], ['kb_nodes.id'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id')

@@ -11,12 +11,12 @@ from app.ai.types import AIError
 from app.brain import contradiction, org_sync, retriever, review, vectors
 from app.brain.chunking import chunk_pages
 from app.brain.extraction import ExtractedEdge, ExtractedNode, ExtractionResult, extract_chunk
-from app.brain.text import guess_language, normalise_title, quote_in, verified_quote
+from app.brain.text import guess_language, normalise_title, quote_in, shares_span, verified_quote
 from app.bridges import discrimination
 from app.core import storage
 from app.core.text_extract import NoExtractableText, extract_pages
 from app.database.database import SessionLocal
-from app.database.models_brain import DEFAULT_VISIBILITY_BY_TYPE, VISIBILITIES
+from app.database.models_brain import DEFAULT_VISIBILITY_BY_TYPE, stricter_layer
 from app.database.sql_models import KbChunk, KbDocument, KbEdge, KbIngestionJob, KbNode, KbNodeSource
 
 logger = logging.getLogger(__name__)
@@ -90,26 +90,34 @@ def fail_interrupted_jobs() -> int:
 
 
 def clear_document_output(db: Session, document_id: int, edge_ids=()) -> None:
-    """Remove a document's chunks, their sources and any draft left with no source. Does not commit."""
+    """Remove a document's chunks, their sources and any draft left with no source. A published node left with no source
+    in a settled document cannot stay readable, so it is rejected and its conflicts close. Does not commit.
+
+    Call with the document locked. The nodes are locked before their source rows, the order review reads them in."""
     chunk_ids = [row[0] for row in db.query(KbChunk.id).filter(KbChunk.document_id == document_id)]
     if chunk_ids:
         node_ids = {row[0] for row in db.query(KbNodeSource.node_id).filter(KbNodeSource.chunk_id.in_(chunk_ids))}
+        nodes = review.lock_nodes(db, node_ids)
         db.query(KbNodeSource).filter(KbNodeSource.chunk_id.in_(chunk_ids)).delete(synchronize_session=False)
-        for node_id in node_ids:
-            node = db.get(KbNode, node_id)
+        rejected: dict[int, int] = {}
+        for node_id, node in nodes.items():
             has_source = db.query(KbNodeSource.id).filter(KbNodeSource.node_id == node_id).first()
-            if node is not None and node.status == "draft" and not has_source:
+            if node.status == "draft" and not has_source:
                 db.query(KbEdge).filter(
                     or_(KbEdge.source_node_id == node_id, KbEdge.target_node_id == node_id)
                 ).delete(synchronize_session=False)
                 db.delete(node)
+            elif node.status == "published" and not review.has_settled_source(db, node_id):
+                node.status = "rejected"
+                contradiction.on_node_rejected(db, node_id)
+                rejected[node_id] = node.company_id
+        db.flush()
+        for company_id in set(rejected.values()):
+            review.settle_edges(db, company_id, set(rejected))
+            contradiction.bump_kb_version(db, company_id)
         db.query(KbChunk).filter(KbChunk.id.in_(chunk_ids)).delete(synchronize_session=False)
     if edge_ids:
         db.query(KbEdge).filter(KbEdge.id.in_(list(edge_ids)), KbEdge.status == "draft").delete(synchronize_session=False)
-
-
-def _stricter(a: str, b: str) -> str:
-    return a if VISIBILITIES.index(a) >= VISIBILITIES.index(b) else b
 
 
 def _parse_date(value: str, fallback):
@@ -144,6 +152,7 @@ def run_job(job_id: int) -> None:
             message = str(exc) if isinstance(exc, NoExtractableText) else GENERIC_ERROR
             if not isinstance(exc, (NoExtractableText, AIError)):
                 logger.exception("Ingestion job %s failed", job_id)
+            review.lock_document(db, document.id)
             clear_document_output(db, document.id, created_edges)
             job = db.get(KbIngestionJob, job_id)
             job.status = "failed"
@@ -174,7 +183,7 @@ def run_failed_retry(job_id: int) -> None:
             _run_failed(db, job, db.get(KbDocument, job.document_id))
         except Exception as exc:  # noqa: BLE001 - every failure must end the job cleanly
             db.rollback()
-            if not isinstance(exc, AIError):
+            if not isinstance(exc, (AIError, _GraphChangedDuringChecks)):
                 logger.exception("Retry of ingestion job %s failed", job_id)
             job = db.get(KbIngestionJob, job_id)
             job.status = "failed"
@@ -182,6 +191,11 @@ def run_failed_retry(job_id: int) -> None:
             db.commit()
     finally:
         db.close()
+
+
+class _GraphChangedDuringChecks(Exception):
+    """A node this retry meant to merge into was rejected or edited during its AI calls, so an item now needs a new node
+    the checks never saw. Nothing is written, and the job can be retried."""
 
 
 def _set_progress(db: Session, job: KbIngestionJob, value: int) -> None:
@@ -276,16 +290,32 @@ def _same_item(item: ExtractedNode, node: KbNode) -> bool:
     )
 
 
+def _live_match(db: Session, graph: _Graph, item: ExtractedNode) -> KbNode | None:
+    """The node this item merges into. Read again and held until this chunk commits: HR may have rejected or edited it
+    since the graph was loaded, and a rejected node takes no new source. The item then starts a new draft."""
+    candidates = graph.by_key.get((item.type, normalise_title(item.title)), [])
+    for candidate in list(candidates):
+        if review.lock_nodes(db, [candidate.id]).get(candidate.id) is None or candidate.status in INACTIVE:
+            candidates.remove(candidate)
+        elif _same_item(item, candidate):
+            return candidate
+    return None
+
+
 def _build_node(graph: _Graph, item: ExtractedNode) -> KbNode:
     document = graph.document
     is_fact = _is_fact(item)
+    # Committed before its check runs, and HR can see it by then: until an answer is stored it needs HR's confirmation.
+    guarded = item.type in discrimination.GUARDED_TYPES
     return KbNode(
         company_id=graph.company_id, department_id=document.department_id, type=item.type,
         title=item.title.strip(), body=item.body, language=document.language,
-        visibility=_stricter(DEFAULT_VISIBILITY_BY_TYPE[item.type], document.visibility),
+        visibility=stricter_layer(DEFAULT_VISIBILITY_BY_TYPE[item.type], document.visibility),
         status="draft", effective_date=_parse_date(item.effective_date, document.effective_date),
         fact_kind=item.fact_kind if is_fact else None, fact_value=item.fact_value.strip() if is_fact else None,
         fact_unit=item.fact_unit.strip() if is_fact else None, scope_text=item.scope_text.strip() if is_fact else None,
+        guard_category=discrimination.UNCHECKED if guarded else None,
+        guard_reason=discrimination.UNCHECKED_REASON if guarded else None,
     )
 
 
@@ -300,12 +330,32 @@ def _new_node(db: Session, graph: _Graph, item: ExtractedNode) -> KbNode:
     return node
 
 
+def chunks_sharing_quote(quote: str, chunks: list[str]) -> list[int]:
+    """Positions of the chunks that say any of the quote: each chunk holding all of it, and the neighbours on either
+    side for as long as they share a span. Chunks overlap, so the next one can start in the middle of the quote.
+
+    Walking out from a holder means a chance match at the edge of a chunk elsewhere in the document does not count."""
+    linked: set[int] = set()
+    for index, text in enumerate(chunks):
+        if not quote_in(quote, text):
+            continue
+        linked.add(index)
+        for step in (-1, 1):
+            neighbour = index + step
+            while 0 <= neighbour < len(chunks) and shares_span(quote, chunks[neighbour]):
+                linked.add(neighbour)
+                neighbour += step
+    return sorted(linked)
+
+
 def _add_sources(db: Session, graph: _Graph, node: KbNode, quote: str) -> None:
-    """Link the node to every chunk of this document that holds the quote. Chunks overlap, so a sentence can be in two
-    of them, and retrieval decides whether a chunk may be read from the nodes linked to it."""
-    for chunk_id, text in graph.document_chunks:
+    """Link the node to every chunk of this document that says any of the quote. Retrieval decides whether a chunk may
+    be read from the nodes linked to it, so a chunk left out here would serve the part of the quote it holds."""
+    texts = [text for _, text in graph.document_chunks]
+    for index in chunks_sharing_quote(quote, texts):
+        chunk_id = graph.document_chunks[index][0]
         key = (node.id, chunk_id, quote)
-        if key not in graph.sources and quote_in(quote, text):
+        if key not in graph.sources:
             graph.sources.add(key)
             db.add(KbNodeSource(node_id=node.id, chunk_id=chunk_id, quote=quote))
 
@@ -359,8 +409,7 @@ def _apply_extraction(db: Session, graph: _Graph, chunk: KbChunk, result: Extrac
         if not _node_is_storable(item) or not _node_is_verified(item, chunk.text):
             graph.dropped += 1
             continue
-        key = (item.type, normalise_title(item.title))
-        node = next((candidate for candidate in graph.by_key.get(key, []) if _same_item(item, candidate)), None)
+        node = _live_match(db, graph, item)
         if node is None:
             node = _new_node(db, graph, item)
             chunk_new.append(node)
@@ -413,9 +462,10 @@ def _store_checks(graph: _Graph, checks: _NodeChecks) -> None:
     """Flag new requirement, skill and behavior nodes that ask for a protected trait, and store every embedding. A
     flagged node stays a draft that HR can only reject or rewrite."""
     for node in graph.new_nodes:
-        result = checks.guards.get(_guard_text(node)) if node.type in discrimination.GUARDED_TYPES else None
-        if result is not None:
-            node.guard_category, node.guard_reason = result.category, result.reason
+        if node.type in discrimination.GUARDED_TYPES:
+            result = checks.guards[_guard_text(node)]
+            node.guard_category = result.category if result else None
+            node.guard_reason = result.reason if result else None
         node.embedding, node.embedding_model, node.embedding_dim = checks.embeddings[retriever.node_text(node)]
 
 
@@ -435,7 +485,9 @@ def _possible_new_nodes(graph: _Graph, extracted: list[tuple[KbChunk, Extraction
 
 def _finish_job(db: Session, job: KbIngestionJob, document: KbDocument, failed_chunk_ids: list[int],
                 check_failed: bool, dropped: int) -> None:
-    """Record the outcome. A document with nothing left to decide is published; what failed stays on the job."""
+    """Record the outcome. A document with nothing left to decide is published, unless the job could not read all of it:
+    then HR decides. What failed stays on the job."""
+    review.lock_document(db, document.id)
     job.dropped_items = dropped
     job.failed_chunk_ids = failed_chunk_ids
     job.contradiction_check_failed = check_failed
@@ -531,6 +583,8 @@ def _run_failed(db: Session, job: KbIngestionJob, document: KbDocument) -> None:
     checks = _check_nodes(_possible_new_nodes(graph, extracted), company_id)
     for chunk, result in extracted:
         _apply_extraction(db, graph, chunk, result)
+    if any(retriever.node_text(node) not in checks.embeddings for node in graph.new_nodes):
+        raise _GraphChangedDuringChecks
     _store_checks(graph, checks)
     new_ids = [n.id for n in graph.new_nodes]
     dropped = graph.dropped

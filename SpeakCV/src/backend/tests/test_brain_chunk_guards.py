@@ -8,8 +8,11 @@ import pytest
 from app.ai import gateway
 from app.ai.providers import fake
 from app.brain import audience as aud
-from app.brain import contradiction, copilot, retriever
-from app.database.sql_models import KbChunk, KbNodeSource
+from app.brain import contradiction, copilot, ingestion, retriever, review
+from app.brain.chunking import chunk_pages
+from app.brain.ingestion import chunks_sharing_quote
+from app.brain.text import shares_span
+from app.database.sql_models import Company, KbChunk, KbDocument, KbNode, KbNodeSource
 from tests.helpers import auth_header
 from tests.test_brain_copilot import World, answer_json, prompt_text
 
@@ -273,3 +276,282 @@ def test_a_conflict_no_longer_open_does_not_hold_back_the_chunks(db, world, leav
     db.commit()
     fake.enqueue("copilot_answer", answer_json(leave.chunk_a, answer="12 days."))
     assert copilot.ask(db, world.employee_audience, LEAVE_QUESTION, world.employee_id).state == "answered"
+
+
+# A quote that straddles two chunks: the next chunk starts inside it, so it says the tail of what HR classed as hidden.
+
+STRADDLING_CANARY = "CANARYTAIL77"
+STRADDLING_QUOTE = (
+    "The salary band for this backend engineering role, as agreed by the compensation committee last quarter for "
+    f"the coming year and reviewed by the board of directors, is 30 to 40 million VND {STRADDLING_CANARY} per month."
+)
+STRADDLING_QUESTION = "What is the salary band for the backend role?"
+
+
+def straddling_document(db, company):
+    """Hard-window chunks, cut so that one holds the whole quote and the next one starts inside it, before the canary."""
+    before = ("Our backend team builds services for customers and partners across the region every day. " * 14)[:1120]
+    after = "Applicants should send a short letter about their distributed systems work and salary band questions. " * 12
+    data = f"{before} {STRADDLING_QUOTE} {after}"
+    pieces = chunk_pages([(None, data)])
+    holders = [piece for piece in pieces if STRADDLING_QUOTE in piece.text]
+    tails = [piece for piece in pieces if STRADDLING_CANARY in piece.text and STRADDLING_QUOTE not in piece.text]
+    assert len(holders) == 1 and len(tails) == 1  # otherwise this document no longer tests a straddling quote
+    note = {"ref": "Backend salary band", "type": "private_note", "title": "Backend salary band",
+            "body": "Pay is discussed at the offer.", "quote": STRADDLING_QUOTE, "fact_kind": "none", "fact_value": "",
+            "fact_unit": "", "scope_text": "", "effective_date": ""}
+    for piece in pieces:
+        fake.enqueue("kb_extract", json.dumps({"nodes": [note] if piece is holders[0] else [], "edges": []}))
+    document = ingestion.create_document(
+        db, company.id, None, title="Job advert", data=data.encode(), suffix=".md", visibility="public",
+        department_id=None, language="en", effective_date=None,
+    )
+    job = ingestion.start_job(db, document.id)
+    ingestion.run_job(job.id)
+    db.expire_all()
+    return db.query(KbNode).filter_by(title="Backend salary band").one(), db.get(KbDocument, document.id)
+
+
+@pytest.fixture
+def acme(db, tmp_path, monkeypatch):
+    monkeypatch.setenv("STORAGE_DIR", str(tmp_path))
+    fake.reset()
+    row = Company(slug="acme", name="Acme")
+    db.add(row)
+    db.commit()
+    return row
+
+
+def candidate_sees(db, company_id, question):
+    """Everything a candidate's question can reach: the prompt, the response and the retrieved context."""
+    fake.register("copilot_answer", lambda *_: json.dumps({"can_answer": False, "answer": "", "citation_ids": []}))
+    response = copilot.ask(db, aud.candidate(company_id), question, None)
+    retrieved = retriever.search(db, aud.candidate(company_id), question, top_k=100, char_budget=10 ** 6)
+    return " ".join([prompt_text(), json.dumps(asdict(response), default=str), *[i.text for i in retrieved.items]])
+
+
+@pytest.mark.parametrize("decision", ["accept", "reject"])
+def test_the_tail_of_a_straddling_quote_reaches_no_candidate(db, acme, decision):
+    node, document = straddling_document(db, acme)
+    assert node.visibility == "confidential"
+    if decision == "accept":
+        review.publish_node(db, node, None)
+    else:
+        node.status = "rejected"
+    document.status = "published"
+    db.commit()
+    assert STRADDLING_CANARY not in candidate_sees(db, acme.id, STRADDLING_QUESTION)
+    assert any(STRADDLING_CANARY in text for (text,) in db.query(KbChunk.text))
+
+
+def test_a_straddling_quote_links_both_chunks(db, acme):
+    node, _ = straddling_document(db, acme)
+    assert db.query(KbNodeSource).filter_by(node_id=node.id).count() == 2
+
+
+@pytest.mark.parametrize("quote,source,shared", [
+    ("the whole quote is here", "before the whole quote is here after", True),
+    ("the salary band is 30 million", "30 million and more after it", True),  # the tail starts the chunk
+    ("the salary band is 30 million", "text before it the salary band", True),  # the head ends the chunk
+    ("a b the salary band is 30 million c d", "the salary band is 30 million", True),  # the chunk lies inside the quote
+    ("the salary  band\nis 30 million", "band is 30 million and after", True),  # compared after normalising whitespace
+    ("the salary band is 30 million", "nothing about it in here at all", False),
+    ("the salary band is 30 million.", ". nothing here", False),  # one character is chance, not a span
+    ("", "anything", False),
+])
+def test_shares_span(quote, source, shared):
+    assert shares_span(quote, source) is shared
+
+
+def test_a_chunk_far_from_the_quote_is_not_linked_by_a_chance_match_at_its_edge():
+    quote = "Annual leave is 12 days per year."
+    chunks = ["Annual leave is 12 days per year. Then more.", "year. A different section starts here.",
+              "Filler that says nothing.", "year. This chunk is far from the quote."]
+    assert chunks_sharing_quote(quote, chunks) == [0, 1]
+
+
+# An edit corrects the fact, not the document: the chunk it came from still says the old value.
+
+
+def decision(**fields):
+    return SimpleNamespace(**{**dict(action="edit", node_id=None, into_node_id=None, document_id=None, title=None,
+                                     body=None, visibility=None, fact_value=None, fact_unit=None, scope_text=None),
+                              **fields})
+
+
+def stated_fact(world, title, body, value, unit, document, chunk_text):
+    node = world.node(title, body, "public", document=document, chunk_text=chunk_text)
+    node.fact_kind, node.fact_value, node.fact_unit, node.scope_text = "number", value, unit, "all staff"
+    world.db.commit()
+    return node
+
+
+def test_a_conflict_settled_by_an_edit_leaves_no_old_value_in_the_prompt(db, world):
+    keep = stated_fact(world, "Annual leave days entitlement", "Annual leave is 17 days.", "17", "days",
+                       world.document("Handbook 2026", "public"), "Annual leave entitlement is 17 days CANARY17 per year.")
+    edited = stated_fact(world, "Annual leave days entitlement", "Annual leave is 19 days.", "19", "days",
+                         world.document("Old memo", "public"), "Annual leave entitlement is 19 days CANARY19 per year.")
+    world.open_conflict(keep, edited)
+
+    review.apply_decisions(db, world.company_id, world.hr_id, [decision(node_id=edited.id, fact_value="17")])
+    db.commit()
+    db.refresh(world.conflict)
+    assert world.conflict.resolution == contradiction.EDIT_RESOLVED
+
+    seen = candidate_sees(db, world.company_id, "How many days of annual leave entitlement?")
+    assert "CANARY19" not in seen
+    assert "19 days" not in seen
+    assert "CANARY17" in seen  # the side nobody edited still speaks from its chunk
+
+
+def test_a_corrected_published_value_leaves_no_old_value_in_the_prompt(db, world):
+    edited = stated_fact(world, "Probation length policy", "Probation is 6 months.", "6", "months",
+                         world.document("Handbook", "public"), "Probation length policy: probation lasts 6 months CANARY6.")
+
+    review.apply_decisions(db, world.company_id, world.hr_id, [decision(node_id=edited.id, fact_value="2")])
+    db.commit()
+
+    seen = candidate_sees(db, world.company_id, "What is the probation length policy?")
+    assert "CANARY6" not in seen
+    assert "6 months" not in seen
+    assert "2 months" in seen or "2\n" in seen or "2 " in seen
+    assert db.query(KbNodeSource).filter_by(node_id=edited.id).one().stale is True
+
+
+@pytest.mark.parametrize("field,value", [("fact_unit", "weeks"), ("scope_text", "contractors")])
+def test_every_claim_field_marks_the_sources_stale(db, world, field, value):
+    edited = stated_fact(world, "Probation length policy", "Probation applies widely.", "6", "months",
+                         world.document("Handbook", "public"), "Probation lasts 6 months CANARY6.")
+    review.apply_decisions(db, world.company_id, world.hr_id, [decision(node_id=edited.id, **{field: value})])
+    db.commit()
+    assert db.query(KbNodeSource).filter_by(node_id=edited.id).one().stale is True
+
+
+def test_a_wording_edit_keeps_the_chunk(db, world):
+    edited = stated_fact(world, "Probation length policy", "Probation is 6 months.", "6", "months",
+                         world.document("Handbook", "public"), "Probation lasts 6 months CANARY6.")
+    review.apply_decisions(db, world.company_id, world.hr_id, [decision(node_id=edited.id, body="Six months it is, 6.")])
+    db.commit()
+    assert db.query(KbNodeSource).filter_by(node_id=edited.id).one().stale is False
+    assert "CANARY6" in candidate_sees(db, world.company_id, "What is the probation length policy?")
+
+
+def test_a_non_fact_with_no_claim_is_not_marked_stale(db, world):
+    edited = world.node("A plain note", "Words.", "public", type="policy", document=world.document("Handbook", "public"))
+    review.apply_decisions(db, world.company_id, world.hr_id, [decision(node_id=edited.id, body="Other words.")])
+    db.commit()
+    assert db.query(KbNodeSource).filter_by(node_id=edited.id).one().stale is False
+
+
+@pytest.mark.parametrize("kind", ["candidate", "employee", "manager", "hr"])
+def test_a_stale_link_withholds_the_chunk_from_every_audience(db, world, kind):
+    node = world.node("Probation length policy", "Probation is 6 months.", "public",
+                      document=world.document("Handbook", "public"), chunk_text="Probation lasts 6 months CANARY6.")
+    db.query(KbNodeSource).filter_by(node_id=node.id).update({"stale": True})
+    db.commit()
+    bundle = retriever.search(db, aud.Audience(world.company_id, kind), "What is the probation length policy?",
+                              top_k=100, char_budget=10 ** 6)
+    assert not any("CANARY6" in item.text for item in bundle.items)
+
+
+def test_a_body_edited_with_the_value_is_kept_as_written(db, world):
+    edited = stated_fact(world, "Probation length policy", "Probation is 6 months.", "6", "months",
+                         world.document("Handbook", "public"), "Probation lasts 6 months CANARY6.")
+    review.apply_decisions(db, world.company_id, world.hr_id,
+                           [decision(node_id=edited.id, fact_value="2", body="Probation is 2 months now.")])
+    db.commit()
+    db.refresh(edited)
+    assert edited.body == "Probation is 2 months now."
+
+
+def test_a_body_that_does_not_state_the_old_claim_survives_the_edit(db, world):
+    edited = stated_fact(world, "Probation length policy", "Probation follows the handbook.", "6", "months",
+                         world.document("Handbook", "public"), "Probation lasts 6 months CANARY6.")
+    review.apply_decisions(db, world.company_id, world.hr_id, [decision(node_id=edited.id, fact_value="2")])
+    db.commit()
+    db.refresh(edited)
+    assert edited.body == "Probation follows the handbook."
+
+
+def test_the_conflict_check_is_not_shown_the_old_quote_of_an_edited_fact(db, world):
+    edited = stated_fact(world, "Probation length policy", "", "6", "months",
+                         world.document("Handbook", "public"), "Probation lasts 6 months CANARY6.")
+    db.query(KbNodeSource).filter_by(node_id=edited.id).update({"stale": True, "quote": "lasts 6 months QUOTECANARY"})
+    db.commit()
+    assert "QUOTECANARY" not in contradiction._fact_block(db, edited)
+
+
+def test_merging_a_stale_link_onto_the_same_chunk_keeps_it_stale(db, world):
+    document = world.document("Handbook", "public")
+    stale = world.node("Leave days", "Words.", "public", status="draft", document=document, chunk_text="Leave CANARY.")
+    link = db.query(KbNodeSource).filter_by(node_id=stale.id).one()
+    target = world.node("Leave days total", "Words.", "public")
+    db.add(KbNodeSource(node_id=target.id, chunk_id=link.chunk_id, quote=link.quote))
+    link.stale = True
+    db.commit()
+    review.apply_decisions(db, world.company_id, world.hr_id,
+                           [decision(action="merge", node_id=stale.id, into_node_id=target.id)])
+    db.commit()
+    assert db.query(KbNodeSource).filter_by(node_id=target.id).one().stale is True
+
+
+# F2: a merge moves a chunk that says another value onto this fact.
+
+
+def merge_world(world, value, target_value, target_kind="number"):
+    document = world.document("Handbook", "public")
+    moved = stated_fact(world, "Leave days total", "Words.", value, "days", document, "Leave is CANARYMOVED days a year.")
+    moved.status = "draft"
+    target = stated_fact(world, "Annual leave days", "Annual leave.", target_value, "days",
+                         world.document("Policy", "public"), "Annual leave days are set here.")
+    target.fact_kind = target_kind
+    world.db.commit()
+    return moved, target
+
+
+def merge(world, moved, target):
+    review.apply_decisions(world.db, world.company_id, world.hr_id,
+                           [decision(action="merge", node_id=moved.id, into_node_id=target.id)])
+    world.db.commit()
+
+
+def moved_links(db, target):
+    return {row.quote: row.stale for row in db.query(KbNodeSource).filter_by(node_id=target.id).all()}
+
+
+def test_merging_into_another_value_marks_the_moved_source_stale_and_keeps_its_chunk_out(db, world):
+    moved, target = merge_world(world, "19", "17")
+    links_before = db.query(KbNodeSource).filter_by(node_id=target.id).count()
+    merge(world, moved, target)
+    rows = db.query(KbNodeSource).filter_by(node_id=target.id).order_by(KbNodeSource.id).all()
+    assert len(rows) == links_before + 1
+    assert sorted(row.stale for row in rows) == [False, True]
+    assert "CANARYMOVED" not in candidate_sees(db, world.company_id, "How many leave days total a year?")
+
+
+def test_merging_into_the_same_value_keeps_the_chunk(db, world):
+    moved, target = merge_world(world, "17", "17")
+    merge(world, moved, target)
+    assert not any(row.stale for row in db.query(KbNodeSource).filter_by(node_id=target.id))
+    assert "CANARYMOVED" in candidate_sees(db, world.company_id, "How many leave days total a year?")
+
+
+def test_merging_a_non_fact_marks_nothing_stale(db, world):
+    document = world.document("Handbook", "public")
+    moved = world.node("Words one", "Words.", "public", type="policy", status="draft", document=document)
+    target = world.node("Words two", "Words.", "public", type="policy", document=document)
+    merge(world, moved, target)
+    assert not any(row.stale for row in db.query(KbNodeSource).filter_by(node_id=target.id))
+
+
+# F6: HR is told when a body is cleared, and an unchanged body sent back counts as untouched.
+
+
+def test_a_body_sent_back_unchanged_is_still_cleared_when_it_states_the_old_value(db, world):
+    edited = stated_fact(world, "Probation length policy", "Probation is 6 months.", "6", "months",
+                         world.document("Handbook", "public"), "Probation lasts 6 months CANARY6.")
+    review.apply_decisions(db, world.company_id, world.hr_id,
+                           [decision(node_id=edited.id, fact_value="2", body="Probation is 6 months.")])
+    db.commit()
+    db.refresh(edited)
+    assert edited.body == ""

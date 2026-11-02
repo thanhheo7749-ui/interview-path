@@ -49,7 +49,7 @@ function Sidebar() {
         </div>
       </div>
 
-      <nav className="mt-6 space-y-1">
+      <nav className="mt-6 min-h-0 flex-1 space-y-1 overflow-y-auto">
         {items.map((item) => {
           const Icon = item.icon;
           return (
@@ -77,7 +77,7 @@ function Sidebar() {
         })}
       </nav>
 
-      <div className="mt-auto space-y-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+      <div className="mt-4 shrink-0 space-y-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
         {membership && (
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
