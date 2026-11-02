@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { formatRecordingTime, generateBrief, saveBrief, sendBrief } from '../../lib/bridges.js';
+import { formatRecordingTime, generateBrief, getBrief, saveBrief, sendBrief } from '../../lib/bridges.js';
 import { ConfirmBar, ErrorAlert, inputClass, primaryButton, secondaryButton } from '../KbFeedback.jsx';
 import { PlayFromMoment } from './TranscriptPanel.jsx';
 
@@ -110,6 +110,24 @@ export function BriefWorkflow({ companyId, appId, audioPositions }) {
   const [confirming, setConfirming] = useState(false);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+
+  // A reload must show the brief the server kept: its draft, review and sent state.
+  useEffect(() => {
+    let cancelled = false;
+    getBrief(companyId, appId)
+      .then((row) => {
+        if (cancelled) return;
+        if (row) {
+          setBrief(row);
+          setContent(row.content);
+          if (row.language) setLanguage(row.language);
+        }
+        setLoaded(true);
+      })
+      .catch((err) => { if (!cancelled) { setError(err.message); setLoaded(true); } });
+    return () => { cancelled = true; };
+  }, [companyId, appId]);
 
   const run = async (action) => {
     setBusy(true);
@@ -151,7 +169,7 @@ export function BriefWorkflow({ companyId, appId, audioPositions }) {
       <p className="text-xs text-slate-500">{t('bridges.brief.hint')}</p>
       <ErrorAlert message={error} />
 
-      {!sent && (
+      {loaded && !sent && (
         <div className="flex flex-wrap items-end gap-2">
           <label className="text-xs font-bold text-slate-600">
             {t('bridges.brief.language')}
@@ -164,7 +182,8 @@ export function BriefWorkflow({ companyId, appId, audioPositions }) {
           </button>
         </div>
       )}
-      {!sent && <p className="text-xs text-slate-500">{t('bridges.brief.replacesNote')}</p>}
+      {!loaded && !error && <p className="text-xs text-slate-500">{t('common.loading')}</p>}
+      {loaded && !sent && <p className="text-xs text-slate-500">{t('bridges.brief.replacesNote')}</p>}
       {confirming && (
         <ConfirmBar message={t('bridges.brief.regenerateConfirm')} confirmLabel={t('bridges.brief.regenerate')} busy={busy} onConfirm={generate} onCancel={() => setConfirming(false)} />
       )}

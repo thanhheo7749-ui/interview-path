@@ -730,7 +730,20 @@
       "no_hire": "Do not recommend hiring",
       "notes": "Notes (optional)",
       "submit": "Submit scorecard",
-      "resubmit": "Submit again"
+      "resubmit": "Submit again",
+      "hrView": {
+        "title": "Hiring manager's scorecard",
+        "hint": "Advice for you. HR makes the final decision; nothing changes automatically.",
+        "none": "The hiring manager has not submitted a scorecard yet.",
+        "by": "Submitted by {{name}} on {{date}}",
+        "hire": "Recommends hiring",
+        "no_hire": "Does not recommend hiring",
+        "recommendation": "Recommendation",
+        "scores": "Scores per requirement",
+        "score": "{{score}} / 5",
+        "notes": "Notes",
+        "noNotes": "No notes."
+      }
     },
     "outcome": {
       "title": "Hiring outcome",

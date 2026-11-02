@@ -16,6 +16,17 @@ export const listDepartments = (companyId) => api(`${company(companyId)}/departm
 const application = (companyId, appId) => `${company(companyId)}/applications/${appId}`;
 export const generateBrief = (companyId, appId, language) =>
   api(`${application(companyId, appId)}/brief`, { method: 'POST', body: { language } });
+// 404 means there is none yet (or the application was anonymized), which is a state, not an error.
+async function orNull(request) {
+  try {
+    return await request;
+  } catch (err) {
+    if (err.status === 404) return null;
+    throw err;
+  }
+}
+export const getBrief = (companyId, appId) => orNull(api(`${application(companyId, appId)}/brief`));
+export const getScorecard = (companyId, appId) => orNull(api(`${application(companyId, appId)}/scorecard`));
 export const saveBrief = (companyId, appId, content) =>
   api(`${application(companyId, appId)}/brief`, {
     method: 'PATCH',

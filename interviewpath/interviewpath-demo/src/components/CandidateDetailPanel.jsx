@@ -6,6 +6,7 @@ import { BriefWorkflow } from './board/BriefEditor.jsx';
 import DecisionBar from './board/DecisionBar.jsx';
 import EvidenceTable from './board/EvidenceTable.jsx';
 import OutcomeControl from './board/OutcomeControl.jsx';
+import HrScorecard from './board/HrScorecard.jsx';
 import TranscriptPanel from './board/TranscriptPanel.jsx';
 import { ErrorAlert } from './KbFeedback.jsx';
 
@@ -92,7 +93,8 @@ function CandidateDetailPanel({ companyId, appId, onClose, onChanged }) {
                 appId={appId}
                 audioPositions={new Set(detail.transcript.filter((turn) => turn.has_audio).map((turn) => turn.position))}
               />
-              <OutcomeControl key={`outcome-${appId}`} companyId={companyId} appId={appId} />
+              <HrScorecard key={`scorecard-${appId}`} companyId={companyId} appId={appId} />
+              <OutcomeControl key={`outcome-${appId}`} companyId={companyId} appId={appId} initial={detail.final_outcome} />
             </>
           )}
         </div>
