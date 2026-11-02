@@ -1,6 +1,6 @@
 """Read models for the HR board. Nothing here returns identity or the raw CV: HR reads blind text first."""
 from app.database.sql_models import (
-    Application, AuditLog, CultureNote, CvClaim, Job, KbNode, RequirementResult, VoiceSession, VoiceTurn,
+    Application, AuditLog, CandidateBrief, CultureNote, CvClaim, Job, KbNode, RequirementResult, VoiceSession, VoiceTurn,
 )
 from app.hiring import jobs
 from app.hiring.state import NOT_TAKEN
@@ -100,6 +100,17 @@ def latest_turns(db, application) -> list[VoiceTurn]:
     return db.query(VoiceTurn).filter(VoiceTurn.session_id == session.id).order_by(VoiceTurn.position).all()
 
 
+def _brief_status(db, application) -> str | None:
+    if application.anonymized_at is not None:
+        return None
+    row = (
+        db.query(CandidateBrief.status)
+        .filter(CandidateBrief.application_id == application.id, CandidateBrief.company_id == application.company_id)
+        .order_by(CandidateBrief.id.desc()).first()
+    )
+    return row[0] if row else None
+
+
 def detail(db, application) -> dict:
     job = db.get(Job, application.job_id)
     turns = latest_turns(db, application)
@@ -151,6 +162,8 @@ def detail(db, application) -> dict:
         "analysis_status": application.analysis_status,
         "interview_note": interview_note(application),
         "hr_decision": application.hr_decision,
+        "final_outcome": application.final_outcome,
+        "brief_status": _brief_status(db, application),
         "hr_decided_at": application.hr_decided_at.isoformat() if application.hr_decided_at else None,
         "fast_tracked": bool(application.fast_tracked),
         "hidden_text_detected": bool(application.hidden_text_detected),

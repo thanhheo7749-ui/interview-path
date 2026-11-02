@@ -12,7 +12,7 @@ from app.brain import audience
 from app.bridges import brief
 from app.database.database import get_db
 from app.database.sql_models import (
-    Application, CandidateBrief, CompanyMember, InterviewScorecard, Job, JobRequirement,
+    Application, CandidateBrief, CompanyMember, InterviewScorecard, Job, JobRequirement, User,
 )
 from app.hiring import decisions
 from app.schemas.bridges import BriefIn, BriefPatch, OutcomeIn, ScorecardIn
@@ -92,6 +92,44 @@ def _draft(db: Session, application: Application) -> CandidateBrief:
     if row is None:
         raise HTTPException(status_code=404, detail="Brief not found")
     return row
+
+
+def _live_application(db: Session, company_id: int, application_id: int) -> Application:
+    """For the read-back routes: an anonymized application has nothing left to show, so it is a 404."""
+    application = _application(db, company_id, application_id)
+    if application.anonymized_at is not None:
+        raise HTTPException(status_code=404, detail="Application not found")
+    return application
+
+
+@router.get(BASE + "/applications/{app_id}/brief")
+def get_brief(company_id: int, app_id: int, member: CompanyMember = Depends(require_member("hr")),
+              db: Session = Depends(get_db)):
+    return brief.serialize(_draft(db, _live_application(db, company_id, app_id)))
+
+
+@router.get(BASE + "/applications/{app_id}/scorecard")
+def get_scorecard(company_id: int, app_id: int, member: CompanyMember = Depends(require_member("hr")),
+                  db: Session = Depends(get_db)):
+    """What the hiring manager submitted. Advice to HR: reading it changes nothing."""
+    application = _live_application(db, company_id, app_id)
+    row = (
+        db.query(InterviewScorecard)
+        .filter(InterviewScorecard.application_id == application.id,
+                InterviewScorecard.company_id == company_id, InterviewScorecard.submitted_at.isnot(None))
+        .order_by(InterviewScorecard.submitted_at.desc(), InterviewScorecard.id.desc()).first()
+    )
+    if row is None:
+        raise HTTPException(status_code=404, detail="Scorecard not found")
+    manager = db.get(User, row.manager_user_id)
+    texts = {r.id: r.text for r in db.query(JobRequirement).filter(
+        JobRequirement.job_id == application.job_id, JobRequirement.company_id == company_id)}
+    body = _scorecard(row)
+    body["requirement_scores"] = [
+        {**score, "text": texts.get(score.get("requirement_id"), "")} for score in (row.requirement_scores or [])
+    ]
+    body["manager_name"] = (manager.full_name or manager.email) if manager is not None else ""
+    return body
 
 
 @router.patch(BASE + "/applications/{app_id}/brief")
