@@ -11,7 +11,7 @@ test.beforeAll(() => {
 });
 
 const NOT_TAKEN = {
-  id: 90001, alias: '#N1', stage: 'ready_for_hr', cv_status: 'meets', interview_band: null, hr_decision: 'pending',
+  id: 90001, alias: '#X9', stage: 'ready_for_hr', cv_status: 'meets', interview_band: null, hr_decision: 'pending',
   fast_tracked: false, analysis_status: 'not_taken', interview_note: 'did not take the interview',
   hidden_text_detected: false, created_at: null,
 };
@@ -35,8 +35,8 @@ test('a candidate who did not take the interview sits in Not enough evidence wit
     }));
   await page.goto(`/jobs/${seed.job_id}/board`);
   const cell = page.getByTestId('cell-not_enough_evidence');
-  await expect(cell.getByTestId('card-#N1').getByTestId('interview-note')).toHaveText('Did not take the interview');
-  await cell.getByTestId('card-#N1').getByRole('button', { name: /#N1/ }).click();
+  await expect(cell.getByTestId('card-#X9').getByTestId('interview-note')).toHaveText('Did not take the interview');
+  await cell.getByTestId('card-#X9').getByRole('button', { name: /#X9/ }).click();
   await expect(page.getByTestId('detail-panel').getByTestId('interview-note')).toHaveText('Did not take the interview');
 });
 
