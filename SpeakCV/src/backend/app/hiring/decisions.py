@@ -4,7 +4,7 @@ Nothing here calls AI, and AI output never reaches this module. Callers own the 
 """
 from datetime import datetime, timezone
 
-from app.database.sql_models import Company, Job, VoiceSession
+from app.database.sql_models import Company, CultureNote, CvClaim, Job, RequirementResult, VoiceSession
 from app.hiring import audit, notify
 from app.hiring.state import InvalidTransition, advance
 
@@ -25,6 +25,13 @@ NOTIFICATIONS = {
                      "Cảm ơn bạn đã dành thời gian và quan tâm đến vị trí {title}. Rất tiếc, đội ngũ tuyển dụng quyết định "
                      "không tiếp tục với hồ sơ của bạn."),
     },
+}
+
+
+# HR's own invitation when the CV could not be processed. It says nothing about the CV.
+INVITED_WITHOUT_CV = {
+    "en": ("Your next step for {title}", "Your next step for {title} is a short recorded interview. Open the app to begin."),
+    "vi": ("Bước tiếp theo cho vị trí {title}", "Bước tiếp theo cho vị trí {title} là một buổi phỏng vấn ngắn có ghi âm. Hãy mở ứng dụng để bắt đầu."),
 }
 
 
@@ -117,6 +124,14 @@ def reveal(db, application, actor_user_id) -> dict:
     return {"name": user.full_name, "email": user.email}
 
 
+def _clear_interview_evidence(db, application_id: int) -> None:
+    """What the CV showed stays. What the old interview showed must not sit beside a new one, or beside none."""
+    db.query(RequirementResult).filter_by(application_id=application_id, source="interview").delete(synchronize_session=False)
+    db.query(CultureNote).filter_by(application_id=application_id).delete(synchronize_session=False)
+    db.query(CvClaim).filter_by(application_id=application_id).update(
+        {CvClaim.status: None, CvClaim.evidence_quote: None, CvClaim.voice_turn_id: None}, synchronize_session=False)
+
+
 def grant_restart(db, application, actor_user_id) -> None:
     """One restart per application. The old session and its audio stay as they are."""
     _check_not_anonymized(application)
@@ -137,8 +152,27 @@ def grant_restart(db, application, actor_user_id) -> None:
     application.interview_band = None
     application.analysis_status = None
     application.ai_suggestion = None
+    _clear_interview_evidence(db, application.id)
     audit.record(db, application.company_id, actor_user_id, "restart_granted", "application", application.id,
                  payload={"session_id": sessions[0].id})
+    db.flush()
+
+
+def invite_without_cv(db, application, actor_user_id) -> None:
+    """A person opens the door a CV could not. No AI runs, and `cv_status` stays empty because nothing assessed the CV."""
+    _check_not_anonymized(application)
+    if application.stage != "cv_failed":
+        raise DecisionError(409, "Only an application whose CV could not be processed can be invited this way")
+    advance(application, "invited")
+    application.processing_error = None
+    audit.record(db, application.company_id, actor_user_id, "invited_without_cv", "application", application.id)
+    if application.candidate_user_id is not None:
+        company = db.get(Company, application.company_id)
+        language = company.default_locale if company.default_locale in INVITED_WITHOUT_CV else "en"
+        title = db.get(Job, application.job_id).title
+        subject, body = INVITED_WITHOUT_CV[language]
+        notify.enqueue(db, application.company_id, application.candidate_user_id, "invited", language,
+                       subject.format(title=title), body.format(title=title), application_id=application.id)
     db.flush()
 
 

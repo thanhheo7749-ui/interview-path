@@ -43,7 +43,7 @@ export interface Application {
   decision: "approved" | "rejected" | null;
 }
 
-export interface FitItem { requirement_id: number; text: string; fit: "matches" | "partly" | "not_seen" }
+export interface FitItem { requirement_id: number; text: string; fit: "matches" | "partly" | "not_seen" | "not_assessed" }
 export interface StyleItem { type: string; title: string; body: string }
 export interface Fit { requirements: FitItem[]; team_style: StyleItem[] }
 export interface ConsentText { purpose: string; version: string; text: string }

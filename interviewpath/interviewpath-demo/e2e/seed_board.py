@@ -21,6 +21,8 @@ SLUG = "board-sample-platform-engineer"
 GEM_SLUG = "board-sample-hidden-gem-engineer"
 # A third job, in a department, that only the brief spec reads: its candidate is approved and briefed there.
 BRIEF_SLUG = "board-sample-brief-engineer"
+# A fourth job that only the states spec reads: its candidates move to other lanes and cells during the spec.
+STATES_SLUG = "board-sample-states-engineer"
 
 
 def silent_wav() -> bytes:
@@ -45,13 +47,46 @@ def main(out_path: str) -> None:
         gem_ids = {a.alias: a.id for a in db.query(Application).filter(Application.job_id == gem.id)}
         brief = db.query(Job).filter(Job.slug == BRIEF_SLUG).first() or seed_brief(db, company)
         brief_ids = {a.alias: a.id for a in db.query(Application).filter(Application.job_id == brief.id)}
+        states = db.query(Job).filter(Job.slug == STATES_SLUG).first() or seed_states(db, company)
         with open(out_path, "w", encoding="utf-8") as handle:
             json.dump({"job_id": job.id, "company_id": company.id, "applications": ids,
                        "gem_job_id": gem.id, "gem_applications": gem_ids,
                        "brief_job_id": brief.id, "brief_department_id": brief.department_id,
-                       "brief_applications": brief_ids}, handle)
+                       "brief_applications": brief_ids, "states_job_id": states.id}, handle)
     finally:
         db.close()
+
+
+def seed_states(db, company):
+    """One candidate whose answer has audio and no transcript, and one whose CV could not be processed."""
+    job = Job(company_id=company.id, title="Sample States Engineer", slug=STATES_SLUG, status="published", version=1,
+              description="Sample job for tests", interview_languages=["en"])
+    db.add(job)
+    db.flush()
+    db.add(JobRequirement(company_id=company.id, job_id=job.id, text="Sample public must-have", must_have=True, position=0))
+    people = {}
+    for alias in ("T1", "C1"):
+        people[alias] = User(email=f"sample-states-{alias.lower()}@example.test", full_name=f"Sample Person {alias}",
+                             hashed_password="!", must_change_password=False)
+    db.add_all(people.values())
+    db.flush()
+    untranscribed = Application(company_id=company.id, job_id=job.id, job_version=1, alias="#T1", stage="ready_for_hr",
+                                cv_status="meets", analysis_status="transcription_failed",
+                                cv_text_blind="[NAME]\nSample CV text.", candidate_user_id=people["T1"].id)
+    unreadable = Application(company_id=company.id, job_id=job.id, job_version=1, alias="#C1", stage="cv_failed",
+                             processing_error="We could not process your CV right now. Please try again.",
+                             candidate_user_id=people["C1"].id)
+    db.add_all([untranscribed, unreadable])
+    db.flush()
+    session = VoiceSession(company_id=company.id, purpose="screening", application_id=untranscribed.id,
+                           owner_user_id=people["T1"].id, language="en", status="completed")
+    db.add(session)
+    db.flush()
+    path = recordings.save_turn_audio(company.id, f"sample-{untranscribed.id}", 1, silent_wav(), ".wav")
+    db.add(VoiceTurn(session_id=session.id, position=1, question_text="Tell me about a service you ran.",
+                     question_source="must_have", transcript_status="failed", stt_failures=2, audio_path=path))
+    db.commit()
+    return job
 
 
 def seed_gem(db, company):

@@ -22,7 +22,7 @@ def test_allowed_transitions(start, end):
 
 @pytest.mark.parametrize("start,end", [
     ("submitted", "ready_for_hr"), ("invited", "session_completed"), ("withdrawn", "invited"),
-    ("ready_for_hr", "withdrawn"), ("cv_failed", "invited"), ("session_completed", "invited"),
+    ("ready_for_hr", "withdrawn"), ("cv_failed", "ready_for_hr"), ("session_completed", "invited"),
 ])
 def test_disallowed_transitions_raise_and_leave_the_stage(start, end):
     application = Application(stage=start)

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-  correctCvStatus, decide, fastTrack, grantRestart, retryAnalysis, revealIdentity,
+  correctCvStatus, decide, fastTrack, grantRestart, inviteAnyway, retryAnalysis, retryTranscription, revealIdentity,
 } from '../../lib/board.js';
 import { ErrorAlert, inputClass, primaryButton, secondaryButton } from '../KbFeedback.jsx';
 
@@ -18,6 +18,8 @@ function DecisionBar({ companyId, detail, onChanged }) {
   const appId = detail.id;
   const awaiting = detail.stage === 'ready_for_hr' && detail.hr_decision === 'pending';
   const failed = detail.stage === 'ready_for_hr' && detail.analysis_status === 'failed';
+  const untranscribed = detail.stage === 'ready_for_hr' && detail.analysis_status === 'transcription_failed';
+  const cvFailed = detail.stage === 'cv_failed';
   const invited = detail.stage === 'invited';
   const otherLabel = detail.cv_status === 'meets' ? 'not_met' : 'meets';
 
@@ -90,6 +92,16 @@ function DecisionBar({ companyId, detail, onChanged }) {
         {failed && (
           <button type="button" disabled={busy} onClick={() => run(() => retryAnalysis(companyId, appId))} className={secondaryButton}>
             {t('board.actions.retry')}
+          </button>
+        )}
+        {untranscribed && (
+          <button type="button" disabled={busy} onClick={() => run(() => retryTranscription(companyId, appId))} className={secondaryButton}>
+            {t('board.actions.retryTranscription')}
+          </button>
+        )}
+        {cvFailed && (
+          <button type="button" disabled={busy} onClick={() => run(() => inviteAnyway(companyId, appId))} className={primaryButton}>
+            {t('board.actions.inviteAnyway')}
           </button>
         )}
         {!identity && (

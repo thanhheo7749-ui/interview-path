@@ -4,6 +4,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.auth.dependencies import require_member
+from app.brain import audience
 from app.database.database import get_db
 from app.database.sql_models import Company, CompanyMember, Department, Job, JobChannelLink, KbNode
 from app.hiring import audit, jobs
@@ -38,13 +39,14 @@ def _check_nodes(db: Session, company_id: int, node_ids: set[int]) -> None:
         raise HTTPException(status_code=404, detail="Knowledge node not found")
 
 
-def _out(db: Session, job: Job, warnings: list[str] | None = None) -> dict:
+def _out(db: Session, job: Job, warnings: list[str] | None = None, requirements: list | None = None) -> dict:
+    """Every route but get_job is for HR, who read every layer. `requirements` is what a narrower audience may read."""
     channels = db.query(JobChannelLink).filter_by(job_id=job.id, company_id=job.company_id).order_by(JobChannelLink.id).all()
     return {
         "id": job.id, "title": job.title, "slug": job.slug, "status": job.status, "version": job.version,
         "department_id": job.department_id, "published_at": job.published_at, "description": job.description,
         "role_node_id": job.role_node_id, "interview_languages": job.interview_languages or [],
-        "requirements": jobs.active_requirements(db, job.id),
+        "requirements": jobs.active_requirements(db, job.id) if requirements is None else requirements,
         "channels": [ChannelOut.model_validate(c, from_attributes=True) for c in channels],
         "warnings": list(warnings or []),
     }
@@ -117,7 +119,8 @@ def list_jobs(company_id: int, member: CompanyMember = Depends(require_member())
 @router.get(JOBS + "/{job_id}", response_model=JobOut)
 def get_job(company_id: int, job_id: int, member: CompanyMember = Depends(require_member()),
             db: Session = Depends(get_db)):
-    return _out(db, _get_job(db, company_id, job_id))
+    job = _get_job(db, company_id, job_id)
+    return _out(db, job, requirements=jobs.visible_requirements(db, job.id, audience.for_member(db, member)))
 
 
 @router.patch(JOBS + "/{job_id}", response_model=JobOut)
@@ -180,12 +183,12 @@ def publish_job(company_id: int, job_id: int, member: CompanyMember = Depends(re
     job = _get_job(db, company_id, job_id)
     company = db.get(Company, company_id)
     try:
-        jobs.publish(db, job, company)
+        warnings = jobs.publish(db, job, company)
     except jobs.JobError as error:
         raise _translate(error)
     audit.record(db, company_id, member.user_id, "job.publish", "job", job.id)
     db.commit()
-    return _out(db, job)
+    return _out(db, job, warnings)
 
 
 @router.post(JOBS + "/{job_id}/close", response_model=JobOut)

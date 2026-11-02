@@ -15,6 +15,7 @@ requests counts up to `max_counted_gap_seconds`, so a dropped connection costs l
 """
 import importlib
 import logging
+import os
 import re
 import threading
 from dataclasses import asdict, dataclass, is_dataclass, replace
@@ -28,7 +29,7 @@ from app.ai import gateway
 from app.ai.types import AIError
 from app.database.sql_models import Application, VoiceSession, VoiceTurn
 from app.hiring import audit, recordings
-from app.hiring.state import NOT_TAKEN, advance
+from app.hiring.state import NOT_TAKEN, TRANSCRIPTION_FAILED, advance
 
 logger = logging.getLogger(__name__)
 
@@ -68,6 +69,7 @@ NOTICE_REPEAT = "repeat"
 ANSWERED = "transcribed"
 NO_ANSWER = "no_answer"
 ANSWERED_STATUSES = (ANSWERED, NO_ANSWER)
+STT_FAILED = "failed"
 
 WHY_FOLLOWUP = {
     "en": "We would like a little more detail on your last answer.",
@@ -330,6 +332,24 @@ def _abandon(db, session: VoiceSession) -> None:
     audit.record(db, session.company_id, None, "voice_session_abandoned", "voice_session", session.id)
 
 
+def _end_untranscribed(db, session: VoiceSession) -> None:
+    """The candidate spoke and speech-to-text failed, so this is not an interview not taken. No AI runs: HR can retry."""
+    session.status = COMPLETED
+    session.finished_at = _now()
+    _move_stage(db, session, "ready_for_hr")
+    db.get(Application, session.application_id).analysis_status = TRANSCRIPTION_FAILED
+    audit.record(db, session.company_id, None, "transcription_failed", "voice_session", session.id)
+
+
+def untranscribed(turn: VoiceTurn) -> bool:
+    """The answer exists as audio, and speech-to-text could not read it."""
+    return turn.transcript_status == STT_FAILED and bool(turn.audio_path)
+
+
+def _has_untranscribed_audio(db, session: VoiceSession) -> bool:
+    return session.application_id is not None and any(untranscribed(turn) for turn in _turns(db, session.id))
+
+
 def _has_an_answer(db, session: VoiceSession) -> bool:
     return any(turn.transcript_status == ANSWERED and (turn.transcript or "").strip() for turn in _turns(db, session.id))
 
@@ -354,13 +374,20 @@ def _count_activity(session: VoiceSession, now: datetime) -> None:
     session.expires_at = now + timedelta(hours=rules.resume_hours)
 
 
+def _idle_past_resume(session: VoiceSession, now: datetime) -> bool:
+    return (now - _last_activity(session, now)).total_seconds() > _rules(session).resume_hours * 3600
+
+
 def _clock_action(db, session: VoiceSession, now: datetime):
     """On a locked running session, count the time and say how it ends now, if it does."""
-    rules = _rules(session)
-    if (now - _last_activity(session, now)).total_seconds() > rules.resume_hours * 3600:
+    if _idle_past_resume(session, now):
+        if _has_untranscribed_audio(db, session):
+            return _end_untranscribed
         return _complete if _has_an_answer(db, session) else _abandon
     _count_activity(session, now)
-    return _complete if session.active_seconds > rules.hard_limit_seconds else None
+    if session.active_seconds <= _rules(session).hard_limit_seconds:
+        return None
+    return _end_untranscribed if _has_untranscribed_audio(db, session) else _complete
 
 
 def _apply_clock(db, session: VoiceSession, now: datetime | None = None) -> bool:
@@ -431,7 +458,11 @@ def sweep_abandoned(db, now: datetime | None = None) -> int:
     count = 0
     for session_id in session_ids:
         try:
-            count += _apply_clock(db, _lock(db, session_id), now)
+            heard = retry_failed_transcripts(db, session_id)
+            session = _lock(db, session_id)
+            if session.status in ACTIVE_STATUSES and _idle_past_resume(session, now):
+                store_transcripts(db, session_id, heard)  # a candidate back during the call keeps their question open
+            count += _apply_clock(db, session, now)
             db.rollback()  # a candidate came back in time: their next request counts this gap
         except Exception as exc:
             db.rollback()
@@ -446,6 +477,47 @@ def _transcribe(audio: bytes, mime_type: str, language: str, company_id: int):
         except AIError:
             continue
     return None
+
+
+def _mime_for(path: str) -> str:
+    suffix = os.path.splitext(path)[1].lower()
+    return next(mime for mime, known in ALLOWED_AUDIO.items() if known == suffix)
+
+
+def retry_failed_transcripts(db, session_id: int) -> dict:
+    """One more STT call for each answer with audio and no transcript. Returns what was heard, for store_transcripts.
+
+    Ends the transaction first and last, so no snapshot or lock is held during the calls. A session with no application
+    has no lane for HR to retry from, so it is left as it is."""
+    db.rollback()
+    session = db.get(VoiceSession, session_id)
+    if session is None or session.application_id is None:
+        db.rollback()
+        return {}
+    wanted = [(turn.id, turn.audio_path) for turn in _turns(db, session_id) if untranscribed(turn)]
+    language, company_id = session.language, session.company_id
+    db.rollback()
+    heard = {}
+    for turn_id, path in wanted:
+        try:
+            result = gateway.transcribe(recordings.read(path), _mime_for(path), [language], "session_stt", company_id)
+        except (AIError, OSError):
+            continue
+        heard[turn_id] = (path, result)
+    return heard
+
+
+def store_transcripts(db, session_id: int, heard: dict) -> None:
+    """Store what retry_failed_transcripts heard, on rows the caller has locked. The caller commits."""
+    for turn in _turns(db, session_id):
+        path, result = heard.get(turn.id, (None, None))
+        if result is None or path != turn.audio_path or not untranscribed(turn):
+            continue
+        text = result.text.strip()
+        turn.transcript = text or None
+        turn.transcript_status = ANSWERED if text else NO_ANSWER
+        turn.audio_seconds = round(result.usage.audio_seconds)
+        turn.answered_at = _now()
 
 
 def _ask_followup(hook: FOLLOWUP_HOOK, info: SessionInfo, turn: AnsweredTurn) -> str | None:
@@ -560,7 +632,7 @@ def submit_answer(db, session: VoiceSession, position: int, audio: bytes, mime_t
     completed = False
     if result is None:
         turn.stt_failures += 1
-        turn.transcript_status = "failed"
+        turn.transcript_status = STT_FAILED
         if turn.stt_failures >= FAILED_SUBMISSIONS_BEFORE_PAUSE:
             session.status = PAUSED
         notice = NOTICE_RETRY

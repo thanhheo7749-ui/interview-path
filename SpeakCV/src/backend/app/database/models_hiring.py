@@ -84,7 +84,7 @@ class Application(Base):
     cv_status_corrected_by = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     cv_status_correction_reason = Column(Text, nullable=True)
     interview_band = Column(String(20), nullable=True)  # many | few
-    analysis_status = Column(String(20), nullable=True)  # pending | running | done | failed | not_taken
+    analysis_status = Column(String(20), nullable=True)  # pending | running | done | failed | not_taken | transcription_failed
     ai_suggestion = Column(Text, nullable=True)
     # Written only by app/hiring/decisions.py (POST .../decision).
     hr_decision = Column(String(20), nullable=False, default="pending")  # pending | approved | rejected

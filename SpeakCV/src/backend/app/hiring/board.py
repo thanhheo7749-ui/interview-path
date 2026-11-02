@@ -3,7 +3,7 @@ from app.database.sql_models import (
     Application, AuditLog, CandidateBrief, CultureNote, CvClaim, Job, KbNode, RequirementResult, VoiceSession, VoiceTurn,
 )
 from app.hiring import jobs
-from app.hiring.state import NOT_TAKEN
+from app.hiring.state import NOT_TAKEN, TRANSCRIPTION_FAILED
 
 CELLS = {
     ("meets", "many"): "priority",
@@ -11,7 +11,7 @@ CELLS = {
     ("not_met", "many"): "hidden_gem",
     ("not_met", "few"): "not_enough_evidence",
 }
-LANES = ("not_interviewed", "refused_recording", "withdrawn", "analysis_failed", "analyzing")
+LANES = ("not_interviewed", "refused_recording", "withdrawn", "analysis_failed", "analyzing", "transcription_failed", "cv_failed")
 NOT_ENOUGH_EVIDENCE = "not_enough_evidence"
 NOT_TAKEN_NOTE = "did not take the interview"
 NOT_INTERVIEWED = ("invited", "session_in_progress")
@@ -23,6 +23,8 @@ def cell_for(application) -> str | None:
         return None
     if application.analysis_status == NOT_TAKEN:  # whatever the CV label says: the interview gave no evidence
         return NOT_ENOUGH_EVIDENCE
+    if application.analysis_status == TRANSCRIPTION_FAILED:  # the candidate spoke: never in a cell HR can reject in bulk
+        return None
     return CELLS.get((application.cv_status, application.interview_band))
 
 
@@ -38,6 +40,8 @@ def _lane_for(application, refused_ids=frozenset()) -> str | None:
         return "withdrawn"
     if stage == "declined_recording" or (stage == "ready_for_hr" and application.id in refused_ids):
         return "refused_recording"
+    if stage == "cv_failed":
+        return "cv_failed"
     if stage in NOT_INTERVIEWED:
         return "not_interviewed"
     if stage in ANALYZING:
@@ -45,7 +49,15 @@ def _lane_for(application, refused_ids=frozenset()) -> str | None:
     if stage == "ready_for_hr":
         if application.analysis_status == "failed":
             return "analysis_failed"
-        if application.fast_tracked or cell_for(application) is None:
+        if application.analysis_status == "running":
+            return "analyzing"
+        if application.analysis_status == TRANSCRIPTION_FAILED:
+            return "transcription_failed"
+        if application.fast_tracked:
+            return "not_interviewed"
+        if application.cv_status is None:  # invited although the CV could not be processed, so no cell can hold it
+            return "cv_failed"
+        if cell_for(application) is None:
             return "not_interviewed"
     return None
 
@@ -133,7 +145,7 @@ def detail(db, application) -> dict:
             "cv": evidence(results.get((requirement.id, "cv")), False),
             "interview": evidence(results.get((requirement.id, "interview")), True),
         }
-        for requirement in jobs.active_requirements(db, application.job_id)
+        for requirement in jobs.requirements_for(db, application)
     ]
     claims = [
         {"id": c.id, "text": c.text, "quote": c.quote, "status": c.status, "evidence_quote": c.evidence_quote,

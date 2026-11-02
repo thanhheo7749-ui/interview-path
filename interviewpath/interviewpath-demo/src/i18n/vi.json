@@ -369,7 +369,10 @@
       "consent_withdrawn": "Rút sự đồng ý",
       "application_withdrawn": "Rút hồ sơ",
       "application_anonymized": "Đã ẩn danh hồ sơ",
-      "reminder_queued": "Đã xếp lịch nhắc"
+      "reminder_queued": "Đã xếp lịch nhắc",
+      "invited_without_cv": "Đã mời khi chưa có kết quả CV",
+      "transcription_retried": "Đã thử lại chuyển giọng nói",
+      "transcription_failed": "Chuyển giọng nói thất bại"
     },
     "retention": {
       "period": "Thời hạn lưu trữ",
@@ -464,7 +467,8 @@
     "addChannel": "Thêm kênh",
     "channelInvalid": "Dùng 1 đến 50 chữ thường, chữ số hoặc dấu gạch dưới.",
     "colBoard": "Ứng viên",
-    "openBoard": "Mở bảng"
+    "openBoard": "Mở bảng",
+    "noPublicRequirement": "Việc làm này không có yêu cầu công khai nào. Buổi phỏng vấn không có gì để đo, nên mức bằng chứng của mọi ứng viên sẽ ở mức thấp."
   },
   "board": {
     "eyebrow": "Bảng ứng viên",
@@ -540,7 +544,9 @@
       "analysis_failed": "Phân tích thất bại",
       "not_interviewed": "Chưa phỏng vấn",
       "refused_recording": "Từ chối ghi âm",
-      "withdrawn": "Đã rút hồ sơ"
+      "withdrawn": "Đã rút hồ sơ",
+      "transcription_failed": "Lỗi kỹ thuật: vẫn có bản ghi âm",
+      "cv_failed": "Không xử lý được CV"
     },
     "bulk": {
       "button": "Loại {{count}} đã chọn",
@@ -604,7 +610,9 @@
       "restart": "Cho phỏng vấn lại",
       "fastTrack": "Đi tắt",
       "retry": "Phân tích lại",
-      "reveal": "Tiết lộ danh tính"
+      "reveal": "Tiết lộ danh tính",
+      "retryTranscription": "Thử lại chuyển giọng nói",
+      "inviteAnyway": "Vẫn mời phỏng vấn"
     },
     "reveal": {
       "title": "Tiết lộ danh tính",
@@ -620,7 +628,9 @@
       "submit": "Lưu chỉnh sửa",
       "corrected": "Nhãn CV đã được HR chỉnh sửa",
       "reasonShown": "Lý do chỉnh sửa: {{reason}}"
-    }
+    },
+    "transcriptionFailed": "Ứng viên này đã trả lời, nhưng chuyển giọng nói thành văn bản bị lỗi. Bản ghi âm vẫn còn. Đây là lỗi kỹ thuật, không phải ứng viên bỏ phỏng vấn. Bạn có thể thử lại.",
+    "cvFailed": "Không xử lý được CV của ứng viên này, nên AI chưa đọc CV. Bạn vẫn có thể mời họ phỏng vấn."
   },
   "bridges": {
     "nav": {

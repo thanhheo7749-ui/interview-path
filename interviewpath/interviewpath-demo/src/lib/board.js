@@ -5,7 +5,7 @@ const post = (path, body) => api(path, { method: 'POST', body });
 
 // The four cells in reading order: rows are the CV, columns are the amount of interview evidence.
 export const CELLS = ['priority', 'strong_cv_unclear', 'hidden_gem', 'not_enough_evidence'];
-export const LANES = ['analyzing', 'analysis_failed', 'not_interviewed', 'refused_recording', 'withdrawn'];
+export const LANES = ['analyzing', 'analysis_failed', 'transcription_failed', 'cv_failed', 'not_interviewed', 'refused_recording', 'withdrawn'];
 
 export const getBoard = (companyId, jobId) => api(`${base(companyId)}/jobs/${jobId}/board`);
 export const getApplication = (companyId, appId) => api(`${base(companyId)}/applications/${appId}`);
@@ -17,6 +17,8 @@ export const revealIdentity = (companyId, appId) => post(`${base(companyId)}/app
 export const grantRestart = (companyId, appId) => post(`${base(companyId)}/applications/${appId}/restart`);
 export const fastTrack = (companyId, appId) => post(`${base(companyId)}/applications/${appId}/fast-track`);
 export const retryAnalysis = (companyId, appId) => post(`${base(companyId)}/applications/${appId}/analysis/retry`);
+export const retryTranscription = (companyId, appId) => post(`${base(companyId)}/applications/${appId}/transcription/retry`);
+export const inviteAnyway = (companyId, appId) => post(`${base(companyId)}/applications/${appId}/invite-anyway`);
 export const bulkReject = (companyId, jobId, applicationIds) =>
   post(`${base(companyId)}/jobs/${jobId}/decisions/bulk`, { application_ids: applicationIds });
 

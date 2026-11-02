@@ -10,6 +10,7 @@ from app.auth.dependencies import require_member
 from app.database.database import get_db
 from app.database.sql_models import Application, CompanyMember, Job, VoiceSession, VoiceTurn
 from app.hiring import analysis, audit, board, decisions
+from app.hiring.state import TRANSCRIPTION_FAILED
 
 router = APIRouter()
 
@@ -136,6 +137,35 @@ def post_fast_track(company_id: int, app_id: int, member: CompanyMember = Depend
     return {"id": application.id, "stage": application.stage}
 
 
+@router.post(BASE + "/applications/{app_id}/invite-anyway")
+def post_invite_anyway(company_id: int, app_id: int, member: CompanyMember = Depends(require_member("hr")),
+                       db: Session = Depends(get_db)):
+    application = _application(db, company_id, app_id, lock=True)
+    try:
+        decisions.invite_without_cv(db, application, member.user_id)
+    except decisions.DecisionError as error:
+        db.rollback()
+        raise _translate(error)
+    db.commit()
+    return {"id": application.id, "stage": application.stage}
+
+
+@router.post(BASE + "/applications/{app_id}/transcription/retry", status_code=202)
+def post_retry_transcription(company_id: int, app_id: int, background: BackgroundTasks,
+                             member: CompanyMember = Depends(require_member("hr")), db: Session = Depends(get_db)):
+    """Claims the retry here, under the lock, so the card moves at once and a second click cannot pay for STT twice."""
+    application = _application(db, company_id, app_id, lock=True)
+    if (application.anonymized_at is not None or application.stage != "ready_for_hr"
+            or application.analysis_status != TRANSCRIPTION_FAILED):
+        db.rollback()
+        raise HTTPException(status_code=409, detail="Only a failed transcription can be retried")
+    application.analysis_status = "running"
+    audit.record(db, company_id, member.user_id, "transcription_retried", "application", application.id)
+    db.commit()
+    background.add_task(analysis.retry_transcription, application.id)
+    return {"id": application.id, "analysis_status": "running"}
+
+
 @router.post(BASE + "/applications/{app_id}/analysis/retry", status_code=202)
 def post_retry_analysis(company_id: int, app_id: int, background: BackgroundTasks,
                         member: CompanyMember = Depends(require_member("hr")), db: Session = Depends(get_db)):
@@ -163,6 +193,9 @@ def post_bulk_reject(company_id: int, job_id: int, body: BulkIn,
     if len(rows) != len(ids):
         db.rollback()
         raise HTTPException(status_code=404, detail="Application not found")
+    if any(application.analysis_status == TRANSCRIPTION_FAILED for application in rows):
+        db.rollback()
+        raise HTTPException(status_code=409, detail="A candidate whose audio could not be transcribed cannot be rejected in bulk")
     try:
         for application in rows:
             decisions.decide(db, application, "rejected", member.user_id, body.reason)

@@ -7,7 +7,7 @@ import ChannelLinks from '../components/ChannelLinks.jsx';
 import { ErrorAlert, WarningList, cardClass, inputClass, primaryButton, secondaryButton } from '../components/KbFeedback.jsx';
 import { api } from '../lib/api.js';
 import {
-  DEFAULT_CHANNELS, INTERVIEW_LANGUAGES, REQUIREMENT_VISIBILITIES, addChannels, closeJob, createJob, getJob, getPrefill,
+  DEFAULT_CHANNELS, INTERVIEW_LANGUAGES, NO_PUBLIC_REQUIREMENT, REQUIREMENT_VISIBILITIES, addChannels, closeJob, createJob, getJob, getPrefill,
   listRoleOptions, patchJob, publishJob,
 } from '../lib/jobs.js';
 
@@ -165,6 +165,7 @@ function JobEditor() {
       found = stored.warnings ?? [];
       if (publish) {
         stored = await publishJob(companyId, stored.id);
+        found = [...found, ...(stored.warnings ?? [])];
         await addChannels(companyId, stored.id, DEFAULT_CHANNELS);
         stored = await getJob(companyId, stored.id);
       }
@@ -225,7 +226,10 @@ function JobEditor() {
         )}
       </div>
       <ErrorAlert message={error} />
-      <WarningList warnings={warnings} onDismiss={() => setWarnings([])} />
+      <WarningList
+        warnings={warnings.map((warning) => (warning === NO_PUBLIC_REQUIREMENT ? t('jobs.noPublicRequirement') : warning))}
+        onDismiss={() => setWarnings([])}
+      />
       {saved && (
         <p role="status" className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-900">
           {t('jobs.saved')}
