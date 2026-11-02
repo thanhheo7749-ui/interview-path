@@ -107,6 +107,11 @@ function ReviewPage() {
                 <p className="text-xs font-bold uppercase tracking-[0.12em] text-slate-400">
                   {t(`review.types.${node.type}`, { defaultValue: node.type })}
                 </p>
+                {node.review_reason && (
+                  <p className="rounded-lg border border-amber-200 bg-amber-50 px-2 py-1 text-xs font-semibold text-amber-900">
+                    {t(`review.reasons.${node.review_reason}`, { defaultValue: node.review_reason })}
+                  </p>
+                )}
                 <div className="grid gap-3 md:grid-cols-2">
                   <label className="text-sm font-semibold text-slate-700">
                     <span className="block">{t('review.itemTitle')}</span>

@@ -177,6 +177,26 @@ test('Retry shows only on a failed document, not on a failed section retry', asy
   await expect(row.getByText('Retry failed', { exact: true })).toBeVisible();
 });
 
+test('a node back from a withdrawn document says why, and a cleared body is warned about', async ({ page }) => {
+  await signIn(page, BRAIN_USER);
+  const node = (id, title, reason) => ({
+    id, type: 'policy', title, body: 'Body', visibility: 'internal', language: 'en', fact_kind: null, fact_value: null, fact_unit: null,
+    scope_text: null, department_id: null, guard_category: null, guard_reason: null, review_reason: reason, sources: [],
+  });
+  await page.route('**/kb/review', (route) => route.fulfill(jsonOf({
+    nodes: [node(941, 'Came back', 'document_withdrawn'), node(942, 'Ordinary draft', null)], edges: [], merge_proposals: [],
+  })));
+  await page.route('**/kb/review/decide', (route) => route.fulfill(jsonOf({
+    ok: true, applied: 1, warnings: ['The body of "Came back" was cleared because it stated the old value.'],
+  })));
+  await page.getByRole('link', { name: /^Review/ }).click();
+  const back = page.getByRole('article').filter({ hasText: 'document it also came from was withdrawn' });
+  await expect(back).toHaveCount(1);
+  await expect(back.getByLabel('Title')).toHaveValue('Came back');
+  await back.getByRole('button', { name: 'Accept', exact: true }).click();
+  await expect(page.getByText('was cleared because it stated the old value')).toBeVisible();
+});
+
 test('the upload form sends a language only when one is chosen', async ({ page }) => {
   await signIn(page, BRAIN_USER);
   await page.getByRole('link', { name: 'Documents' }).click();

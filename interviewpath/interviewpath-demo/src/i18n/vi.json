@@ -158,6 +158,9 @@
     "withdrawn": "Đã thu hồi tài liệu. Đã xóa {{removed}} mục, giữ lại {{kept}} mục vì còn tài liệu khác hỗ trợ."
   },
   "review": {
+    "reasons": {
+      "document_withdrawn": "Cần duyệt lại: một tài liệu nguồn của mục này đã bị thu hồi. Hãy kiểm tra nội dung không lặp lại những gì tài liệu đó đã nêu."
+    },
     "title": "Duyệt",
     "empty": "Không có gì cần duyệt. Hãy tải tài liệu lên, các mục được trích xuất sẽ xuất hiện ở đây.",
     "unknownDocument": "Tài liệu không rõ",

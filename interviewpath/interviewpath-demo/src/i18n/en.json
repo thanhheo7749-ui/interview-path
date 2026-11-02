@@ -158,6 +158,9 @@
     "withdrawn": "Document withdrawn. {{removed}} items removed, {{kept}} kept because another document supports them."
   },
   "review": {
+    "reasons": {
+      "document_withdrawn": "Back for review: a document it also came from was withdrawn. Check that its text does not repeat what that document said."
+    },
     "title": "Review",
     "empty": "Nothing to review. Upload a document and its extracted items will appear here.",
     "unknownDocument": "Unknown document",
