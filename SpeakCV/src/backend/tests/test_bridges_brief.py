@@ -442,3 +442,138 @@ def test_anonymizing_erases_brief_and_scorecard_and_hides_the_interview(db, worl
     assert db.get(Application, application.id).final_outcome == "hired"
     assert api.get(url(world, f"/my-interviews/{application.id}"), headers=mgr(world)).status_code == 404
     assert api.get(url(world, "/my-interviews"), headers=mgr(world)).json() == []
+
+
+# HR reads the brief state and the scorecard back
+def brief_url(world, application):
+    return url(world, f"/applications/{application.id}/brief")
+
+
+def card_url(world, application):
+    return url(world, f"/applications/{application.id}/scorecard")
+
+
+def submit_card(api, world, application, recommendation="hire", notes="Solid operator"):
+    return api.post(card_url(world, application), headers=mgr(world),
+                    json={"scores": scores(world), "recommendation": recommendation, "notes": notes})
+
+
+def test_hr_reads_the_brief_back_with_its_review_and_sent_state(db, world, api):
+    application = make_app(db, world)
+    assert api.get(brief_url(world, application), headers=hr(world)).status_code == 404
+    generate(api, world, application)
+    draft = api.get(brief_url(world, application), headers=hr(world))
+    assert draft.status_code == 200, draft.text
+    assert draft.json()["status"] == "draft" and draft.json()["reviewed_by"] is None
+    assert points(draft.json()["content"])
+    api.patch(brief_url(world, application), headers=hr(world), json={})
+    reviewed = api.get(brief_url(world, application), headers=hr(world)).json()
+    assert reviewed["status"] == "draft" and reviewed["reviewed_by"] == world["people"]["hr"]["id"]
+    api.post(brief_url(world, application) + "/send", headers=hr(world))
+    sent = api.get(brief_url(world, application), headers=hr(world)).json()
+    assert sent["status"] == "sent" and sent["sent_at"]
+
+
+def test_the_brief_and_scorecard_reads_are_hr_only(db, world, api):
+    application = make_app(db, world)
+    send_brief(api, world, application)
+    submit_card(api, world, application)
+    for who in ("mgr", "sales", "emp"):
+        assert api.get(brief_url(world, application), headers=mgr(world, who)).status_code == 403
+        assert api.get(card_url(world, application), headers=mgr(world, who)).status_code == 403
+    assert api.get(brief_url(world, application)).status_code == 401
+    assert api.get(card_url(world, application)).status_code == 401
+
+
+def test_the_reads_do_not_cross_companies(db, world, api):
+    application = make_app(db, world)
+    send_brief(api, world, application)
+    submit_card(api, world, application)
+    other = db.query(Company).filter_by(slug="other").one()
+    outsider = make_user(db, "outsider-hr@example.test")
+    db.add(CompanyMember(company_id=other.id, user_id=outsider.id, role="hr"))
+    db.commit()
+    headers = auth_header(outsider.email)
+    for path in (f"/applications/{application.id}/brief", f"/applications/{application.id}/scorecard"):
+        assert api.get(url(world, path), headers=headers).status_code == 403  # not a member of this company
+        assert api.get(f"/api/companies/{other.id}{path}", headers=headers).status_code == 404  # not their application
+
+
+def test_hr_reads_the_scorecard_as_advice_with_the_managers_name(db, world, api):
+    application = make_app(db, world)
+    send_brief(api, world, application)
+    empty = api.get(card_url(world, application), headers=hr(world))
+    assert empty.status_code == 200 and empty.json() == {"scorecards": []}
+    submit_card(api, world, application, notes="Solid operator")
+    response = api.get(card_url(world, application), headers=hr(world))
+    assert response.status_code == 200, response.text
+    assert len(response.json()["scorecards"]) == 1
+    body = response.json()["scorecards"][0]
+    assert body["recommendation"] == "hire" and body["notes"] == "Solid operator" and body["submitted_at"]
+    assert body["manager_name"]
+    assert [(s["requirement_id"], s["score"]) for s in body["requirement_scores"]] == [(r.id, 4) for r in world["reqs"][:3]]
+    assert [s["text"] for s in body["requirement_scores"]] == ["FastAPI experience", "Docker in production", "Kubernetes"]
+    db.expire_all()
+    assert db.get(Application, application.id).hr_decision == "approved"  # advice only: nothing moves by itself
+    assert db.get(Application, application.id).final_outcome is None
+
+
+def test_application_detail_carries_brief_status_and_final_outcome(db, world, api):
+    application = make_app(db, world)
+    path = url(world, f"/applications/{application.id}")
+    before = api.get(path, headers=hr(world)).json()
+    assert before["brief_status"] is None and before["final_outcome"] is None
+    generate(api, world, application)
+    assert api.get(path, headers=hr(world)).json()["brief_status"] == "draft"
+    api.patch(brief_url(world, application), headers=hr(world), json={})
+    api.post(brief_url(world, application) + "/send", headers=hr(world))
+    api.post(url(world, f"/applications/{application.id}/outcome"), headers=hr(world), json={"outcome": "hired"})
+    after = api.get(path, headers=hr(world)).json()
+    assert after["brief_status"] == "sent" and after["final_outcome"] == "hired"
+
+
+def test_an_anonymized_application_answers_404_for_both_reads_and_the_detail_stays_up(db, world, api):
+    application = make_app(db, world)
+    send_brief(api, world, application)
+    submit_card(api, world, application)
+    api.post(url(world, f"/applications/{application.id}/outcome"), headers=hr(world), json={"outcome": "hired"})
+    retention.anonymize_application(db, db.get(Application, application.id))
+    assert api.get(brief_url(world, application), headers=hr(world)).status_code == 404
+    assert api.get(card_url(world, application), headers=hr(world)).status_code == 404
+    detail = api.get(url(world, f"/applications/{application.id}"), headers=hr(world))
+    assert detail.status_code == 200
+    assert detail.json()["brief_status"] is None
+
+
+def second_manager(db, world):
+    user = make_user(db, "mgr2@example.test")
+    user.full_name = "Second Manager"
+    db.add(CompanyMember(company_id=world["id"], user_id=user.id, role="manager",
+                         department_id=world["job"].department_id))
+    db.commit()
+    return auth_header(user.email)
+
+
+def test_hr_sees_every_managers_scorecard_newest_first_so_no_hire_is_not_hidden(db, world, api):
+    application = make_app(db, world)
+    send_brief(api, world, application)
+    submit_card(api, world, application, recommendation="no_hire", notes="First")
+    second = api.post(card_url(world, application), headers=second_manager(db, world),
+                      json={"scores": scores(world, 5), "recommendation": "hire", "notes": "Second"})
+    assert second.status_code == 200, second.text
+    cards = api.get(card_url(world, application), headers=hr(world)).json()["scorecards"]
+    assert [c["notes"] for c in cards] == ["Second", "First"]
+    assert [c["recommendation"] for c in cards] == ["hire", "no_hire"]
+    assert cards[0]["manager_name"] == "Second Manager" and cards[1]["manager_name"]
+
+
+def test_a_scorecard_whose_manager_was_deleted_has_an_empty_manager_name(db, world, api):
+    application = make_app(db, world)
+    send_brief(api, world, application)
+    submit_card(api, world, application)
+    db.query(InterviewScorecard).update({InterviewScorecard.manager_user_id: None})
+    db.commit()
+    response = api.get(card_url(world, application), headers=hr(world))
+    assert response.status_code == 200, response.text
+    cards = response.json()["scorecards"]
+    assert len(cards) == 1 and cards[0]["manager_name"] == "" and cards[0]["recommendation"] == "hire"

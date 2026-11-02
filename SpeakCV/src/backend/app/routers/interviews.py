@@ -12,7 +12,7 @@ from app.brain import audience
 from app.bridges import brief
 from app.database.database import get_db
 from app.database.sql_models import (
-    Application, CandidateBrief, CompanyMember, InterviewScorecard, Job, JobRequirement,
+    Application, CandidateBrief, CompanyMember, InterviewScorecard, Job, JobRequirement, User,
 )
 from app.hiring import decisions
 from app.schemas.bridges import BriefIn, BriefPatch, OutcomeIn, ScorecardIn
@@ -92,6 +92,49 @@ def _draft(db: Session, application: Application) -> CandidateBrief:
     if row is None:
         raise HTTPException(status_code=404, detail="Brief not found")
     return row
+
+
+def _live_application(db: Session, company_id: int, application_id: int) -> Application:
+    """For the read-back routes: an anonymized application has nothing left to show, so it is a 404."""
+    application = _application(db, company_id, application_id)
+    if application.anonymized_at is not None:
+        raise HTTPException(status_code=404, detail="Application not found")
+    return application
+
+
+@router.get(BASE + "/applications/{app_id}/brief")
+def get_brief(company_id: int, app_id: int, member: CompanyMember = Depends(require_member("hr")),
+              db: Session = Depends(get_db)):
+    return brief.serialize(_draft(db, _live_application(db, company_id, app_id)))
+
+
+@router.get(BASE + "/applications/{app_id}/scorecard")
+def get_scorecard(company_id: int, app_id: int, member: CompanyMember = Depends(require_member("hr")),
+                  db: Session = Depends(get_db)):
+    """Every manager's submitted scorecard, newest first. Advice to HR: reading them changes nothing."""
+    application = _live_application(db, company_id, app_id)
+    rows = (
+        db.query(InterviewScorecard)
+        .filter(InterviewScorecard.application_id == application.id,
+                InterviewScorecard.company_id == company_id, InterviewScorecard.submitted_at.isnot(None))
+        .order_by(InterviewScorecard.submitted_at.desc(), InterviewScorecard.id.desc()).all()
+    )
+    texts = {r.id: r.text for r in db.query(JobRequirement).filter(
+        JobRequirement.job_id == application.job_id, JobRequirement.company_id == company_id)}
+    manager_ids = {r.manager_user_id for r in rows if r.manager_user_id is not None}
+    names = {}
+    if manager_ids:
+        for user in db.query(User).filter(User.id.in_(manager_ids)):
+            names[user.id] = user.full_name or user.email
+    cards = []
+    for row in rows:
+        card = _scorecard(row)
+        card["requirement_scores"] = [
+            {**score, "text": texts.get(score.get("requirement_id"), "")} for score in (row.requirement_scores or [])
+        ]
+        card["manager_name"] = names.get(row.manager_user_id, "")  # "" once the manager's account is deleted
+        cards.append(card)
+    return {"scorecards": cards}
 
 
 @router.patch(BASE + "/applications/{app_id}/brief")

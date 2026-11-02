@@ -6,10 +6,10 @@ import { ConfirmBar, ErrorAlert, secondaryButton } from '../KbFeedback.jsx';
 const OUTCOMES = ['hired', 'not_hired', 'offer_declined'];
 
 // HR records what happened after the interviews. Each choice is asked about first; nothing here is set by AI.
-function OutcomeControl({ companyId, appId }) {
+function OutcomeControl({ companyId, appId, initial = null }) {
   const { t } = useTranslation();
   const [pending, setPending] = useState(null);
-  const [recorded, setRecorded] = useState(null);
+  const [recorded, setRecorded] = useState(initial);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
 

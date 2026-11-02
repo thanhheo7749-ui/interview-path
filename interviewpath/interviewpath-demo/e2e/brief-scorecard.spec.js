@@ -45,11 +45,21 @@ async function addManager(request) {
   expect(changed.ok()).toBe(true);
 }
 
+async function selectCandidate(page) {
+  await page.getByTestId('card-#B1').getByRole('button', { name: /#B1/ }).click();
+  await expect(page.getByTestId('detail-panel').getByRole('heading', { name: '#B1' })).toBeVisible();
+}
+
 async function openCandidate(page) {
   await signIn(page, BOARD_USER);
   await page.goto(`/jobs/${seed.brief_job_id}/board`);
-  await page.getByTestId('card-#B1').getByRole('button', { name: /#B1/ }).click();
-  await expect(page.getByTestId('detail-panel').getByRole('heading', { name: '#B1' })).toBeVisible();
+  await selectCandidate(page);
+}
+
+// A reload closes the panel; opening the candidate again must show what the server kept.
+async function reopenCandidate(page) {
+  await page.reload();
+  await selectCandidate(page);
 }
 
 test('HR approves, drafts a Korean brief, reviews it and sends it; the manager scores in Korean; HR records the outcome', async ({ page, browser }) => {
@@ -97,6 +107,16 @@ test('HR approves, drafts a Korean brief, reviews it and sends it; the manager s
   await expect(send).toBeDisabled();
   await workflow.getByRole('button', { name: 'Save wording and mark reviewed' }).click();
   await expect(send).toBeEnabled();
+  // Reloading keeps the draft, its review, and offers generating only as a regenerate with a warning.
+  await reopenCandidate(page);
+  await expect(workflow.getByTestId('brief-status')).toHaveAttribute('data-status', 'reviewed');
+  await expect(clarify.getByRole('textbox').first()).toHaveValue('HR wording, edited again.');
+  await expect(send).toBeEnabled();
+  await expect(workflow.getByRole('button', { name: 'Generate brief' })).toHaveCount(0);
+  await workflow.getByRole('button', { name: 'Generate again' }).click();
+  await expect(workflow.getByRole('alertdialog')).toContainText('Replace the current draft');
+  await workflow.getByRole('alertdialog').getByRole('button', { name: 'Cancel' }).click();
+  await expect(workflow.getByTestId('brief-status')).toHaveAttribute('data-status', 'reviewed');
   // The quote is the evidence's, not the wording's.
   await expect(clarify.getByTestId('original-quote')).toHaveText(QUOTE_SECOND);
   await send.click();
@@ -154,7 +174,22 @@ test('HR approves, drafts a Korean brief, reviews it and sends it; the manager s
   await expect(manager.getByRole('listitem').filter({ hasText: 'Sample Brief Engineer' }).getByTestId('scored-state')).toHaveText('평가서 제출됨');
   await context.close();
 
-  // HR records the outcome, after confirming it. The scorecard has no HR read route yet (reported), so it is not shown here.
+  // HR reloads: the sent brief and the manager's scorecard (advice only) are still there.
+  await reopenCandidate(page);
+  await expect(workflow.getByTestId('brief-status')).toHaveAttribute('data-status', 'sent');
+  await expect(workflow.getByTestId('brief-to-clarify')).toContainText('HR wording, edited again.');
+  await expect(workflow.getByRole('button', { name: 'Generate brief' })).toHaveCount(0);
+  const card = panel.getByTestId('hr-scorecard');
+  await expect(card.getByTestId('scorecard-item')).toHaveCount(1);
+  await expect(card.getByTestId('scorecard-manager')).toHaveText('Brief Manager');
+  await expect(card.getByTestId('scorecard-recommendation')).toHaveText('Recommends hiring');
+  await expect(card.getByRole('listitem').filter({ hasText: 'Run services in production' })).toContainText('4');
+  await expect(card.getByRole('listitem').filter({ hasText: 'Lead incident reviews' })).toContainText('2');
+  await expect(card).toContainText('강한 운영 경험.');
+  await expect(card.getByRole('button')).toHaveCount(0); // read-only: HR still decides
+  await expect(panel.getByTestId('decided-state')).toHaveText('Approved');
+
+  // HR records the outcome, after confirming it.
   const outcome = panel.getByTestId('outcome-control');
   await outcome.getByRole('button', { name: 'Hired', exact: true }).click();
   await expect(outcome.getByRole('alertdialog')).toContainText('Record the outcome as "Hired"?');
@@ -163,6 +198,10 @@ test('HR approves, drafts a Korean brief, reviews it and sends it; the manager s
   await outcome.getByRole('button', { name: 'Hired', exact: true }).click();
   await outcome.getByRole('button', { name: 'Yes, record it' }).click();
   await expect(outcome.getByTestId('outcome-recorded')).toHaveText('Recorded: Hired');
+
+  // A reload shows the recorded outcome too.
+  await reopenCandidate(page);
+  await expect(panel.getByTestId('outcome-recorded')).toHaveText('Recorded: Hired');
 });
 
 test('the brief keys exist in English, Vietnamese and Korean with the same placeholders', () => {
@@ -174,6 +213,7 @@ test('the brief keys exist in English, Vietnamese and Korean with the same place
   const keys = (locale) => Object.fromEntries(flat(read(locale).bridges).filter(([key]) => /^(brief|interviews|scorecard|outcome|nav\.myInterviews)/.test(key)));
   const en = keys('en');
   expect(Object.keys(en).length).toBeGreaterThan(40);
+  expect(Object.keys(en).filter((key) => key.startsWith('scorecard.hrView')).length).toBeGreaterThan(3);
   for (const locale of ['vi', 'ko']) {
     const other = keys(locale);
     expect(Object.keys(other).sort()).toEqual(Object.keys(en).sort());
