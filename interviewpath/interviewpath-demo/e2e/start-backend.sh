@@ -35,6 +35,9 @@ if [ "${E2E_SEED_BOARD:-}" = "1" ]; then
   printf '%s' "$BOARD_PASSWORD" > "$E2E_TMP/portal_e2e_board_password"
   PYTHONPATH=. $PY "$E2E_DIR/seed_board.py" "$E2E_TMP/board_seed.json"
 fi
+# A company for the intake spec, so it leaves the temporary password of the login spec's user unchanged.
+INTAKE_PASSWORD=$($PY -m app.cli create-company --slug intake --name "Intake Company" --hr-email intake-hr@e2e.test --hr-name "Intake HR" | awk '/Temporary password/ {print $NF}')
+printf '%s' "$INTAKE_PASSWORD" > "$E2E_TMP/portal_e2e_intake_password"
 # One user in two companies, to test that nothing from the previous company survives a switch.
 SWITCH_PASSWORD=$($PY -m app.cli create-company --slug switch-a --name "Switch Alpha" --hr-email switch-hr@e2e.test --hr-name "Switch HR" | awk '/Temporary password/ {print $NF}')
 printf '%s' "$SWITCH_PASSWORD" > "$E2E_TMP/portal_e2e_switch_password"
