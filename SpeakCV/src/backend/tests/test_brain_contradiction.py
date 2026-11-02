@@ -1,4 +1,5 @@
 import json
+from types import SimpleNamespace
 
 import pytest
 
@@ -51,7 +52,7 @@ def test_normalise_fact_value_forms(kind, raw, expected):
     ("number", ("15", "days"), ("15", "ngày"), True),
     ("number", ("5 triệu", ""), ("5 tỷ", ""), False),
     ("number", ("5", "triệu VND"), ("5,000,000", "VND"), True),
-    ("number", ("500만원", ""), ("5,000,000", ""), True),
+    ("number", ("500만원", ""), ("5,000,000", ""), False),  # 원 is stated on one side only
     ("number", ("500만원", ""), ("5,000,000", "KRW"), True),
     ("number", ("1.000.000", ""), ("1000000", ""), True),
     ("number", ("twelve", "days"), ("Twelve", "days"), True),
@@ -170,8 +171,8 @@ def test_different_fact_kind_is_never_compared(db, company):
     assert fake.last_messages() == []
 
 
-def test_low_cosine_is_never_compared(db, company):
-    node(db, company, "12", embedding=vec(1, 0))
+def test_low_cosine_with_another_title_is_never_compared(db, company):
+    node(db, company, "12", title="Sick leave", embedding=vec(1, 0))
     new = node(db, company, "15", status="draft", embedding=vec(0, 1))
     assert contradiction.check_new_facts(db, company.id, [new.id]) == 0
     assert fake.last_messages() == []
@@ -240,7 +241,7 @@ def test_five_million_and_five_billion_conflict(db, company):
 
 
 @pytest.mark.parametrize("kind,one,two", [
-    ("number", "500만원", "5,000,000"), ("number", "1.000.000", "1000000"), ("date", "December 1, 2026", "2026.12.01"),
+    ("number", "5 triệu", "5,000,000"), ("number", "1.000.000", "1000000"), ("date", "December 1, 2026", "2026.12.01"),
 ])
 def test_equal_forms_are_settled_by_code_without_the_ai(db, company, kind, one, two):
     node(db, company, one, kind=kind, unit="")
@@ -440,3 +441,153 @@ def test_ai_error_during_ingestion_counts_a_failed_chunk(db, company):
     job = upload(db, company, "# Leave\n\nStaff receive 15 days of annual leave.")
     assert job.status == "review" and job.failed_chunks == 1
     assert conflicts(db) == []
+
+
+# N3: the normaliser settles a pair only when it is sure. Everything else goes to the AI check.
+
+
+@pytest.mark.parametrize("a,b", [
+    (("12", ""), ("12", "weeks")),
+    (("12", "months"), ("12", "")),
+    (("15", ""), ("15 to 20", "")),
+    (("15", ""), ("at least 15", "")),
+    (("5 triệu", ""), ("5 triệu rưỡi", "")),
+    (("1 triệu", ""), ("1 triệu 2", "")),
+    (("5,000,000", ""), ("5,000,000 USD", "")),
+    (("5,000,000", ""), ("5,000,000", "USD")),
+    (("500만원", ""), ("5,000,000", "")),
+    ((".5", "days"), ("5", "days")),
+    (("3-5", "days"), ("3", "days")),
+    (("15+", "days"), ("15", "days")),
+])
+def test_a_number_with_something_more_on_one_side_is_not_equal(a, b):
+    assert contradiction.same_value("number", *a, *b) is False
+    assert contradiction.same_value("number", *b, *a) is False
+
+
+@pytest.mark.parametrize("a,b", [
+    ("2026-01-01 to 2026-06-30", "2026-01-01 to 2026-12-31"),
+    ("from 1 January 2026 until 31 March 2026", "from 1 January 2026 until 30 June 2026"),
+    ("2026-01-01", "2026-01-01 to 2026-06-30"),
+    ("before 2026-01-01", "2026-01-01"),
+    ("12/01/2026", "December 1, 2026"),
+    ("01/12/2026", "December 1, 2026"),
+])
+def test_dates_equal_only_when_every_date_and_every_word_match(a, b):
+    assert contradiction.same_value("date", a, "", b, "") is False
+    assert contradiction.same_value("date", b, "", a, "") is False
+
+
+@pytest.mark.parametrize("a,b", [
+    ("from 1 January 2026 until 31 March 2026", "from 1 January 2026 until 31 March 2026"),
+    ("2026-01-01 to 2026-06-30", "2026.01.01 to 2026.06.30"),
+    ("ngày 1 tháng 12 năm 2026", "December 1, 2026"),
+    ("13/01/2026", "January 13, 2026"),  # 13 cannot be a month, so only one reading exists
+    ("1/1/2026", "January 1, 2026"),
+])
+def test_dates_written_differently_are_still_equal(a, b):
+    assert contradiction.same_value("date", a, "", b, "") is True
+
+
+def as_facts(kind, a, b):
+    return (SimpleNamespace(fact_kind=kind, fact_value=a[0], fact_unit=a[1]),
+            SimpleNamespace(fact_kind=kind, fact_value=b[0], fact_unit=b[1]))
+
+
+@pytest.mark.parametrize("kind,a,b", [
+    ("number", ("5tr", ""), ("5 triệu", "")),
+    ("number", ("10tr", ""), ("10.000.000", "")),
+    ("number", ("5M", ""), ("5,000,000", "")),
+    ("number", ("5 thousand", ""), ("5000", "")),
+    ("number", ("5 trieu", ""), ("5 triệu", "")),
+    ("number", ("5 millions", ""), ("5,000,000", "")),
+    ("number", ("12", ""), ("15", "days")),
+    ("number", ("1", "year"), ("12", "months")),
+    ("number", ("5", "working days"), ("5", "days")),
+    ("date", ("12/01/2026", ""), ("December 1, 2026", "")),
+])
+def test_what_code_cannot_read_is_left_to_the_ai_and_is_no_certain_conflict(kind, a, b):
+    first, second = as_facts(kind, a, b)
+    assert contradiction.same_value(kind, *a, *b) is False
+    assert contradiction._differ_for_certain(first, second) is False
+    assert contradiction._differ_for_certain(second, first) is False
+
+
+@pytest.mark.parametrize("kind,a,b", [
+    ("number", ("12", "days"), ("15", "days")),
+    ("number", ("12", ""), ("15", "")),
+    ("number", ("12", "weeks"), ("12", "months")),
+    ("number", ("5 triệu", ""), ("5 tỷ", "")),
+    ("number", (".5", "days"), ("5", "days")),
+    ("number", ("at least 15", ""), ("at least 20", "")),
+    ("date", ("2026-01-01 to 2026-06-30", ""), ("2026-01-01 to 2026-12-31", "")),
+    ("date", ("2026-12-01", ""), ("2026-12-02", "")),
+    ("boolean", ("yes", ""), ("không", "")),
+])
+def test_what_code_can_read_and_disagrees_is_a_certain_conflict(kind, a, b):
+    assert contradiction._differ_for_certain(*as_facts(kind, a, b)) is True
+
+
+@pytest.mark.parametrize("one,two", [("15", "15 to 20"), ("5,000,000", "5,000,000 USD"), ("5tr", "5 triệu")])
+def test_a_pair_code_is_unsure_of_reaches_the_ai_check(db, company, one, two):
+    node(db, company, one, unit="")
+    new = node(db, company, two, unit="", status="draft")
+    fake.enqueue("kb_conflict_check", conflict_answer(same_value=False))
+    assert contradiction.check_new_facts(db, company.id, [new.id]) == 1
+    assert "same_value" in fake.last_system()
+
+
+def test_the_ai_can_settle_a_form_code_cannot_read(db, company):
+    node(db, company, "5tr", unit="")
+    new = node(db, company, "5 triệu", unit="", status="draft")
+    fake.enqueue("kb_conflict_check", conflict_answer(same_value=True))
+    assert contradiction.check_new_facts(db, company.id, [new.id]) == 0
+
+
+# N8: two facts with one title are about one thing, however differently their bodies are worded.
+
+
+def test_same_title_and_type_reach_the_check_below_the_cosine_gate(db, company):
+    node(db, company, "12", embedding=vec(1.0))
+    new = node(db, company, "15", status="draft", embedding=vec(0.0, 1.0))
+    fake.enqueue("kb_conflict_check", conflict_answer())
+    assert contradiction.check_new_facts(db, company.id, [new.id]) == 1
+
+
+def test_a_title_differing_in_case_and_spacing_is_the_same_title(db, company):
+    node(db, company, "12", title="Annual  LEAVE", embedding=vec(1.0))
+    new = node(db, company, "15", title="annual leave", status="draft", embedding=vec(0.0, 1.0))
+    fake.enqueue("kb_conflict_check", conflict_answer())
+    assert contradiction.check_new_facts(db, company.id, [new.id]) == 1
+
+
+def test_same_title_in_another_type_is_held_to_the_gate(db, company):
+    other = node(db, company, "12", embedding=vec(1.0))
+    other.type = "policy"
+    db.commit()
+    new = node(db, company, "15", status="draft", embedding=vec(0.0, 1.0))
+    assert contradiction.check_new_facts(db, company.id, [new.id]) == 0
+    assert fake.last_messages() == []
+
+
+# The anti-fabrication gate: a word counts as a number only where it is used as one.
+
+
+@pytest.mark.parametrize("value,quote,found", [
+    ("5", "được nghỉ 12 ngày mỗi năm", False),  # năm is a year here
+    ("5", "12 ngày", False),
+    ("5", "nghỉ năm ngày liên tiếp", True),
+    ("5", "năm năm kinh nghiệm", True),
+    ("3", "ba mẹ của nhân viên", False),  # ba is a parent here
+    ("3", "thử việc ba tháng", True),
+    ("2", "hai mươi ngày phép", False),  # twenty, not two
+    ("1", "Công ty xét thưởng một lần mỗi năm", True),
+    ("1", "no one is exempt", False),
+    ("1", "one of the rules", False),
+    ("1", "one day per week", True),
+    ("2", "paid twice a year", True),
+    ("6", "six months", True),
+    ("3", "the team has three leads", True),
+])
+def test_a_number_word_counts_only_in_a_numeric_sense(value, quote, found):
+    assert contradiction.value_in_quote("number", value, quote) is found

@@ -42,7 +42,8 @@ Answer three questions:
   12 weeks and 12 months are different values.
 Judge only from the text given. Do not guess."""
 
-_NUMBER = re.compile(r"[-+]?\d[\d.,]*")
+# A leading dot belongs to the number, so ".5" is not read as 5. Not after a word or a digit: "days.5" still holds a 5.
+_NUMBER = re.compile(r"[-+]?(?:\d[\d.,]*|(?<![\w.,])\.\d+)")
 _NEXT_NUMBER = re.compile(r"\s*(" + _NUMBER.pattern + ")")
 _DOT_THOUSANDS = re.compile(r"[-+]?[1-9]\d{0,2}(?:\.\d{3})+")
 _COMMA_THOUSANDS = re.compile(r"[-+]?\d{1,3}(?:,\d{3})+(?:\.\d+)?")
@@ -78,13 +79,24 @@ _UNIT_ALIASES = {
     "원": "krw", "won": "krw", "krw": "krw", "đồng": "vnd", "vnd": "vnd", "usd": "usd", "$": "usd",
 }
 _TIME_UNITS = {"day", "week", "month", "year", "hour"}
+_DATE_FILLER = {"ngày"}
 # For the anti-fabrication gate only: documents often spell out the small numbers that facts state as digits.
 _NUMBER_WORDS = {
-    "one": 1, "once": 1, "two": 2, "twice": 2, "three": 3, "four": 4, "five": 5, "six": 6, "seven": 7, "eight": 8,
-    "nine": 9, "ten": 10, "một": 1, "hai": 2, "ba": 3, "bốn": 4, "năm": 5, "sáu": 6, "bảy": 7, "tám": 8, "chín": 9,
-    "mười": 10,
+    "once": 1, "two": 2, "twice": 2, "three": 3, "four": 4, "five": 5, "six": 6, "seven": 7, "eight": 8, "nine": 9,
+    "ten": 10,
 }
-_WORD = re.compile(r"[^\W\d_]+")
+# These also mean something else: "no one", "ba mẹ" (parents), "mỗi năm" (each year). They count only before what they
+# would count, so "hai mươi" (twenty) is not a 2 either.
+_COUNTING_WORDS = {
+    "one": 1, "một": 1, "hai": 2, "ba": 3, "bốn": 4, "năm": 5, "sáu": 6, "bảy": 7, "tám": 8, "chín": 9, "mười": 10,
+}
+_COUNTED = frozenset("""
+day days week weeks month months year years hour hours minute minutes time person employee manager reviewer approver
+round interview review
+ngày tuần tháng năm giờ tiếng phút quý lần người nhân vị bạn buổi đợt kỳ vòng bước cấp mức khoản suất ca đồng trăm nghìn
+ngàn triệu tỷ tỉ
+""".split())
+_TOKEN = re.compile(r"\w+")
 _KOREAN_COUNT = re.compile(r"(한|두|세|네)\s*(?:번|회|명|개|달|차례)")
 _KOREAN_NUMBERS = {"한": 1, "두": 2, "세": 3, "네": 4}
 
@@ -169,7 +181,13 @@ def _date_in(raw: str) -> str | None:
 
 
 def _dates_in(raw: str) -> list[str]:
-    text = _folded(raw)
+    return [iso for _, _, iso, _ in _date_matches(_folded(raw))]
+
+
+def _date_matches(text: str) -> list[tuple[int, int, str, bool]]:
+    """(start, end, ISO date, whether the writing could also mean another date) for each date, in reading order.
+
+    12/01/2026 is read day first, as Vietnamese and Korean documents write it, but an American writer means December."""
     found = []
     for pattern, order in (
         (_YMD, "ymd"), (_KOREAN, "ymd"), (_DMY, "dmy"), (_VIETNAMESE, "dmy"), (_MONTH_FIRST, "mdy"), (_DAY_FIRST, "dmy"),
@@ -182,10 +200,12 @@ def _dates_in(raw: str) -> list[str]:
                 "ymd": (first, second, third), "dmy": (third, second, first), "mdy": (third, first, second),
             }[order]
             try:
-                found.append(date(year, month, day).isoformat())
+                iso = date(year, month, day).isoformat()
             except ValueError:
                 continue
-    return found
+            ambiguous = pattern is _DMY and "." not in match.group(0) and day != month and day <= 12
+            found.append((match.start(), match.end(), iso, ambiguous))
+    return sorted(found)
 
 
 def _boolean(raw: str) -> str | None:
@@ -217,8 +237,27 @@ def _canonical_unit(text: str) -> str:
     return " ".join(dict.fromkeys(_UNIT_ALIASES.get(word, word) for word in words if word))
 
 
+def _comparable_dates(value: str | None) -> tuple[str, str] | None:
+    """(every date in order, the words around them). None when there is no date, or one that could be read two ways."""
+    text = _folded(value)
+    matches = _date_matches(text)
+    if not matches or any(ambiguous for _, _, _, ambiguous in matches):
+        return None
+    rest, position = [], 0
+    for start, end, _, _ in matches:
+        rest.append(text[position:start])
+        position = end
+    rest.append(text[position:])
+    words = (word.strip(".,:;()") for word in " ".join(rest).split())
+    return " ".join(iso for _, _, iso, _ in matches), " ".join(w for w in words if w and w not in _DATE_FILLER)
+
+
 def _comparable(kind: str, value: str | None, unit: str | None) -> tuple[str, str] | None:
-    """(canonical value, canonical unit). A multiplier or unit may be in either field. None when unreadable."""
+    """(canonical value, what is said around it). A multiplier or unit may be in either field. None when unreadable.
+
+    What is around it is kept word for word when code does not know it, so that "at least 15" is not 15."""
+    if kind == "date":
+        return _comparable_dates(value)
     canonical = normalise_fact_value(kind, value)
     if canonical is None:
         return None
@@ -229,23 +268,27 @@ def _comparable(kind: str, value: str | None, unit: str | None) -> tuple[str, st
 
 
 def same_value(kind: str, value_a: str | None, unit_a: str | None, value_b: str | None, unit_b: str | None) -> bool:
-    """True only when code can tell that two facts state one value. A unit stated on one side only is no difference."""
+    """True only when code can tell that two facts state one value, and so need no AI check.
+
+    Both sides must say the same around the number: a unit on one side only, or a word code does not know, is a question
+    for the model."""
     if _folded(value_a) and _folded(value_a) == _folded(value_b) and _folded(unit_a) == _folded(unit_b):
         return True
     first, second = _comparable(kind, value_a, unit_a), _comparable(kind, value_b, unit_b)
-    if first is None or second is None or first[0] != second[0]:
-        return False
-    return not first[1] or not second[1] or first[1] == second[1]
+    return first is not None and first == second
 
 
 def _differ_for_certain(node: KbNode, other: KbNode) -> bool:
-    """True when code can read both facts and they disagree, so the model's same_value cannot excuse the pair."""
+    """True when code can read both facts and they disagree, so the model's same_value cannot excuse the pair.
+
+    A number that differs counts only when both say the same around it: "5tr" and "5 triệu", or 12 and 1 year, may well
+    be one value that code cannot read. The same number differs in two time units, which cannot convert to one number."""
     first = _comparable(node.fact_kind, node.fact_value, node.fact_unit)
     second = _comparable(other.fact_kind, other.fact_value, other.fact_unit)
     if first is None or second is None:
         return False
     if first[0] != second[0]:
-        return not first[1] or not second[1] or first[1] == second[1]
+        return first[1] == second[1]
     return first[1] != second[1] and first[1] in _TIME_UNITS and second[1] in _TIME_UNITS
 
 
@@ -260,9 +303,12 @@ def _amounts_in(quote: str) -> set[str]:
         amount = _amount_at(text, match)
         if amount is not None:
             found.add(_canonical_number(amount[0]))
-    for word in _WORD.findall(text):
-        if word in _NUMBER_WORDS:
-            found.add(str(_NUMBER_WORDS[word]))
+    tokens = _TOKEN.findall(text)
+    for index, token in enumerate(tokens):
+        if token in _NUMBER_WORDS:
+            found.add(str(_NUMBER_WORDS[token]))
+        elif token in _COUNTING_WORDS and index + 1 < len(tokens) and tokens[index + 1] in _COUNTED:
+            found.add(str(_COUNTING_WORDS[token]))
     for match in _KOREAN_COUNT.finditer(text):
         found.add(str(_KOREAN_NUMBERS[match.group(1)]))
     return found
@@ -322,9 +368,14 @@ def _already_paired(db: Session, company_id: int, first: int, second: int, reche
     ).first() is not None
 
 
+def _same_title(node: KbNode, other: KbNode) -> bool:
+    return node.type == other.type and _folded(node.title) == _folded(other.title)
+
+
 def check_new_facts(db: Session, company_id: int, node_ids: list[int], bump_version: bool = True,
                     recheck_dismissed: bool = False) -> int:
-    """Open a conflict for each new fact that disagrees with a similar fact. Returns how many were opened.
+    """Open a conflict for each new fact that disagrees with a similar fact, or one with the same type and title however
+    its body is worded. Returns how many were opened.
 
     AIError from the check propagates; conflicts opened before it are already committed.
     bump_version=False is for a request that has already moved the version: resetting it afterwards would undo
@@ -357,7 +408,7 @@ def check_new_facts(db: Session, company_id: int, node_ids: list[int], bump_vers
             vectors.decode(node.embedding), np.stack([vectors.decode(c.embedding) for c in candidates])
         )
         for other, score in zip(candidates, scores):
-            if score < CONFLICT_COSINE:
+            if score < CONFLICT_COSINE and not _same_title(node, other):
                 continue
             if same_value(node.fact_kind, node.fact_value, node.fact_unit, other.fact_value, other.fact_unit):
                 continue
