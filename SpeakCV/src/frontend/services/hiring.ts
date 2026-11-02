@@ -60,7 +60,7 @@ export interface MyConsent {
   id: number;
   purpose: string;
   version: string;
-  language: string;
+  language: string | null;
   granted_at: string | null;
   withdrawn_at: string | null;
   job_title: string | null;
@@ -90,10 +90,11 @@ export const getPublicJob = (slug: string, src?: string | null) =>
 export const getConsentText = (purpose: string, language = "en") =>
   request<ConsentText>(`/consents/${encodeURIComponent(purpose)}?language=${language}`);
 
-export function applyToJob(slug: string, file: File, consentVersion: string, src?: string | null) {
+export function applyToJob(slug: string, file: File, consentVersion: string, consentLanguage: string, src?: string | null) {
   const form = new FormData();
   form.append("file", file);
   form.append("consent_version", consentVersion);
+  form.append("consent_language", consentLanguage);
   if (src) form.append("src", src);
   return request<Application>(`/public/jobs/${encodeURIComponent(slug)}/apply`, { method: "POST", body: form });
 }

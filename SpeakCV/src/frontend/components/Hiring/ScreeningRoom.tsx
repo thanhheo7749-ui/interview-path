@@ -357,7 +357,7 @@ export function ScreeningRoom({ applicationId }: { applicationId: number }) {
   if (!ACTIVE.includes(state.status) || state.position === null) {
     return shell(
       <div>
-        <p role="status">{state.status === "expired" ? text.expired : text.withHr}</p>
+        <p role="status">{state.status === "abandoned" ? text.abandoned : text.withHr}</p>
         {back}
       </div>,
     );
