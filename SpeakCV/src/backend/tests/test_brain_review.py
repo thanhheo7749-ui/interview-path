@@ -569,7 +569,7 @@ def test_ai_failure_keeps_the_edit_and_returns_a_warning(client, w, steady_vecto
 
 
 def test_ai_failure_on_one_node_still_checks_the_next(client, w, monkeypatch):
-    first, second = fact(w, "One", "1"), fact(w, "Two", "2")
+    first, second = fact(w, "First", "1"), fact(w, "Second", "2")
     checked = []
 
     def check(_db, _company_id, node_ids, **_):
@@ -1295,3 +1295,80 @@ def test_a_closed_conflict_cannot_be_resolved_again_inside_the_lock(db, w):
     with pytest.raises(contradiction.ConflictClosed):
         contradiction.resolve(db, row, "a", None)
     db.rollback()
+
+
+# F4: why a node came back to the queue.
+
+
+def test_a_kept_node_says_why_it_came_back(client, two_documents):
+    w = two_documents
+    assert unpublish(client, w).status_code == 200
+    [item] = [n for n in client.get(w.url("review"), headers=w.hr).json()["nodes"] if n["id"] == w.shared.id]
+    assert item["review_reason"] == "document_withdrawn"
+    assert w.reload(w.shared).review_reason == "document_withdrawn"
+
+
+def test_an_ordinary_draft_has_no_review_reason(client, w):
+    node = w.node("Plain")
+    [item] = client.get(w.url("review"), headers=w.hr).json()["nodes"]
+    assert item["id"] == node.id and item["review_reason"] is None
+
+
+@pytest.mark.parametrize("action", ["accept", "reject", "merge"])
+def test_a_decision_clears_the_review_reason(client, two_documents, action):
+    w = two_documents
+    assert unpublish(client, w).status_code == 200
+    target = w.node("Target", status="published", doc=False)
+    item = {"action": action, "node_id": w.shared.id}
+    if action == "merge":
+        item["into_node_id"] = target.id
+    assert decide(client, w, [item]).status_code == 200
+    assert w.reload(w.shared).review_reason is None
+
+
+def test_an_edit_is_no_decision_and_keeps_the_review_reason(client, two_documents):
+    w = two_documents
+    assert unpublish(client, w).status_code == 200
+    assert decide(client, w, [{"action": "edit", "node_id": w.shared.id, "body": "Reworded."}]).status_code == 200
+    assert w.reload(w.shared).review_reason == "document_withdrawn"
+
+
+# F6
+
+
+def clearing_fact(w):
+    node = fact(w, "Leave days", "12")
+    node.body = "Leave is 12 days a year."
+    w.db.commit()
+    return node
+
+
+def test_the_response_warns_when_a_body_is_cleared(client, w):
+    node = clearing_fact(w)
+    response = decide(client, w, [{"action": "edit", "node_id": node.id, "fact_value": "15"}])
+    assert response.status_code == 200
+    assert w.reload(node).body == ""
+    [warning] = response.json()["warnings"]
+    assert "Leave days" in warning and "body" in warning
+
+
+def test_no_warning_when_the_body_is_rewritten_or_does_not_state_the_value(client, w):
+    node = clearing_fact(w)
+    response = decide(client, w, [{"action": "edit", "node_id": node.id, "fact_value": "15", "body": "Leave is 15 days."}])
+    assert response.json()["warnings"] == []
+    other = fact(w, "Sick days", "5")
+    other.body = "See the handbook."
+    w.db.commit()
+    assert decide(client, w, [{"action": "edit", "node_id": other.id, "fact_value": "6"}]).json()["warnings"] == []
+
+
+def test_a_cleared_body_is_warned_about_once_with_an_ai_warning_beside_it(client, w, monkeypatch):
+    node = clearing_fact(w)
+
+    def down(*_args, **_kwargs):
+        raise AIError("down")
+
+    monkeypatch.setattr(review.contradiction, "check_new_facts", down)
+    response = decide(client, w, [{"action": "edit", "node_id": node.id, "fact_value": "15"}])
+    warnings = response.json()["warnings"]
+    assert len(warnings) == 2 and sum("body" in text for text in warnings) == 1

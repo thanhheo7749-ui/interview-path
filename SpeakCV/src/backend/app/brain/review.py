@@ -38,6 +38,7 @@ UNPUBLISHABLE = ("review", "published")
 SETTLED = ("review", "published")
 ACTIVE_JOB = ("queued", "running")
 CHANGED_DURING_CHECK = "This item changed while it was being checked. Please try again."
+DOCUMENT_WITHDRAWN = "document_withdrawn"  # why a node came back to the review queue
 
 
 class ReviewError(Exception):
@@ -341,6 +342,7 @@ def unpublish_document(db: Session, company_id: int, document_id: int) -> dict:
             ).delete(synchronize_session=False)
             for layer in layers:
                 node.visibility = stricter_layer(node.visibility, layer)
+            node.review_reason = DOCUMENT_WITHDRAWN
             node.status = "draft"
             node.approved_by = node.approved_at = None
         else:
@@ -391,8 +393,10 @@ def _states_claim(node: KbNode, name: str, old: str | None) -> bool:
 
 
 def _apply_fields(item, node: KbNode, reembed: dict[int, KbNode], edited_facts: dict[int, KbNode],
-                 changed_claims: set[int]) -> None:
+                 changed_claims: set[int]) -> bool:
+    """Returns whether the edit cleared the node's body."""
     replaced_claim: dict[str, str | None] = {}
+    body_before = node.body
     for name in EDITABLE:
         value = getattr(item, name)
         if value is None:
@@ -412,9 +416,12 @@ def _apply_fields(item, node: KbNode, reembed: dict[int, KbNode], edited_facts: 
             changed_claims.add(node.id)
             replaced_claim[name] = getattr(node, name)
         setattr(node, name, value)
-    # The body is read with the fact, so a correction that leaves it alone would still tell the old value.
-    if item.body is None and any(_states_claim(node, name, old) for name, old in replaced_claim.items()):
+    # The body is read with the fact, so a correction that leaves it alone would still tell the old value. The portal
+    # sends the whole form, so a body sent back as it was has been left alone too.
+    if node.body == body_before and any(_states_claim(node, name, old) for name, old in replaced_claim.items()):
         node.body = ""
+        return True
+    return False
 
 
 def _guard(node: KbNode, item, before: tuple[str, str], publishing: bool, check) -> None:
@@ -466,6 +473,11 @@ def _merge(db: Session, company_id: int, node: KbNode, into_id: int, user_id: in
     have = {
         (row.chunk_id, row.quote): row for row in db.query(KbNodeSource).filter(KbNodeSource.node_id == target.id)
     }
+    # What the merged fact's chunks say is not what the target says, so they must not speak for it.
+    other_value = bool(node.fact_kind and target.fact_kind) and (
+        node.fact_kind != target.fact_kind or not contradiction.same_value(
+            node.fact_kind, node.fact_value, node.fact_unit, target.fact_value, target.fact_unit)
+    )
     for source in db.query(KbNodeSource).filter(KbNodeSource.node_id == node.id).all():
         twin = have.get((source.chunk_id, source.quote))
         if twin is not None:
@@ -473,6 +485,7 @@ def _merge(db: Session, company_id: int, node: KbNode, into_id: int, user_id: in
             db.delete(source)
         else:
             source.node_id = target.id
+            source.stale = source.stale or other_value
             have[(source.chunk_id, source.quote)] = source
     edges = db.query(KbEdge).filter(
         KbEdge.company_id == company_id, or_(KbEdge.source_node_id == node.id, KbEdge.target_node_id == node.id)
@@ -541,12 +554,17 @@ def _ask_ai_first(db: Session, company_id: int, items) -> _AiAnswers:
     return answers
 
 
-def apply_decisions(db: Session, company_id: int, user_id: int, items) -> dict[int, bool]:
+def _body_cleared_warning(node: KbNode) -> str:
+    return f"The body of \"{node.title}\" was cleared because it stated the old value. Write it again if it is needed."
+
+
+def apply_decisions(db: Session, company_id: int, user_id: int, items, warnings: list[str] | None = None) -> dict[int, bool]:
     """Apply review items in order. Raises ReviewError; the caller rolls back so a bad item changes nothing.
 
     Commits once before writing anything, to end the transaction before the AI calls, so the caller must have nothing
     pending that it may yet discard. Returns the live facts this request edited, each with whether its value, unit or
-    scope changed. The caller commits, then passes them to recheck_edited_facts."""
+    scope changed. The caller commits, then passes them to recheck_edited_facts. warnings, when given, collects what HR
+    should be told about the edits."""
     answers = _ask_ai_first(db, company_id, items)
     touched: set[int] = set()
     reembed: dict[int, KbNode] = {}
@@ -566,12 +584,14 @@ def apply_decisions(db: Session, company_id: int, user_id: int, items) -> dict[i
         touched.add(node.id)
         if item.action == "edit":
             before = (node.title, node.body)
-            _apply_fields(item, node, reembed, edited_facts, changed_claims)
+            if _apply_fields(item, node, reembed, edited_facts, changed_claims) and warnings is not None:
+                warnings.append(_body_cleared_warning(node))
             _guard(node, item, before, node.status == "published", answers.stored_guard)
             changed = changed or node.status == "published"
         elif item.action == "accept":
             before = (node.title, node.body)
-            _apply_fields(item, node, reembed, edited_facts, changed_claims)
+            if _apply_fields(item, node, reembed, edited_facts, changed_claims) and warnings is not None:
+                warnings.append(_body_cleared_warning(node))
             _guard(node, item, before, True, answers.stored_guard)
             publish_node(db, node, user_id)
             changed = True
@@ -583,6 +603,8 @@ def apply_decisions(db: Session, company_id: int, user_id: int, items) -> dict[i
             _merge(db, company_id, node, item.into_node_id, user_id)
             touched.add(item.into_node_id)
             changed = True
+        if item.action != "edit":
+            node.review_reason = None
         db.flush()
         if node.id in changed_claims:
             db.query(KbNodeSource).filter(KbNodeSource.node_id == node.id).update({KbNodeSource.stale: True})

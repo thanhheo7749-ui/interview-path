@@ -493,3 +493,65 @@ def test_merging_a_stale_link_onto_the_same_chunk_keeps_it_stale(db, world):
                            [decision(action="merge", node_id=stale.id, into_node_id=target.id)])
     db.commit()
     assert db.query(KbNodeSource).filter_by(node_id=target.id).one().stale is True
+
+
+# F2: a merge moves a chunk that says another value onto this fact.
+
+
+def merge_world(world, value, target_value, target_kind="number"):
+    document = world.document("Handbook", "public")
+    moved = stated_fact(world, "Leave days total", "Words.", value, "days", document, "Leave is CANARYMOVED days a year.")
+    moved.status = "draft"
+    target = stated_fact(world, "Annual leave days", "Annual leave.", target_value, "days",
+                         world.document("Policy", "public"), "Annual leave days are set here.")
+    target.fact_kind = target_kind
+    world.db.commit()
+    return moved, target
+
+
+def merge(world, moved, target):
+    review.apply_decisions(world.db, world.company_id, world.hr_id,
+                           [decision(action="merge", node_id=moved.id, into_node_id=target.id)])
+    world.db.commit()
+
+
+def moved_links(db, target):
+    return {row.quote: row.stale for row in db.query(KbNodeSource).filter_by(node_id=target.id).all()}
+
+
+def test_merging_into_another_value_marks_the_moved_source_stale_and_keeps_its_chunk_out(db, world):
+    moved, target = merge_world(world, "19", "17")
+    links_before = db.query(KbNodeSource).filter_by(node_id=target.id).count()
+    merge(world, moved, target)
+    rows = db.query(KbNodeSource).filter_by(node_id=target.id).order_by(KbNodeSource.id).all()
+    assert len(rows) == links_before + 1
+    assert sorted(row.stale for row in rows) == [False, True]
+    assert "CANARYMOVED" not in candidate_sees(db, world.company_id, "How many leave days total a year?")
+
+
+def test_merging_into_the_same_value_keeps_the_chunk(db, world):
+    moved, target = merge_world(world, "17", "17")
+    merge(world, moved, target)
+    assert not any(row.stale for row in db.query(KbNodeSource).filter_by(node_id=target.id))
+    assert "CANARYMOVED" in candidate_sees(db, world.company_id, "How many leave days total a year?")
+
+
+def test_merging_a_non_fact_marks_nothing_stale(db, world):
+    document = world.document("Handbook", "public")
+    moved = world.node("Words one", "Words.", "public", type="policy", status="draft", document=document)
+    target = world.node("Words two", "Words.", "public", type="policy", document=document)
+    merge(world, moved, target)
+    assert not any(row.stale for row in db.query(KbNodeSource).filter_by(node_id=target.id))
+
+
+# F6: HR is told when a body is cleared, and an unchanged body sent back counts as untouched.
+
+
+def test_a_body_sent_back_unchanged_is_still_cleared_when_it_states_the_old_value(db, world):
+    edited = stated_fact(world, "Probation length policy", "Probation is 6 months.", "6", "months",
+                         world.document("Handbook", "public"), "Probation lasts 6 months CANARY6.")
+    review.apply_decisions(db, world.company_id, world.hr_id,
+                           [decision(node_id=edited.id, fact_value="2", body="Probation is 6 months.")])
+    db.commit()
+    db.refresh(edited)
+    assert edited.body == ""

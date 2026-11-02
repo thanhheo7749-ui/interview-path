@@ -99,6 +99,8 @@ class KbNode(Base):
     # Set by the discrimination guard (app.bridges.discrimination): a category, or "unchecked" when the AI check failed.
     guard_category = Column(String(30), nullable=True)
     guard_reason = Column(Text, nullable=True)
+    # Why a node came back to the review queue, until HR decides on it: document_withdrawn.
+    review_reason = Column(String(30), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
 

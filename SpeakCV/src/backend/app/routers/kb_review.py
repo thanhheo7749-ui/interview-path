@@ -52,7 +52,8 @@ def _node_out(node: KbNode, sources: list[dict]) -> dict:
         "id": node.id, "type": node.type, "title": node.title, "body": node.body, "visibility": node.visibility,
         "language": node.language, "fact_kind": node.fact_kind, "fact_value": node.fact_value,
         "fact_unit": node.fact_unit, "scope_text": node.scope_text, "department_id": node.department_id,
-        "guard_category": node.guard_category, "guard_reason": node.guard_reason, "sources": sources,
+        "guard_category": node.guard_category, "guard_reason": node.guard_reason,
+        "review_reason": node.review_reason, "sources": sources,
     }
 
 
@@ -97,8 +98,9 @@ def decide(
     member: CompanyMember = Depends(require_member("hr")),
     db: Session = Depends(get_db),
 ):
+    notes: list[str] = []
     try:
-        edited = review.apply_decisions(db, company_id, member.user_id, body.items)
+        edited = review.apply_decisions(db, company_id, member.user_id, body.items, notes)
         db.commit()
     except review.ReviewError as exc:
         db.rollback()
@@ -106,7 +108,7 @@ def decide(
     except Exception:
         db.rollback()
         raise
-    warnings = review.recheck_edited_facts(db, company_id, edited)
+    warnings = notes + review.recheck_edited_facts(db, company_id, edited)
     return {"ok": True, "applied": len(body.items), "warnings": warnings}
 
 
