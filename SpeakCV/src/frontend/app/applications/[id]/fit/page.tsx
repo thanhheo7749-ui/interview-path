@@ -13,6 +13,7 @@ const FIT_STYLE: Record<string, string> = {
   matches: "bg-emerald-500/20 text-emerald-300",
   partly: "bg-amber-500/20 text-amber-300",
   not_seen: "bg-slate-500/20 text-slate-300",
+  not_assessed: "bg-slate-500/20 text-slate-300",
 };
 
 export default function FitPage({ params }: { params: Promise<{ id: string }> }) {
@@ -82,7 +83,9 @@ export default function FitPage({ params }: { params: Promise<{ id: string }> })
     );
   }
 
-  const fitWord = (value: string) => (value === "matches" ? t.fitMatches : value === "partly" ? t.fitPartly : t.fitNotSeen);
+  const fitWord = (value: string) => (
+    value === "matches" ? t.fitMatches : value === "partly" ? t.fitPartly : value === "not_assessed" ? t.fitNotAssessed : t.fitNotSeen
+  );
 
   return (
     <main className="min-h-screen bg-theme-secondary px-4 py-10">

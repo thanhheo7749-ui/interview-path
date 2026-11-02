@@ -4,8 +4,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
 import { Strings, useLang } from "@/lib/i18n";
-import { Application, HiringError, listMyApplications, reuploadCv } from "@/services/hiring";
-import { LangToggle } from "@/components/Hiring/SampleNotice";
+import { Application, HiringError, listMyApplications, reuploadCv, withdrawApplication } from "@/services/hiring";
+import { ConfirmDialog, LangToggle } from "@/components/Hiring/SampleNotice";
 
 const POLL_MS = 3000;
 
@@ -56,6 +56,58 @@ function Reupload({ id, onDone }: { id: number; onDone: () => void }) {
       </label>
       {error && <p role="alert" className="mt-1 text-sm text-red-400">{error}</p>}
     </div>
+  );
+}
+
+function WithdrawUnreadable({ id, onDone }: { id: number; onDone: () => void }) {
+  const { t } = useLang();
+  const [open, setOpen] = useState(false);
+  const [reason, setReason] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  const confirm = async () => {
+    setBusy(true);
+    setError("");
+    try {
+      await withdrawApplication(id, reason);
+      setOpen(false);
+      onDone();
+    } catch {
+      setError(t.genericError);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <>
+      <button onClick={() => setOpen(true)} className="mt-2 block text-sm text-blue-400 underline">
+        {t.withdraw}
+      </button>
+      {open && (
+        <ConfirmDialog
+          title={t.withdrawTitle}
+          body={t.withdrawBody}
+          confirmLabel={busy ? t.withdrawing : t.withdraw}
+          busy={busy}
+          error={error}
+          onConfirm={confirm}
+          onCancel={() => setOpen(false)}
+        >
+          <label className="block text-sm text-theme-text-secondary">
+            {t.withdrawReason}
+            <textarea
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              maxLength={2000}
+              rows={3}
+              className="mt-1 w-full rounded-lg border border-theme-border bg-theme-surface p-2 text-theme-text"
+            />
+          </label>
+        </ConfirmDialog>
+      )}
+    </>
   );
 }
 
@@ -118,7 +170,12 @@ export default function ApplicationsPage() {
                 {a.is_sample ? ` (${t.sampleTag})` : ""}
               </p>
               <p className="mt-2 text-sm text-theme-text">{statusText(a, t)}</p>
-              {a.status === "cv_unreadable" && <Reupload id={a.id} onDone={load} />}
+              {a.status === "cv_unreadable" && (
+                <>
+                  <Reupload id={a.id} onDone={load} />
+                  <WithdrawUnreadable id={a.id} onDone={load} />
+                </>
+              )}
               {a.status === "invited" && (
                 <Link href={`/applications/${a.id}/fit`} className="mt-2 inline-block text-sm text-blue-400 underline">
                   {t.seeFit}
