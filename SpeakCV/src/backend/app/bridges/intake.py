@@ -10,6 +10,7 @@ import re
 from dataclasses import dataclass
 
 from pydantic import BaseModel
+from sqlalchemy import exists, or_
 
 from app.ai import gateway
 from app.ai.types import AIError
@@ -18,7 +19,7 @@ from app.brain import ingestion, retriever
 from app.brain.prompting import as_data
 from app.database.database import SessionLocal
 from app.database.sql_models import HiringRequest, KbDocument, KbIngestionJob, VoiceSession, VoiceTurn
-from app.hiring import audit, identity
+from app.hiring import audit, identity, recordings
 from app.hiring.planner import PlannedQuestion, PlanOutput
 
 logger = logging.getLogger(__name__)
@@ -210,6 +211,32 @@ def _locked_request(db, session_id: int) -> HiringRequest | None:
             .populate_existing().with_for_update().first())
 
 
+def erase_raw(session_id: int) -> None:
+    """Delete the audio and blank the raw answers of a finished intake session. The masked document is the record.
+
+    Safe to repeat: a file already gone is fine, and blank rows stay blank. Rows are blanked only after their files are
+    gone, so a failure leaves them for the next run. The turn status stays, so a state read of the session still works.
+    Screening sessions are never touched. Nothing here logs content."""
+    db = SessionLocal()
+    try:
+        session = db.get(VoiceSession, session_id)
+        if session is None or session.purpose != PURPOSE:
+            return
+        turns = db.query(VoiceTurn).filter(VoiceTurn.session_id == session_id).all()
+        for turn in turns:
+            if turn.audio_path:
+                try:
+                    recordings.delete(turn.audio_path)
+                except (OSError, ValueError) as exc:
+                    logger.error("Could not delete intake audio for session %s: %s", session_id, type(exc).__name__)
+                    continue
+                turn.audio_path = None
+            turn.transcript = None
+        db.commit()
+    finally:
+        db.close()
+
+
 def complete(db, session: VoiceSession) -> KbDocument:
     """Turn a finished intake session into a queued document. Idempotent: a session already completed returns its document.
 
@@ -224,6 +251,7 @@ def complete(db, session: VoiceSession) -> KbDocument:
     if request.intake_document_id is not None:
         document = db.get(KbDocument, request.intake_document_id)
         db.rollback()
+        erase_raw(session_id)  # a retry after a crash between the commit and the erase
         return document
     request_id, department_id, title = request.id, request.department_id, request.title
     turns = db.query(VoiceTurn).filter(VoiceTurn.session_id == session_id).order_by(VoiceTurn.position).all()
@@ -236,6 +264,7 @@ def complete(db, session: VoiceSession) -> KbDocument:
     if request.intake_document_id is not None:  # another worker finished first
         document = db.get(KbDocument, request.intake_document_id)
         db.rollback()
+        erase_raw(session_id)
         return document
     db.rollback()
     document = ingestion.create_document(
@@ -253,6 +282,8 @@ def complete(db, session: VoiceSession) -> KbDocument:
     audit.record(db, company_id, owner, "intake_document_created", "hiring_request", request_id,
                  payload={"document_id": document_id, "names_checked": names_checked})
     db.commit()
+    erase_raw(session_id)  # only now: if the document had failed, the raw data would still be here for the retry
+    db.expire_all()
     return db.get(KbDocument, document_id)
 
 
@@ -281,7 +312,8 @@ def run_completion(session_id: int) -> None:
 
 
 def recover_interrupted() -> list[int]:
-    """At startup, a finished intake whose document was never made (a crash after the commit) is completed now.
+    """At startup, a finished intake whose document was never made (a crash after the commit) is completed now, and
+    one whose raw audio or answers were not yet erased is cleaned up.
 
     Called from lifespan, so it assumes one worker process. Off under test, like analysis.recover_interrupted."""
     if os.environ.get("APP_ENV") == "test":
@@ -294,7 +326,9 @@ def recover_interrupted() -> list[int]:
             db.query(VoiceSession.id)
             .join(HiringRequest, HiringRequest.intake_session_id == VoiceSession.id)
             .filter(VoiceSession.purpose == PURPOSE, VoiceSession.status == voice.COMPLETED,
-                    HiringRequest.intake_document_id.is_(None))
+                    or_(HiringRequest.intake_document_id.is_(None),
+                        exists().where(VoiceTurn.session_id == VoiceSession.id,
+                                       or_(VoiceTurn.audio_path.isnot(None), VoiceTurn.transcript.isnot(None)))))
             .all()
         )]
     finally:
