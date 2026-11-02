@@ -1,4 +1,4 @@
-import { AlertTriangle, BrainCircuit, Briefcase, ClipboardCheck, ClipboardList, FileText, HelpCircle, KeyRound, LogOut, MessageSquare, Network, Settings, ShieldCheck } from "lucide-react";
+import { AlertTriangle, BrainCircuit, Briefcase, ClipboardCheck, ClipboardList, FileText, Users, HelpCircle, KeyRound, LogOut, MessageSquare, Network, Settings, ShieldCheck } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { NavLink } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext.jsx";
@@ -20,6 +20,7 @@ const navItems = [
   { labelKey: "nav.graph", to: "/graph", icon: Network, hrOnly: true },
   { labelKey: "nav.jobs", to: "/jobs", icon: Briefcase, hrOnly: true },
   { labelKey: "bridges.nav.hiringRequests", to: "/hiring-requests", icon: ClipboardList, roles: ["hr", "manager"] },
+  { labelKey: "bridges.nav.myInterviews", to: "/my-interviews", icon: Users, roles: ["manager"] },
   { labelKey: "nav.copilot", to: "/copilot", icon: MessageSquare },
   { labelKey: "nav.password", to: "/account/password", icon: KeyRound },
 ];
@@ -33,7 +34,7 @@ function Sidebar() {
   const items = [...navItems.filter((item) => (!item.hrOnly || isHr) && (!item.roles || item.roles.includes(membership?.role))), ...(isHr ? kbNavItems : [])];
 
   return (
-    <aside className="fixed inset-y-0 left-0 z-30 flex w-64 flex-col border-r border-slate-200 bg-white px-4 py-5 shadow-panel">
+    <aside className="fixed inset-y-0 left-0 z-30 flex w-64 flex-col overflow-y-auto border-r border-slate-200 bg-white px-4 py-5 shadow-panel">
       <div className="flex items-center gap-3 px-2">
         <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-blue-600 text-white shadow-card">
           <BrainCircuit size={23} />
@@ -48,7 +49,7 @@ function Sidebar() {
         </div>
       </div>
 
-      <nav className="mt-8 space-y-2">
+      <nav className="mt-6 space-y-1">
         {items.map((item) => {
           const Icon = item.icon;
           return (
@@ -57,7 +58,7 @@ function Sidebar() {
               to={item.to}
               className={({ isActive }) =>
                 [
-                  "flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-semibold transition",
+                  "flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-semibold transition",
                   isActive
                     ? "bg-slate-950 text-white shadow-card"
                     : "text-slate-600 hover:bg-slate-100 hover:text-slate-950",
