@@ -38,6 +38,15 @@ class AcknowledgeIn(BaseModel):
     line_id: Optional[str] = None
 
 
+class DraftVersionIn(BaseModel):
+    """The version the page shows, so an approval or a publish covers what the person read."""
+    version: StrictInt
+
+
+class RequestChangesIn(BaseModel):
+    comment: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=2000)]
+
+
 class BriefIn(BaseModel):
     language: Language = "ko"
 
@@ -65,7 +74,8 @@ class ScoreIn(BaseModel):
 
 
 class ScorecardIn(BaseModel):
-    scores: list[ScoreIn] = Field(min_length=1, max_length=100)
+    # Empty only for a manager who may read none of the application's requirements; the route checks which they may.
+    scores: list[ScoreIn] = Field(max_length=100)
     recommendation: Literal["hire", "no_hire"]
     notes: str = Field(default="", max_length=5000)
 
@@ -77,6 +87,13 @@ class OutcomeIn(BaseModel):
 class HiringRequestIn(BaseModel):
     title: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=255)]
     manager_user_id: StrictInt
+    department_id: Optional[StrictInt] = None
+
+
+class HiringRequestPatch(BaseModel):
+    """Only the fields sent change. A department can be cleared with null; a request always has a manager."""
+    title: Optional[Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=255)]] = None
+    manager_user_id: Optional[StrictInt] = None
     department_id: Optional[StrictInt] = None
 
 

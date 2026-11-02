@@ -103,7 +103,7 @@ def test_a_draft_edited_during_the_check_is_not_published_from_old_lines(client,
         session.commit()
 
     during_the_check(monkeypatch, edit)
-    response = client.post(publish_url(company_id, draft_id), headers=headers)
+    response = client.post(publish_url(company_id, draft_id), headers=headers, json={"version": 1})
     assert response.status_code == 409, response.text
     assert in_other_session(lambda s: (s.query(Job).filter_by(company_id=company_id).count(),
                                        s.get(JobDraft, draft_id).status)) == (0, "approved")
@@ -112,7 +112,7 @@ def test_a_draft_edited_during_the_check_is_not_published_from_old_lines(client,
 def post_in_thread(url, headers, results):
     def run():
         with TestClient(app) as other_client:
-            results.append(other_client.post(url, headers=headers).status_code)
+            results.append(other_client.post(url, headers=headers, json={"version": 1}).status_code)
 
     thread = threading.Thread(target=run, daemon=True)
     thread.start()
@@ -134,7 +134,7 @@ def test_a_second_publish_finishing_during_the_check_is_reused(client, db, world
         return result
 
     monkeypatch.setattr(jobs, "check_requirements", hook)
-    response = client.post(url, headers=headers)
+    response = client.post(url, headers=headers, json={"version": 1})
     assert response.status_code == 200, response.text
     check = in_other_session(lambda s: (s.query(Job).filter_by(company_id=company_id).count(),
                                         s.query(JobRequirement).filter_by(active=True).count(), s.get(JobDraft, draft_id).job_id))
@@ -156,7 +156,7 @@ def test_a_second_publish_waits_for_the_first_and_reuses_its_job(client, db, wor
         return job
 
     monkeypatch.setattr(publishing, "_new_job", hook)
-    response = client.post(url, headers=headers)
+    response = client.post(url, headers=headers, json={"version": 1})
     threads[0].join(30)
     assert response.status_code == 200, response.text
     assert results == [200]

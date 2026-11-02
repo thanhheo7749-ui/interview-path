@@ -1,5 +1,6 @@
 """A small company graph for the JD Studio tests."""
 import json
+from datetime import datetime, timezone
 from types import SimpleNamespace
 
 from app.ai import gateway
@@ -109,8 +110,11 @@ def line(line_id, sources, en="Line", vi="Dong", ko="Jul", is_requirement=False,
 
 
 def make_draft(db, company_id, lines, request_id=None, status="draft"):
+    """In any status but draft it is past its first submit, as a draft that got there through the routes would be."""
     draft = JobDraft(company_id=company_id, hiring_request_id=request_id, version=1, lines=lines,
                      requirement_lines=[], lint=[], failed_languages=[], status=status)
+    if status != "draft" and hasattr(JobDraft, "submitted_at"):
+        draft.submitted_at = datetime.now(timezone.utc)
     db.add(draft)
     db.commit()
     return draft

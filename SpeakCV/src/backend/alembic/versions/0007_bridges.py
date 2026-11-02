@@ -35,7 +35,8 @@ def upgrade() -> None:
     sa.ForeignKeyConstraint(['application_id'], ['applications.id'], ondelete='CASCADE'),
     sa.ForeignKeyConstraint(['company_id'], ['companies.id'], ondelete='CASCADE'),
     sa.ForeignKeyConstraint(['reviewed_by'], ['users.id'], ondelete='SET NULL'),
-    sa.PrimaryKeyConstraint('id')
+    sa.PrimaryKeyConstraint('id'),
+    sa.UniqueConstraint('application_id', name='uq_candidate_briefs_application')
     )
     with op.batch_alter_table('candidate_briefs', schema=None) as batch_op:
         batch_op.create_index(batch_op.f('ix_candidate_briefs_application_id'), ['application_id'], unique=False)
@@ -54,7 +55,8 @@ def upgrade() -> None:
     sa.ForeignKeyConstraint(['application_id'], ['applications.id'], ondelete='CASCADE'),
     sa.ForeignKeyConstraint(['company_id'], ['companies.id'], ondelete='CASCADE'),
     sa.ForeignKeyConstraint(['manager_user_id'], ['users.id'], ondelete='SET NULL'),
-    sa.PrimaryKeyConstraint('id')
+    sa.PrimaryKeyConstraint('id'),
+    sa.UniqueConstraint('application_id', 'manager_user_id', name='uq_scorecards_application_manager')
     )
     with op.batch_alter_table('interview_scorecards', schema=None) as batch_op:
         batch_op.create_index(batch_op.f('ix_interview_scorecards_application_id'), ['application_id'], unique=False)
@@ -102,6 +104,7 @@ def upgrade() -> None:
     sa.Column('title', sa.String(length=255), nullable=True),
     sa.Column('status', sa.String(length=20), nullable=False),
     sa.Column('approved_by', sa.Integer(), nullable=True),
+    sa.Column('submitted_at', sa.DateTime(timezone=True), nullable=True),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('(CURRENT_TIMESTAMP)'), nullable=False),
     sa.ForeignKeyConstraint(['approved_by'], ['users.id'], ondelete='SET NULL'),
     sa.ForeignKeyConstraint(['company_id'], ['companies.id'], ondelete='CASCADE'),

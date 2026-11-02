@@ -6,10 +6,10 @@ import AssistantPanel from '../components/jd/AssistantPanel.jsx';
 import ChannelContent from '../components/jd/ChannelContent.jsx';
 import LineEditor from '../components/jd/LineEditor.jsx';
 import LintPanel from '../components/jd/LintPanel.jsx';
-import { ErrorAlert, cardClass, primaryButton, secondaryButton } from '../components/KbFeedback.jsx';
+import { ErrorAlert, cardClass, inputClass, primaryButton, secondaryButton } from '../components/KbFeedback.jsx';
 import {
   acknowledgeUnchecked, approveDraft, askAssistant, confirmDraftLine, dismissProposal, generateChannelContent,
-  getChannelContent, getDraft, patchDraftLines, publishDraft, rerunLint, submitDraft,
+  getChannelContent, getDraft, patchDraftLines, publishDraft, requestDraftChanges, rerunLint, submitDraft,
 } from '../lib/bridges.js';
 
 const LANGUAGES = [
@@ -17,6 +17,52 @@ const LANGUAGES = [
   { code: 'vi', label: 'Tiếng Việt' },
   { code: 'ko', label: '한국어' },
 ];
+
+// The approver sends the draft back to HR with what should change.
+function RequestChangesForm({ busy, onSend }) {
+  const { t } = useTranslation();
+  const [comment, setComment] = useState('');
+
+  const submit = async (event) => {
+    event.preventDefault();
+    if (await onSend(comment.trim())) setComment('');
+  };
+
+  return (
+    <form onSubmit={submit} className="flex w-full flex-wrap items-end gap-3">
+      <label className="min-w-64 flex-1 text-sm font-semibold text-slate-700">
+        {t('jd.feedback.comment')}
+        <textarea
+          rows={2}
+          maxLength={2000}
+          value={comment}
+          onChange={(e) => setComment(e.target.value)}
+          className={`${inputClass} mt-1 w-full`}
+        />
+      </label>
+      <button type="submit" disabled={busy || !comment.trim()} className={secondaryButton}>
+        {t('jd.feedback.send')}
+      </button>
+    </form>
+  );
+}
+
+function ManagerFeedback({ items }) {
+  const { t } = useTranslation();
+  if (items.length === 0) return null;
+  return (
+    <section aria-label={t('jd.feedback.title')} data-testid="manager-feedback" className={`${cardClass} space-y-2`}>
+      <h2 className="text-lg font-extrabold tracking-tight">{t('jd.feedback.title')}</h2>
+      <ul className="space-y-2">
+        {items.map((item, index) => (
+          <li key={`${item.created_at}-${index}`} className="rounded-xl bg-amber-50 px-3 py-2 text-sm text-amber-900">
+            {item.comment}
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
 
 function JdStudio() {
   const { t, i18n } = useTranslation();
@@ -69,11 +115,16 @@ function JdStudio() {
       return next;
     } catch (err) {
       setError(err.message);
+      // The draft moved, so what this page shows is out of date: show what it says now, beside the message.
+      if (err.status === 409) {
+        const current = await getDraft(companyId, draftId).catch(() => null);
+        if (current) setDraft(current);
+      }
       return null;
     } finally {
       setBusy(false);
     }
-  }, []);
+  }, [companyId, draftId]);
 
   const lineNumbers = useMemo(
     () => Object.fromEntries((draft?.lines ?? []).map((line, index) => [line.id, index + 1])),
@@ -97,6 +148,7 @@ function JdStudio() {
   const incomplete = (draft.failed_languages ?? []).length > 0;
   const clean = !draft.blocks_publish && !incomplete && draft.lines.length > 0;
   const canSubmit = isHr && status === 'draft';
+  const unsupportedLines = new Set(issues.filter((issue) => issue.check === 'no_source').map((issue) => issue.line_id));
 
   const saveLine = async (lineId, text) =>
     Boolean(await act(() => patchDraftLines(companyId, draft.id, [{ id: lineId, text: { [lang]: text } }])));
@@ -110,7 +162,7 @@ function JdStudio() {
   const sendMessage = async (message) => Boolean(await act(() => askAssistant(companyId, draft.id, message)));
 
   const publish = async () => {
-    const published = await act(() => publishDraft(companyId, draft.id));
+    const published = await act(() => publishDraft(companyId, draft.id, draft.version));
     if (!published) return;
     setChannels([]); // the lines changed: text written for the version before must not be shown
     setChannelError('');
@@ -167,11 +219,16 @@ function JdStudio() {
           </>
         )}
         {isManager && status === 'manager_review' && (
-          <button type="button" disabled={busy} onClick={() => act(() => approveDraft(companyId, draft.id))} className={primaryButton}>
-            {t('jd.approve')}
-          </button>
+          <>
+            <button type="button" disabled={busy} onClick={() => act(() => approveDraft(companyId, draft.id, draft.version))} className={primaryButton}>
+              {t('jd.approve')}
+            </button>
+            <RequestChangesForm busy={busy} onSend={(comment) => act(() => requestDraftChanges(companyId, draft.id, comment))} />
+          </>
         )}
       </section>
+
+      <ManagerFeedback items={draft.manager_feedback ?? []} />
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
         <section aria-label={t('jd.lines')} className="space-y-3">
@@ -218,6 +275,7 @@ function JdStudio() {
                 lang={lang}
                 canEdit={isHr}
                 busy={busy}
+                unsupported={unsupportedLines.has(line.id)}
                 onSave={saveLine}
                 onRemove={removeLine}
                 onConfirm={confirmLine}

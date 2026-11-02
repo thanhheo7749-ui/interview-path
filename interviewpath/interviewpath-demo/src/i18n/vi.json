@@ -680,6 +680,11 @@
       "generateDraft": "Tạo bản nháp",
       "openDraft": "Mở bản nháp",
       "awaitingApproval": "Đang chờ bạn duyệt",
+      "edit": "Sửa",
+      "editOne": "Sửa yêu cầu: {{title}}",
+      "cancelRequest": "Hủy yêu cầu",
+      "cancelOne": "Hủy yêu cầu: {{title}}",
+      "cancelConfirm": "Hủy yêu cầu tuyển dụng này? Phần phỏng vấn nhu cầu, bản nháp và phê duyệt sẽ dừng lại và không thể mở lại.",
       "startAgain": "Bắt đầu lại phỏng vấn đầu vào"
     },
     "intake": {
@@ -843,6 +848,11 @@
     "submit": "Gửi cho quản lý",
     "publish": "Đăng",
     "approve": "Duyệt",
+    "feedback": {
+      "title": "Nhận xét của quản lý",
+      "comment": "Cần thay đổi điều gì?",
+      "send": "Yêu cầu chỉnh sửa"
+    },
     "lines": "Các dòng của mô tả",
     "languageTabs": "Ngôn ngữ của mô tả",
     "incomplete": "Các ngôn ngữ chưa đầy đủ: {{languages}}.",
@@ -852,6 +862,7 @@
     "emptyInLanguage": "(chưa viết gì bằng ngôn ngữ này)",
     "restrictedSource": "Nguồn bị hạn chế",
     "unsourced": "Không có nguồn",
+    "unsupported": "Nguồn không nói điều này",
     "confirmedByHr": "HR đã xác nhận",
     "mustHave": "Bắt buộc",
     "requirement": "Yêu cầu",
@@ -883,6 +894,7 @@
       "warning": "Cảnh báo",
       "line": "dòng {{number}}",
       "differentScope": "Đây là phạm vi khác",
+      "fact": "Thông tin của công ty: {{title}}",
       "acknowledge": "Ghi nhận: không chạy được kiểm tra",
       "checks": {
         "discrimination": "Phân biệt đối xử",
@@ -934,6 +946,7 @@
       "no_source": "Không có nguồn trong tri thức công ty.",
       "unknown_nodes": "Dòng này dẫn tới tri thức không có sẵn.",
       "unsupported_numbers": "Dòng này nêu các số mà nguồn không có: {{numbers}}.",
+      "unsupported_terms": "Dòng này nêu mức lương hoặc phúc lợi mà nguồn không đề cập.",
       "unknown": "Tri thức công ty không hỗ trợ dòng này."
     }
   }

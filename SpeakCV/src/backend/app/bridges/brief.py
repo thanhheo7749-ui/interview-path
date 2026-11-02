@@ -7,17 +7,18 @@ recording time is read by code from the evidence row, so the AI cannot alter or 
 from datetime import datetime, timezone
 
 from pydantic import BaseModel
+from sqlalchemy.exc import IntegrityError
 
 from app.ai import gateway
 from app.ai.config import get_config
-from app.brain.audience import department_subtree
+from app.brain.audience import Audience, department_subtree, requirement_filter
 from app.brain.prompting import as_data
 from app.brain.text import quote_in
 from app.database.sql_models import (
-    Application, CandidateBrief, CompanyMember, CvClaim, InterviewScorecard, Job, JobRequirement, RequirementResult, VoiceSession,
-    VoiceTurn,
+    Application, CandidateBrief, CompanyMember, CvClaim, HiringRequest, InterviewScorecard, Job, JobRequirement,
+    RequirementResult, VoiceSession, VoiceTurn,
 )
-from app.hiring import audit, notify
+from app.hiring import audit, jobs, notify
 from app.hiring.state import CONSENT_WITHDRAWN
 
 PROMPT_VERSION = "candidate-brief-1"
@@ -184,12 +185,62 @@ def _get(db, application) -> CandidateBrief | None:
 get_brief = _get
 
 
+def _lock_brief(db, application) -> CandidateBrief | None:
+    return (
+        db.query(CandidateBrief)
+        .filter(CandidateBrief.application_id == application.id, CandidateBrief.company_id == application.company_id)
+        .populate_existing().with_for_update().first()
+    )
+
+
+def _lock_row(db, application, row: CandidateBrief) -> None:
+    """Read the application and the brief as they are now: a regenerate may have cleared the review since this request
+    read the row, and a withdrawal may have deleted it. The application's lock comes first, as in a withdrawal."""
+    db.query(Application).filter(Application.id == application.id).populate_existing().with_for_update().first()
+    current = db.query(CandidateBrief).filter(CandidateBrief.id == row.id).populate_existing().with_for_update().first()
+    if current is None:
+        raise BriefError(409, "This brief no longer exists")
+
+
+def _check_can_have_brief(application) -> None:
+    if application.hr_decision != "approved" or application.anonymized_at is not None:
+        raise BriefError(409, "A brief needs an approved application")
+
+
+def _row_to_write(db, application, had_withdrawn: bool) -> CandidateBrief:
+    """After the AI call. Takes the application's row and the brief's, reads them as they are now, and refuses if the
+    application was deleted, lost its consent or approval, or the brief went out during the call: nothing drawn from this
+    evidence is written then. Two first generates meet at the unique key, and the one that loses writes over the winner's
+    draft."""
+    application_id = application.id
+    # End the transaction, so the reads after these locks see what was committed before they were granted.
+    db.rollback()
+    locked = db.query(Application).filter(Application.id == application_id).populate_existing().with_for_update().first()
+    if (
+        locked is None or locked.anonymized_at is not None
+        or (locked.analysis_status == CONSENT_WITHDRAWN and not had_withdrawn)
+    ):
+        raise BriefError(409, "This application changed while the brief was being written. Please try again.")
+    _check_can_have_brief(application)
+    row = _lock_brief(db, application)
+    if row is None:
+        row = CandidateBrief(company_id=application.company_id, application_id=application_id, language=DEFAULT_LANGUAGE,
+                             content={}, status="draft")
+        try:
+            with db.begin_nested():
+                db.add(row)
+        except IntegrityError:
+            row = _lock_brief(db, application)
+    if row.status == "sent" and not row.stale:
+        raise BriefError(409, "This brief was already sent")
+    return row
+
+
 def generate(db, application, reviewer_id, language: str = DEFAULT_LANGUAGE) -> CandidateBrief:
     """Draft a brief from the application's evidence. Needs HR's approval. A sent brief is not replaced."""
     if language not in LANGUAGES:
         raise BriefError(422, "Unsupported language")
-    if application.hr_decision != "approved" or application.anonymized_at is not None:
-        raise BriefError(409, "A brief needs an approved application")
+    _check_can_have_brief(application)
     row = _get(db, application)
     if row is not None and row.status == "sent" and not row.stale:
         raise BriefError(409, "This brief was already sent")
@@ -204,16 +255,6 @@ def generate(db, application, reviewer_id, language: str = DEFAULT_LANGUAGE) -> 
             [{"role": "user", "content": _prompt(evidence, language)}], BriefOutput, MAX_OUTPUT_TOKENS,
             "candidate_brief", application.company_id,
         )
-        # Withdrawn consent or a deletion during the call: nothing drawn from this evidence is written.
-        locked = (
-            db.query(Application).filter(Application.id == application.id)
-            .populate_existing().with_for_update().first()
-        )
-        if (
-            locked is None or locked.anonymized_at is not None
-            or (locked.analysis_status == CONSENT_WITHDRAWN and not had_withdrawn)
-        ):
-            raise BriefError(409, "This application changed while the brief was being written. Please try again.")
         out = response.value
         content = assemble(
             evidence,
@@ -222,9 +263,7 @@ def generate(db, application, reviewer_id, language: str = DEFAULT_LANGUAGE) -> 
             [(q.evidence_id, q.question, "") for q in out.questions],
         )
         provider, model = response.provider, get_config().slot("reasoning").model
-    if row is None:
-        row = CandidateBrief(company_id=application.company_id, application_id=application.id)
-        db.add(row)
+    row = _row_to_write(db, application, had_withdrawn)
     row.language, row.content, row.status, row.reviewed_by, row.sent_at = language, content, "draft", None, None
     row.stale = False
     audit.record(db, application.company_id, reviewer_id, "brief_generated", "application", application.id,
@@ -236,6 +275,7 @@ def generate(db, application, reviewer_id, language: str = DEFAULT_LANGUAGE) -> 
 
 def edit(db, application, row, reviewer_id, strengths=None, to_clarify=None, questions=None) -> CandidateBrief:
     """HR changes wording only. The result goes through `assemble` again, so quotes and times stay the evidence's."""
+    _lock_row(db, application, row)
     if row.status == "sent":
         raise BriefError(409, "A sent brief cannot be edited")
     content = dict(row.content or {})
@@ -255,17 +295,27 @@ def edit(db, application, row, reviewer_id, strengths=None, to_clarify=None, que
     return row
 
 
-def _managers_of(db, company_id: int, department_id: int | None) -> list[int]:
-    if department_id is None:
+def _managers_of(db, job: Job) -> list[int]:
+    """Who reads this job's interviews: the manager assigned to its request, else the managers of its department."""
+    assigned = db.query(HiringRequest.manager_user_id).filter(HiringRequest.job_id == job.id,
+                                                              HiringRequest.company_id == job.company_id).all()
+    if assigned:
+        return list(dict.fromkeys(user_id for (user_id,) in assigned if user_id is not None))
+    if job.department_id is None:
         return []
-    members = db.query(CompanyMember).filter(CompanyMember.company_id == company_id, CompanyMember.role == "manager",
+    members = db.query(CompanyMember).filter(CompanyMember.company_id == job.company_id, CompanyMember.role == "manager",
                                              CompanyMember.department_id.isnot(None)).all()
-    return [m.user_id for m in members if department_id in department_subtree(db, company_id, m.department_id)]
+    return [m.user_id for m in members if job.department_id in department_subtree(db, job.company_id, m.department_id)]
 
 
 def send(db, application, row, actor_user_id) -> CandidateBrief:
+    _lock_row(db, application, row)
     if application.anonymized_at is not None:
         raise BriefError(409, "This application was anonymized")
+    if application.analysis_status == CONSENT_WITHDRAWN:
+        raise BriefError(409, "The candidate withdrew consent to the recording")
+    if row.stale:
+        raise BriefError(409, "The analysis changed after this brief was written. Generate it again")
     if row.status == "sent":
         raise BriefError(409, "This brief was already sent")
     if row.reviewed_by is None:
@@ -275,7 +325,7 @@ def send(db, application, row, actor_user_id) -> CandidateBrief:
     row.sent_at = datetime.now(timezone.utc)
     audit.record(db, application.company_id, actor_user_id, "brief_sent", "application", application.id)
     subject, body = NOTIFICATION[row.language if row.language in NOTIFICATION else "en"]
-    for user_id in _managers_of(db, application.company_id, job.department_id):
+    for user_id in _managers_of(db, job):
         notify.enqueue(db, application.company_id, user_id, "brief", row.language,
                        subject.format(title=job.title, alias=application.alias),
                        body.format(title=job.title, alias=application.alias), application_id=application.id)
@@ -283,24 +333,53 @@ def send(db, application, row, actor_user_id) -> CandidateBrief:
     return row
 
 
-def submit_scorecard(db, application, manager_user_id, scores, recommendation, notes) -> InterviewScorecard:
-    """One scorecard per manager and application. Resubmitting replaces it and is logged. `scores` is a list of
-    (requirement_id, score) that must cover exactly the job's active requirements."""
-    active = {r.id for r in db.query(JobRequirement).filter(
-        JobRequirement.job_id == application.job_id, JobRequirement.active.is_(True)).all()}
-    given = [requirement_id for requirement_id, _ in scores]
-    if len(set(given)) != len(given) or set(given) != active:
-        raise BriefError(422, "Score every active requirement of the job exactly once")
-    row = (
-        db.query(InterviewScorecard)
-        .filter(InterviewScorecard.application_id == application.id,
-                InterviewScorecard.company_id == application.company_id,
-                InterviewScorecard.manager_user_id == manager_user_id).first()
+def _find_scorecard(db, application, manager_user_id, lock: bool = False) -> InterviewScorecard | None:
+    query = db.query(InterviewScorecard).filter(
+        InterviewScorecard.application_id == application.id, InterviewScorecard.company_id == application.company_id,
+        InterviewScorecard.manager_user_id == manager_user_id)
+    return (query.populate_existing().with_for_update() if lock else query).first()
+
+
+def readable_requirements(db, application, reader: Audience) -> list[JobRequirement]:
+    """What this application is measured against, as far as this reader may read it."""
+    ids = [row.id for row in jobs.requirements_for(db, application)]
+    return (
+        db.query(JobRequirement).join(Job, Job.id == JobRequirement.job_id)
+        .filter(JobRequirement.id.in_(ids), requirement_filter(reader))
+        .order_by(JobRequirement.position, JobRequirement.id).all()
     )
+
+
+def for_reader(db, application, row: CandidateBrief, reader: Audience) -> dict:
+    """The brief without any point on a requirement above this reader's layer, since its label, its summary and its quote
+    all speak of that requirement."""
+    readable = {item.id for item in readable_requirements(db, application, reader)}
+    hidden = {
+        f"r{result_id}" for result_id, requirement_id in db.query(RequirementResult.id, RequirementResult.requirement_id)
+        .filter(RequirementResult.application_id == application.id).all() if requirement_id not in readable
+    }
+    content = dict(row.content or {})
+    for section in ("strengths", "to_clarify", "questions"):
+        content[section] = [point for point in content.get(section, []) if point.get("evidence_id") not in hidden]
+    return {**serialize(row), "content": content}
+
+
+def submit_scorecard(db, application, manager_user_id, required: set[int], scores, recommendation, notes) -> InterviewScorecard:
+    """One scorecard per manager and application. Resubmitting replaces it and is logged. `scores` is a list of
+    (requirement_id, score) that must cover exactly the `required` requirements. Two first submits meet at the unique key,
+    and the one that loses updates the winner's row."""
+    given = [requirement_id for requirement_id, _ in scores]
+    if len(set(given)) != len(given) or set(given) != required:
+        raise BriefError(422, "Score every requirement shown exactly once")
+    row = _find_scorecard(db, application, manager_user_id)
     if row is None:
         row = InterviewScorecard(company_id=application.company_id, application_id=application.id,
-                                 manager_user_id=manager_user_id)
-        db.add(row)
+                                 manager_user_id=manager_user_id, recommendation=recommendation)
+        try:
+            with db.begin_nested():
+                db.add(row)
+        except IntegrityError:
+            row = _find_scorecard(db, application, manager_user_id, lock=True)
     row.requirement_scores = [{"requirement_id": rid, "score": score} for rid, score in scores]
     row.recommendation, row.notes = recommendation, notes
     row.submitted_at = datetime.now(timezone.utc)

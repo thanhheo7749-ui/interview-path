@@ -135,10 +135,19 @@ def _lines(world):
     ]
 
 
+def _version(draft):
+    session = SessionLocal()
+    try:
+        return session.get(JobDraft, draft.id).version
+    finally:
+        session.close()
+
+
 def _approved(api, db, world):
     draft = make_draft(db, world.company.id, _lines(world), world.request.id)
     assert api.post(_url(world, f"/job-drafts/{draft.id}/submit"), headers=HR).status_code == 200
-    assert api.post(_url(world, f"/job-drafts/{draft.id}/approve"), headers=MANAGER).status_code == 200
+    assert api.post(_url(world, f"/job-drafts/{draft.id}/approve"), headers=MANAGER,
+                    json={"version": _version(draft)}).status_code == 200
     return draft
 
 
@@ -315,7 +324,7 @@ def test_a_node_that_changed_during_the_call_is_refused(api, review_world, probe
 def test_publish_from_jd_studio(api, db, world, probe):
     draft = _approved(api, db, world)
     probe.start()
-    response = api.post(_url(world, f"/job-drafts/{draft.id}/publish"), headers=HR)
+    response = api.post(_url(world, f"/job-drafts/{draft.id}/publish"), headers=HR, json={"version": _version(draft)})
     assert response.status_code == 200, response.text
     assert response.json()["job"]["status"] == "published"
     probe.assert_clean("discrimination_check", "lint_embed")
@@ -323,7 +332,7 @@ def test_publish_from_jd_studio(api, db, world, probe):
 
 def test_republish_onto_an_existing_job(api, db, world, probe):
     draft = _approved(api, db, world)
-    assert api.post(_url(world, f"/job-drafts/{draft.id}/publish"), headers=HR).status_code == 200
+    assert api.post(_url(world, f"/job-drafts/{draft.id}/publish"), headers=HR, json={"version": _version(draft)}).status_code == 200
     lines = _lines(world) + [line("l3", [world.docker.id], en="You ship containers", vi="Docker", ko="Docker",
                                   is_requirement=True)]
     db.expire_all()
@@ -331,7 +340,7 @@ def test_republish_onto_an_existing_job(api, db, world, probe):
     stored.lines, stored.status = lines, "approved"
     db.commit()
     probe.start()
-    response = api.post(_url(world, f"/job-drafts/{draft.id}/publish"), headers=HR)
+    response = api.post(_url(world, f"/job-drafts/{draft.id}/publish"), headers=HR, json={"version": _version(draft)})
     assert response.status_code == 200, response.text
     assert response.json()["job"]["version"] == 2
     probe.assert_clean("discrimination_check")
@@ -341,7 +350,7 @@ def test_a_publish_refused_by_the_guard_leaves_no_job(api, db, world, probe):
     draft = _approved(api, db, world)
     fake.register("discrimination_check", _flag_single_language("You have 3 years of Python experience"))
     probe.start()
-    response = api.post(_url(world, f"/job-drafts/{draft.id}/publish"), headers=HR)
+    response = api.post(_url(world, f"/job-drafts/{draft.id}/publish"), headers=HR, json={"version": _version(draft)})
     assert response.status_code == 422, response.text
     db.expire_all()
     assert db.query(Job).count() == 0
@@ -361,7 +370,7 @@ def test_publish_to_a_closed_job_asks_no_ai_about_requirements(api, db, world, p
     seen = []
     fake.register("discrimination_check", lambda _system, messages, _schema: (
         seen.append(messages[-1]["content"]) or '{"flagged": false, "category": "age", "reason": ""}'))
-    response = api.post(_url(world, f"/job-drafts/{draft.id}/publish"), headers=HR)
+    response = api.post(_url(world, f"/job-drafts/{draft.id}/publish"), headers=HR, json={"version": _version(draft)})
     assert response.status_code == 409
     assert "<statement>\nYou have 3 years of Python experience\n</statement>" not in seen
 
@@ -434,7 +443,7 @@ def test_an_edit_refused_by_validation_runs_no_lint(api, db, world, probe):
 
 def test_channel_generate(api, db, world, probe):
     draft = _approved(api, db, world)
-    assert api.post(_url(world, f"/job-drafts/{draft.id}/publish"), headers=HR).status_code == 200
+    assert api.post(_url(world, f"/job-drafts/{draft.id}/publish"), headers=HR, json={"version": _version(draft)}).status_code == 200
     probe.start()
     response = api.post(_url(world, f"/job-drafts/{draft.id}/channels/generate"), headers=HR)
     assert response.status_code == 200, response.text
@@ -459,7 +468,7 @@ def test_channel_commentary(api, db, world, probe):
 
 def test_channel_generate_saves_nothing_when_the_ai_fails(api, db, world, monkeypatch):
     draft = _approved(api, db, world)
-    assert api.post(_url(world, f"/job-drafts/{draft.id}/publish"), headers=HR).status_code == 200
+    assert api.post(_url(world, f"/job-drafts/{draft.id}/publish"), headers=HR, json={"version": _version(draft)}).status_code == 200
     db.expire_all()
     job_id = db.get(JobDraft, draft.id).job_id
 

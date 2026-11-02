@@ -72,6 +72,8 @@ function ReviewPage() {
       notifyKbChanged();
     } catch (err) {
       setError(err.message);
+      // The check could not run on the text HR rewrote: it goes out only once HR confirms having read it.
+      if (err.code === UNCHECKED && items.length === 1) setConfirming(items[0].node_id);
     } finally {
       setBusy(false);
     }

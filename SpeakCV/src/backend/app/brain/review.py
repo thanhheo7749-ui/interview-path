@@ -428,6 +428,15 @@ def _apply_fields(item, node: KbNode, reembed: dict[int, KbNode], edited_facts: 
     return False
 
 
+def _confirm_unchecked(node: KbNode, item) -> None:
+    """An item the check could not read goes out only on HR's word. `code` lets the portal ask for it."""
+    if not getattr(item, "confirm_unchecked", False):
+        raise ReviewError(409, {"code": discrimination.UNCHECKED,
+                                "message": "The automatic discrimination check did not run for this item. "
+                                           "Edit it or confirm that it was reviewed."})
+    node.guard_category = node.guard_reason = None
+
+
 def _guard_by_rules(node: KbNode, before: tuple[str, str], publishing: bool) -> None:
     """The types the classifier does not cover are held to the rules, which need no AI: a node flagged at intake stays
     blocked until HR rewrites it, and an edit is checked again."""
@@ -454,17 +463,18 @@ def _guard(node: KbNode, item, before: tuple[str, str], publishing: bool, check)
         if held is None or not publishing or node.status == "published":
             return
         if held == discrimination.UNCHECKED:
-            if not getattr(item, "confirm_unchecked", False):
-                raise ReviewError(409, "The automatic discrimination check did not run for this item. "
-                                       "Edit it or confirm that it was reviewed.")
-            node.guard_category = node.guard_reason = None
+            _confirm_unchecked(node, item)
             return
         raise ReviewError(409, f"Blocked ({held}): {node.guard_reason}")
     result = check(node)
     node.guard_category = result.category if result else None
     node.guard_reason = result.reason if result else None
-    if result is not None and not result.unchecked and publishing:
-        raise ReviewError(409, f"Blocked ({result.category}): {result.reason}")
+    if result is None or not publishing:
+        return
+    if result.unchecked:
+        _confirm_unchecked(node, item)
+        return
+    raise ReviewError(409, f"Blocked ({result.category}): {result.reason}")
 
 
 def _load_for(db: Session, company_id: int, node_id: int, action: str) -> KbNode:

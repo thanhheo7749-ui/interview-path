@@ -40,6 +40,11 @@ function LintPanel({ issues, lineNumbers, canAct, busy, onDifferentScope, onReru
               <p data-testid="lint-message">
                 {canAct ? issue.message : t(`jd.lint.messages.${issue.check}`, { defaultValue: t('jd.lint.messages.other') })}
               </p>
+              {issue.check === 'conflict' && issue.node_title && (
+                <p data-testid="lint-fact" className="font-semibold">
+                  {t('jd.lint.fact', { title: issue.node_title })}
+                </p>
+              )}
               {canAct && issue.check === 'conflict' && nodeId != null && (
                 <button type="button" disabled={busy} onClick={() => onDifferentScope(issue.line_id, nodeId)} className={secondaryButton}>
                   {t('jd.lint.differentScope')}

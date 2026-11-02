@@ -1,8 +1,9 @@
 """JD Studio: a job description in three languages where every line traces to knowledge graph nodes.
 
 Generation reads with the candidate audience, so confidential and internal content cannot reach a prompt. Code, not the
-model, decides what enters the draft: a line needs sources that were in the context, and every number in it must
-appear in those sources. Anything else becomes a proposal that HR may confirm, which records who and when."""
+model, decides what enters the draft: a line needs sources that were in the context, which must state its numbers with
+their units and carry any salary or benefit it names. The assistant may only restyle a line: a new line, or a change to
+what a line cites or asks of the candidate, becomes a proposal. HR may confirm a proposal, which records who and when."""
 import copy
 import json
 from dataclasses import dataclass
@@ -13,10 +14,11 @@ from sqlalchemy.orm import Session
 
 from app.ai import gateway
 from app.brain import audience as aud
-from app.brain import contradiction, retriever
+from app.brain import retriever
 from app.brain.prompting import as_data
 from app.bridges import lint
-from app.bridges.lint import LANGS, NUMBER_AT
+from app.bridges.claims import unsupported_claims, unsupported_line_numbers
+from app.bridges.lint import LANGS
 from app.database.sql_models import HiringRequest, Job, JobDraft, JobDraftMessage
 from app.hiring import audit
 
@@ -28,6 +30,7 @@ HISTORY_LIMIT = 10
 MAX_MESSAGE_CHARS = 2000
 PROPOSAL = "proposal"
 PROPOSAL_DONE = "proposal_confirmed"
+MANAGER_FEEDBACK = "manager_feedback"
 PROPOSAL_DISMISSED = "proposal_dismissed"
 CONFIRMED_LABEL = "Confirmed by HR"
 RESETS_ON_EDIT = ("manager_review", "approved", "published")
@@ -153,25 +156,11 @@ def build_context(db: Session, company_id: int, role_node_id: int | None, query:
 
 # --- validation --------------------------------------------------------------------------------------------------
 
-def _unsupported_numbers(line: dict, node_texts: dict[int, str]) -> list[str]:
-    source = "\n".join(node_texts.get(node_id, "") for node_id in line.get("source_node_ids") or [])
-    missing = []
-    for lang in LANGS:
-        for match in NUMBER_AT.finditer((line.get("text") or {}).get(lang) or ""):
-            token, word = match.group(1), match.group(2) or ""
-            if contradiction.value_in_quote("number", token, source):
-                continue
-            if word and contradiction.value_in_quote("number", f"{token} {word}", source):
-                continue
-            missing.append(token)
-    return list(dict.fromkeys(missing))
-
-
 def validate_lines(lines: list[dict], allowed_node_ids, node_texts: dict[int, str] | None = None) -> LineValidation:
     """Split lines into valid and rejected. An HR-confirmed line is valid as it is.
 
-    Any other line needs sources, all of them in allowed_node_ids, and each number in its text must appear in the
-    text of its sources. With node_texts None the number check is skipped."""
+    Any other line needs sources, all of them in allowed_node_ids, and its sources must state its numbers with their
+    units and carry any salary or benefit it names. With node_texts None those two checks are skipped."""
     allowed = set(allowed_node_ids)
     valid, rejected = [], []
     for item in lines:
@@ -185,9 +174,9 @@ def validate_lines(lines: list[dict], allowed_node_ids, node_texts: dict[int, st
         elif not set(sources) <= allowed:
             detail = sorted(set(sources) - allowed)
             code, reason = "unknown_nodes", f"The line cites nodes that are not in the company context: {detail}."
-        elif node_texts is not None and (missing := _unsupported_numbers(item, node_texts)):
-            detail = missing
-            code, reason = "unsupported_numbers", f"The line states numbers that its sources do not contain: {', '.join(missing)}."
+        elif node_texts is not None and (reason := unsupported_claims(item, node_texts)):
+            numbers = unsupported_line_numbers(item, node_texts)
+            code, detail = ("unsupported_numbers", numbers) if numbers else ("unsupported_terms", [])
         if reason is None:
             valid.append(item)
         else:
@@ -261,6 +250,20 @@ def _same_text(first: dict, second: dict) -> bool:
     return all((first.get(lang) or "").strip() == (second.get(lang) or "").strip() for lang in LANGS)
 
 
+def _same_claim(before: dict, after: dict) -> bool:
+    """What a line cites and asks of the candidate, which a restyle leaves as it is."""
+    return (before.get("source_node_ids") == after.get("source_node_ids")
+            and bool(before.get("is_requirement")) == bool(after.get("is_requirement"))
+            and bool(before.get("must_have")) == bool(after.get("must_have")))
+
+
+def _lock_unchanged(db: Session, draft: JobDraft, version: int, status: str) -> None:
+    """After the AI calls: take the row, read it as it is now, and refuse if someone moved it during the calls."""
+    lint.lock_row(db, draft)
+    if draft.version != version or draft.status != status:
+        raise JdStudioError(409, "The draft changed while this was running. Please read it again and retry.")
+
+
 # --- generation --------------------------------------------------------------------------------------------------
 
 def job_context(db: Session, source) -> JobContext:
@@ -278,7 +281,7 @@ def job_context(db: Session, source) -> JobContext:
 def generate(db: Session, source, user_id: int) -> JobDraft:
     """A new draft from the candidate-audience context. AIError propagates and leaves nothing behind.
 
-    Lines code rejects are not in the draft. They are on the returned draft as rejected_lines, which is not stored."""
+    Lines code rejects are not in the draft. They are stored on the draft as rejected, for HR to read."""
     ctx = job_context(db, source)
     context = build_context(db, ctx.company_id, ctx.role_node_id, ctx.title)
     if not context.texts:
@@ -358,8 +361,16 @@ def pending_proposals(db: Session, draft: JobDraft) -> list[dict]:
     return [{"id": f"{PROPOSAL}-{row.id}", **json.loads(row.content)} for row in rows]
 
 
+def _as_proposal(line: dict, reason: str, replaces: str | None = None) -> dict:
+    proposal = {**line["text"], "reason": reason, "is_requirement": bool(line.get("is_requirement")),
+                "must_have": bool(line.get("must_have"))}
+    return {**proposal, "replaces": replaces} if replaces else proposal
+
+
 def revise(db: Session, draft: JobDraft, message: str, user_id: int) -> RevisionResult:
-    """Apply an HR request. AIError propagates before anything is written."""
+    """Apply an HR request. AIError propagates before anything is written. JdStudioError(409) if the draft moved during
+    the AI calls. A line the model may not change this way stays as it was, with the change as a proposal."""
+    version, status = draft.version, draft.status
     message = message.strip()[:MAX_MESSAGE_CHARS]
     context = draft_context(db, draft, message)
     history = "\n".join(f"{row.role}: {as_data(' '.join(row.content.split()))}" for row in _history(db, draft))
@@ -381,31 +392,34 @@ def revise(db: Session, draft: JobDraft, message: str, user_id: int) -> Revision
     stored = _unique_ids([_stored(item) for item in output.lines])
     for out in stored:
         before = existing.get(out["id"])
-        if before is not None and before.get("hr_confirmed"):
-            if _same_text(before["text"], out["text"]):
-                kept.append(copy.deepcopy(before))
-            else:
-                kept.append(copy.deepcopy(before))
-                proposals.append({**out["text"], "reason": "HR confirmed this line, so the assistant may not change it."})
+        if before is None:
+            proposals.append(_as_proposal(out, "The assistant may not add a line. HR decides whether it belongs."))
             continue
-        if before is not None and _same_text(before["text"], out["text"]) \
-                and before.get("source_node_ids") == out["source_node_ids"]:
+        if _same_text(before["text"], out["text"]) and (before.get("hr_confirmed") or _same_claim(before, out)):
             kept.append(copy.deepcopy(before))  # untouched by the model, so judged by lint as before
-            continue
-        if before is not None:
-            out["conflict_dismissed"] = list(before.get("conflict_dismissed") or [])
-        candidates.append(out)
+        elif before.get("hr_confirmed"):
+            kept.append(copy.deepcopy(before))
+            proposals.append(_as_proposal(out, "HR confirmed this line, so the assistant may not change it.", out["id"]))
+        elif not _same_claim(before, out):
+            kept.append(copy.deepcopy(before))
+            proposals.append(_as_proposal(
+                out, "The assistant may only restyle a line, not change its sources or what it asks.", out["id"]))
+        else:
+            candidates.append(out)  # a restyle: checked below. A new text voids a conflict marked as a different scope
     result = validate_lines(candidates, set(context.texts), context.texts)
+    by_id = {item["id"]: item for item in candidates}
     for item in result.rejected:
-        proposals.append({**item["text"], "reason": item["reason"]})
+        kept.append(copy.deepcopy(existing[item["line_id"]]))
+        proposals.append(_as_proposal(by_id[item["line_id"]], item["reason"], item["line_id"]))
     accepted = {item["id"]: item for item in [*kept, *result.valid]}
     ordered = [accepted[item["id"]] for item in stored if item["id"] in accepted]
 
     summary = output.summary.strip() or "Draft revised."
     if proposals:
-        summary += (f" {len(proposals)} proposed line(s) were not added because the knowledge graph has no source for "
-                    "them. Confirm a proposal to add it as a line confirmed by HR.")
+        summary += (f" {len(proposals)} proposed change(s) were not applied because the knowledge graph does not support "
+                    "them. Confirm a proposal to apply it as confirmed by HR.")
     issues = lint.evaluate(db, draft.company_id, ordered)
+    _lock_unchanged(db, draft, version, status)
     _set_lines(draft, ordered)
     db.add(JobDraftMessage(company_id=draft.company_id, job_draft_id=draft.id, role="user", content=message,
                            created_by=user_id))
@@ -423,11 +437,13 @@ def revise(db: Session, draft: JobDraft, message: str, user_id: int) -> Revision
 # --- HR actions --------------------------------------------------------------------------------------------------
 
 def confirm_line(db: Session, draft: JobDraft, line_id: str, user_id: int) -> JobDraft:
-    """HR confirms a line that has no valid source: a pending proposal, or a line already in the draft."""
+    """HR confirms a line that no source supports: one already in the draft, or a pending proposal, which replaces the
+    line it was proposed for or else adds one. The line then rests on HR's word, so it cites nothing."""
+    version, status = draft.version, draft.status
     lines = copy.deepcopy(draft.lines or [])
     confirmation = {"user_id": user_id, "at": _now()}
     target = next((item for item in lines if item["id"] == line_id), None)
-    row = None
+    row_id = None
     if target is not None:
         if target.get("hr_confirmed"):
             raise JdStudioError(409, "This line is already confirmed")
@@ -436,14 +452,21 @@ def confirm_line(db: Session, draft: JobDraft, line_id: str, user_id: int) -> Jo
         proposal = next((p for p in pending_proposals(db, draft) if p["id"] == line_id), None)
         if proposal is None:
             raise JdStudioError(404, "Line or proposal not found")
-        row = db.get(JobDraftMessage, int(line_id.rsplit("-", 1)[1]))
-        lines.append({
-            "id": _new_id(lines), "text": {lang: proposal[lang] for lang in LANGS}, "source_node_ids": [],
-            "hr_confirmed": confirmation, "is_requirement": False, "must_have": False, "conflict_dismissed": [],
-        })
+        row_id = int(line_id.rsplit("-", 1)[1])
+        confirmed = {
+            "id": proposal.get("replaces") or _new_id(lines), "text": {lang: proposal[lang] for lang in LANGS},
+            "source_node_ids": [], "hr_confirmed": confirmation, "is_requirement": bool(proposal.get("is_requirement")),
+            "must_have": bool(proposal.get("must_have")), "conflict_dismissed": [],
+        }
+        replaced = next((index for index, item in enumerate(lines) if item["id"] == confirmed["id"]), None)
+        if replaced is None:
+            lines.append(confirmed)
+        else:
+            lines[replaced] = confirmed
     issues = lint.evaluate(db, draft.company_id, lines)
-    if row is not None:
-        row.role = PROPOSAL_DONE
+    _lock_unchanged(db, draft, version, status)
+    if row_id is not None:
+        db.get(JobDraftMessage, row_id).role = PROPOSAL_DONE
     _set_lines(draft, lines)
     audit.record(db, draft.company_id, user_id, "job_draft.line_confirmed", "job_draft", draft.id, {"line_id": line_id})
     lint.store(db, draft, issues)
@@ -470,7 +493,9 @@ def dismiss_proposal(db: Session, draft: JobDraft, proposal_id: str, user_id: in
 def edit_lines(db: Session, draft: JobDraft, patches: list[dict], user_id: int) -> JobDraft:
     """HR's manual edit. A patch with a known id changes that line, an unknown or missing id adds one, delete removes.
 
-    Changing the text voids an acknowledgement of an unchecked line. conflict_dismissed marks "different scope"."""
+    Changing the text voids what was said about the old text: an acknowledgement of an unchecked line, HR's confirmation,
+    and any conflict marked "different scope" through conflict_dismissed."""
+    version, status = draft.version, draft.status
     lines = copy.deepcopy(draft.lines or [])
     visible = {n.id for n in retriever.visible_graph(db, aud.candidate(draft.company_id))[0]}
     known = {n.id for n in retriever.visible_graph(db, aud.Audience(draft.company_id, "hr"))[0]}
@@ -486,8 +511,12 @@ def edit_lines(db: Session, draft: JobDraft, patches: list[dict], user_id: int) 
                       "conflict_dismissed": []}
             lines.append(target)
         if patch.get("text"):
-            target["text"] = {**target["text"], **{k: v.strip() for k, v in patch["text"].items() if k in LANGS}}
-            target.pop("unchecked_ack", None)
+            text = {**target["text"], **{k: v.strip() for k, v in patch["text"].items() if k in LANGS}}
+            if text != target["text"]:
+                target["text"] = text
+                target.pop("unchecked_ack", None)
+                target["hr_confirmed"] = None
+                target["conflict_dismissed"] = []
         if patch.get("source_node_ids") is not None:
             ids = list(dict.fromkeys(patch["source_node_ids"]))
             if not set(ids) <= visible:
@@ -503,6 +532,7 @@ def edit_lines(db: Session, draft: JobDraft, patches: list[dict], user_id: int) 
                 raise JdStudioError(422, "That node is not in this company")
             target["conflict_dismissed"] = ids
     issues = lint.evaluate(db, draft.company_id, lines)
+    _lock_unchanged(db, draft, version, status)
     _set_lines(draft, lines)
     audit.record(db, draft.company_id, user_id, "job_draft.edited", "job_draft", draft.id, {"lines": len(patches)})
     lint.store(db, draft, issues)

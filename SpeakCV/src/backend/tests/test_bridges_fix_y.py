@@ -82,8 +82,9 @@ def test_dismissing_a_proposal_removes_it_for_good(api, db, world):
 
 def _publish(api, world, draft_id):
     assert api.post(_url(world, f"/job-drafts/{draft_id}/submit"), headers=HR).status_code == 200
-    assert api.post(_url(world, f"/job-drafts/{draft_id}/approve"), headers=MANAGER).status_code == 200
-    response = api.post(_url(world, f"/job-drafts/{draft_id}/publish"), headers=HR)
+    version = {"version": api.get(_url(world, f"/job-drafts/{draft_id}"), headers=HR).json()["version"]}
+    assert api.post(_url(world, f"/job-drafts/{draft_id}/approve"), headers=MANAGER, json=version).status_code == 200
+    response = api.post(_url(world, f"/job-drafts/{draft_id}/publish"), headers=HR, json=version)
     assert response.status_code == 200, response.text
     return response.json()
 

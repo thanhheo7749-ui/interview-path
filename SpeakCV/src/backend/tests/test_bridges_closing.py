@@ -62,7 +62,7 @@ def test_a_manager_gets_titles_only_for_sources_their_layer_allows(api, db, worl
                                 department_id=world.sales.id)
     lines = [line("l1", [world.python.id, world.internal.id, world.note.id, secret.id]),
              line("l2", [world.role.id])]
-    draft = make_draft(db, world.company.id, lines, world.request.id)
+    draft = make_draft(db, world.company.id, lines, world.request.id, status="manager_review")
     out = api.get(_url(world, f"/job-drafts/{draft.id}"), headers=auth_header("mgr@acme.test"))
     assert out.status_code == 200
     sources = {s["node_id"]: s["title"] for s in _sources(out.json())["l1"]}
@@ -77,7 +77,8 @@ def test_a_manager_gets_titles_only_for_sources_their_layer_allows(api, db, worl
 
 def test_sources_never_expose_a_node_of_another_company(api, db, world):
     foreign = world.builder.node("Foreign secret title", "x", company_id=world.other.id)
-    draft = make_draft(db, world.company.id, [line("l1", [foreign.id, world.python.id])], world.request.id)
+    draft = make_draft(db, world.company.id, [line("l1", [foreign.id, world.python.id])], world.request.id,
+                       status="manager_review")
     for who in ("hr@acme.test", "mgr@acme.test"):
         out = api.get(_url(world, f"/job-drafts/{draft.id}"), headers=auth_header(who))
         assert "Foreign secret title" not in out.text
@@ -96,7 +97,7 @@ def test_conflict_issues_carry_the_node_id(db, world):
     report = lint.run(db, draft)
     conflicts = [i for i in report.issues if i.check == "conflict"]
     assert [i.node_id for i in conflicts] == [world.leave.id]
-    assert str(world.leave.id) in conflicts[0].message
+    assert world.leave.title not in conflicts[0].message
     assert all(i.node_id is None for i in report.issues if i.check != "conflict")
     db.refresh(draft)
     assert [i["node_id"] for i in draft.lint if i["check"] == "conflict"] == [world.leave.id]

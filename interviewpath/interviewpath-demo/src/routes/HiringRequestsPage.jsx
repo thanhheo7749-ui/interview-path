@@ -2,9 +2,10 @@ import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate } from 'react-router-dom';
 import { useCompany } from '../company/CompanyContext.jsx';
-import { EmptyState, ErrorAlert, cardClass, inputClass, primaryButton, secondaryButton } from '../components/KbFeedback.jsx';
+import { ConfirmBar, EmptyState, ErrorAlert, cardClass, inputClass, primaryButton, secondaryButton } from '../components/KbFeedback.jsx';
 import {
-  createHiringRequest, generateDraft, listDepartments, listHiringRequests, listMembers,
+  cancelHiringRequest, createHiringRequest, generateDraft, listDepartments, listHiringRequests, listMembers,
+  updateHiringRequest,
 } from '../lib/bridges.js';
 import { listRoleOptions } from '../lib/jobs.js';
 
@@ -92,6 +93,142 @@ function CreateForm({ companyId, onCreated }) {
         {t('bridges.requests.create')}
       </button>
     </form>
+  );
+}
+
+// HR changes a request's title, manager or department. The assigned manager is who reads and approves its drafts.
+function EditRequestForm({ companyId, request, onSaved, onClose }) {
+  const { t } = useTranslation();
+  const [managers, setManagers] = useState([]);
+  const [departments, setDepartments] = useState([]);
+  const [title, setTitle] = useState(request.title);
+  const [managerId, setManagerId] = useState(String(request.manager_user_id ?? ''));
+  const [departmentId, setDepartmentId] = useState(String(request.department_id ?? ''));
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    Promise.all([listMembers(companyId), listDepartments(companyId)])
+      .then(([members, depts]) => {
+        if (cancelled) return;
+        setManagers(members.filter((m) => m.role === 'manager'));
+        setDepartments(depts);
+      })
+      .catch((err) => {
+        if (!cancelled) setError(err.message);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [companyId]);
+
+  const submit = async (event) => {
+    event.preventDefault();
+    setError('');
+    setBusy(true);
+    try {
+      await updateHiringRequest(companyId, request.id, {
+        title: title.trim(),
+        manager_user_id: Number(managerId),
+        department_id: departmentId === '' ? null : Number(departmentId),
+      });
+      onSaved();
+    } catch (err) {
+      setError(err.message);
+      setBusy(false);
+    }
+  };
+
+  return (
+    <form onSubmit={submit} data-testid="edit-request" className="w-full space-y-3 border-t border-slate-200 pt-3">
+      <div className="grid gap-3 sm:grid-cols-3">
+        <label className="text-sm font-semibold text-slate-700">
+          {t('bridges.requests.titleLabel')}
+          <input required value={title} onChange={(e) => setTitle(e.target.value)} className={`${inputClass} mt-1 w-full`} />
+        </label>
+        <label className="text-sm font-semibold text-slate-700">
+          {t('bridges.requests.managerLabel')}
+          <select required value={managerId} onChange={(e) => setManagerId(e.target.value)} className={`${inputClass} mt-1 w-full`}>
+            <option value="">{t('bridges.requests.chooseManager')}</option>
+            {managers.map((m) => (
+              <option key={m.user_id} value={m.user_id}>
+                {m.full_name || m.email}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="text-sm font-semibold text-slate-700">
+          {t('bridges.requests.departmentLabel')}
+          <select value={departmentId} onChange={(e) => setDepartmentId(e.target.value)} className={`${inputClass} mt-1 w-full`}>
+            <option value="">{t('members.noDepartment')}</option>
+            {departments.map((d) => (
+              <option key={d.id} value={d.id}>
+                {d.name}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+      <ErrorAlert message={error} />
+      <div className="flex gap-2">
+        <button type="submit" disabled={busy || !title.trim() || managerId === ''} className={primaryButton}>
+          {t('common.save')}
+        </button>
+        <button type="button" disabled={busy} onClick={onClose} className={secondaryButton}>
+          {t('common.cancel')}
+        </button>
+      </div>
+    </form>
+  );
+}
+
+// HR's controls on a request: edit it while it is live, cancel it until it is published.
+function RequestControls({ companyId, request, onChanged }) {
+  const { t } = useTranslation();
+  const [editing, setEditing] = useState(false);
+  const [confirming, setConfirming] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+
+  const cancel = async () => {
+    setError('');
+    setBusy(true);
+    try {
+      await cancelHiringRequest(companyId, request.id);
+      onChanged();
+    } catch (err) {
+      setError(err.message);
+      setConfirming(false);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="w-full space-y-3">
+      <div className="flex flex-wrap gap-2">
+        <button type="button" disabled={busy} onClick={() => setEditing(true)} aria-label={t('bridges.requests.editOne', { title: request.title })} className={secondaryButton}>
+          {t('bridges.requests.edit')}
+        </button>
+        {request.status !== 'published' && (
+          <button type="button" disabled={busy} onClick={() => setConfirming(true)} aria-label={t('bridges.requests.cancelOne', { title: request.title })} className={secondaryButton}>
+            {t('bridges.requests.cancelRequest')}
+          </button>
+        )}
+      </div>
+      {confirming && (
+        <ConfirmBar
+          message={t('bridges.requests.cancelConfirm')}
+          confirmLabel={t('bridges.requests.cancelRequest')}
+          busy={busy}
+          onConfirm={cancel}
+          onCancel={() => setConfirming(false)}
+        />
+      )}
+      <ErrorAlert message={error} />
+      {editing && <EditRequestForm companyId={companyId} request={request} onSaved={onChanged} onClose={() => setEditing(false)} />}
+    </div>
   );
 }
 
@@ -212,15 +349,16 @@ function HiringRequestsPage() {
       {requests && requests.length > 0 && (
         <ul className="space-y-3">
           {requests.map((request) => (
-            <li key={request.id} data-testid={`request-${request.id}`} className={`${cardClass} flex items-center justify-between gap-4`}>
+            <li key={request.id} data-testid={`request-${request.id}`} className={`${cardClass} flex flex-wrap items-center justify-between gap-4`}>
               <div>
                 <p className="font-bold">{request.title}</p>
                 <p data-testid="request-status" className="text-sm text-slate-600">
                   {t(`bridges.requests.status.${request.status}`, { defaultValue: request.status })}
                 </p>
               </div>
-              {isHr && <DraftActions companyId={companyId} request={request} roles={roles} />}
+              {isHr && request.status !== 'cancelled' && <DraftActions companyId={companyId} request={request} roles={roles} />}
               {!isHr && request.latest_draft_id != null && <ManagerDraftLink request={request} />}
+              {isHr && request.status !== 'cancelled' && <RequestControls companyId={companyId} request={request} onChanged={reload} />}
               {!isHr && INTAKE_OPEN.includes(request.status) && (
                 <Link to={`/intake/${request.id}`} className={primaryButton}>
                   {request.status === 'intake_in_progress' ? t('bridges.requests.resumeIntake') : request.status === 'intake_empty' ? t('bridges.requests.startAgain') : t('bridges.requests.startIntake')}

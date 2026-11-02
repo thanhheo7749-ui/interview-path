@@ -110,6 +110,11 @@
       "generateDraft": "초안 생성",
       "openDraft": "초안 열기",
       "awaitingApproval": "승인 대기 중",
+      "edit": "수정",
+      "editOne": "요청 수정: {{title}}",
+      "cancelRequest": "요청 취소",
+      "cancelOne": "요청 취소: {{title}}",
+      "cancelConfirm": "이 채용 요청을 취소할까요? 인테이크, 초안 작성과 승인이 중단되며 다시 열 수 없습니다.",
       "startAgain": "인테이크 다시 시작"
     },
     "intake": {
@@ -273,6 +278,11 @@
     "submit": "매니저에게 제출",
     "publish": "게시",
     "approve": "승인",
+    "feedback": {
+      "title": "매니저 의견",
+      "comment": "무엇을 바꿔야 하나요?",
+      "send": "수정 요청"
+    },
     "lines": "설명 문장",
     "languageTabs": "설명 언어",
     "incomplete": "아직 완성되지 않은 언어: {{languages}}.",
@@ -282,6 +292,7 @@
     "emptyInLanguage": "(이 언어로 작성된 내용이 없습니다)",
     "restrictedSource": "접근 제한된 출처",
     "unsourced": "출처 없음",
+    "unsupported": "출처에 없는 내용입니다",
     "confirmedByHr": "HR 확인됨",
     "mustHave": "필수",
     "requirement": "요건",
@@ -313,6 +324,7 @@
       "warning": "경고",
       "line": "{{number}}번 문장",
       "differentScope": "적용 범위가 다릅니다",
+      "fact": "회사 정보: {{title}}",
       "acknowledge": "확인함: 검사를 실행하지 못했습니다",
       "checks": {
         "discrimination": "차별",
@@ -364,6 +376,7 @@
       "no_source": "회사 지식에 출처가 없습니다.",
       "unknown_nodes": "사용할 수 없는 지식을 인용합니다.",
       "unsupported_numbers": "출처에 없는 숫자를 말합니다: {{numbers}}.",
+      "unsupported_terms": "출처에 없는 급여나 복리후생을 언급합니다.",
       "unknown": "회사 지식이 이 줄을 뒷받침하지 않습니다."
     }
   },

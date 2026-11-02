@@ -4,7 +4,8 @@ import { inputClass, primaryButton, secondaryButton } from '../KbFeedback.jsx';
 
 // One line of the description in the chosen language: its source chips, an inline edit, and a mark when nothing in the
 // knowledge graph supports it. The API sends each line's sources with the title the reader may see; a source above the reader's layer has no title and reads as restricted.
-function LineEditor({ line, number, lang, canEdit, busy, onSave, onRemove, onConfirm, onFlag }) {
+// `unsupported` means lint found that the line says something its sources do not: it needs HR's word just as much.
+function LineEditor({ line, number, lang, canEdit, busy, unsupported, onSave, onRemove, onConfirm, onFlag }) {
   const { t } = useTranslation();
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState('');
@@ -61,6 +62,11 @@ function LineEditor({ line, number, lang, canEdit, busy, onSave, onRemove, onCon
             {t('jd.unsourced')}
           </span>
         )}
+        {unsupported && !unsourced && (
+          <span data-testid="unsupported-mark" className="rounded-full bg-red-50 px-2 py-0.5 text-xs font-bold text-red-800">
+            {t('jd.unsupported')}
+          </span>
+        )}
         {line.hr_confirmed && (
           <span data-testid="confirmed-label" className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-bold text-emerald-800">
             {t('jd.confirmedByHr')}
@@ -103,7 +109,7 @@ function LineEditor({ line, number, lang, canEdit, busy, onSave, onRemove, onCon
           <button type="button" disabled={busy} aria-label={t('jd.editLine', { number })} onClick={start} className={secondaryButton}>
             {t('jd.edit')}
           </button>
-          {unsourced && (
+          {(unsourced || unsupported) && (
             <button type="button" disabled={busy} aria-label={t('jd.confirmLine', { number })} onClick={() => onConfirm(line.id)} className={secondaryButton}>
               {t('jd.confirmLineShort')}
             </button>
