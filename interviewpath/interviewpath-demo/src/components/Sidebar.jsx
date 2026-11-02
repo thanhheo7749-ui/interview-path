@@ -1,4 +1,4 @@
-import { AlertTriangle, BrainCircuit, Briefcase, ClipboardCheck, FileText, HelpCircle, KeyRound, LogOut, MessageSquare, Network, Settings, ShieldCheck } from "lucide-react";
+import { AlertTriangle, BrainCircuit, Briefcase, ClipboardCheck, ClipboardList, FileText, HelpCircle, KeyRound, LogOut, MessageSquare, Network, Settings, ShieldCheck } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { NavLink } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext.jsx";
@@ -19,6 +19,7 @@ const navItems = [
   { labelKey: "nav.settings", to: "/settings", icon: Settings },
   { labelKey: "nav.graph", to: "/graph", icon: Network, hrOnly: true },
   { labelKey: "nav.jobs", to: "/jobs", icon: Briefcase, hrOnly: true },
+  { labelKey: "bridges.nav.hiringRequests", to: "/hiring-requests", icon: ClipboardList, roles: ["hr", "manager"] },
   { labelKey: "nav.copilot", to: "/copilot", icon: MessageSquare },
   { labelKey: "nav.password", to: "/account/password", icon: KeyRound },
 ];
@@ -29,7 +30,7 @@ function Sidebar() {
   const { memberships, membership, selectCompany } = useCompany();
   const isHr = membership?.role === "hr";
   const kbCounts = useKbCounts(membership?.company_id ?? null, isHr);
-  const items = [...navItems.filter((item) => !item.hrOnly || isHr), ...(isHr ? kbNavItems : [])];
+  const items = [...navItems.filter((item) => (!item.hrOnly || isHr) && (!item.roles || item.roles.includes(membership?.role))), ...(isHr ? kbNavItems : [])];
 
   return (
     <aside className="fixed inset-y-0 left-0 z-30 flex w-64 flex-col border-r border-slate-200 bg-white px-4 py-5 shadow-panel">

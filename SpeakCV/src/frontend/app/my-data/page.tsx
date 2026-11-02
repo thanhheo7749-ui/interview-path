@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
 import { format, useLang } from "@/lib/i18n";
 import {
-  Application, deleteMyApplication, HiringError, listMyApplications, listMyConsents, MyConsent, withdrawConsent,
+  Application, deleteMyApplication, listMyApplications, listMyConsents, MyConsent, withdrawConsent,
 } from "@/services/hiring";
 import { ConfirmDialog, LangToggle } from "@/components/Hiring/SampleNotice";
 
@@ -16,7 +16,6 @@ export default function MyDataPage() {
   const { user, isLoading } = useAuth();
   const [apps, setApps] = useState<Application[] | null>(null);
   const [consents, setConsents] = useState<MyConsent[] | null>(null);
-  const [consentsMissing, setConsentsMissing] = useState(false);
   const [error, setError] = useState("");
   const [pending, setPending] = useState<Pending>(null);
   const [busy, setBusy] = useState(false);
@@ -30,11 +29,8 @@ export default function MyDataPage() {
     }
     try {
       setConsents(await listMyConsents());
-      setConsentsMissing(false);
-    } catch (err) {
-      // The listing route may not be deployed yet: show an empty state, not an error.
-      if (err instanceof HiringError && err.status === 404) setConsentsMissing(true);
-      else setError(t.genericError);
+    } catch {
+      setError(t.genericError);
     }
   }, [t.genericError]);
 
@@ -86,7 +82,6 @@ export default function MyDataPage() {
 
         <section className="space-y-2">
           <h2 className="text-lg font-bold text-theme-text">{t.consentsHeading}</h2>
-          {consentsMissing && <p className="text-sm text-theme-muted">{t.consentsUnavailable}</p>}
           {consents && consents.length === 0 && <p className="text-sm text-theme-muted">{t.consentsEmpty}</p>}
           <ul className="space-y-2">
             {consents?.map((c) => (

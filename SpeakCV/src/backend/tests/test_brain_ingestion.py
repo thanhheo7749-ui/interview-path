@@ -941,3 +941,42 @@ def test_a_document_with_a_dropped_item_stays_in_review_after_the_job(db, compan
     job = run(db, document)
     assert job.dropped_items == 1 and job.status == "review"
     assert db.get(KbDocument, document.id).status == "review"
+
+
+def test_a_retry_whose_merge_target_was_rejected_during_its_ai_calls_writes_nothing_and_can_retry(db, company, monkeypatch):
+    first = make_doc(db, company)
+    item = fact("Annual leave", "12 days of annual leave")
+    fake.enqueue("kb_extract", extraction([item]))
+    run(db, first)
+    target_id = db.query(KbNode).filter_by(title="Annual leave").one().id
+    db.commit()
+
+    second = make_doc(db, company)
+    fake.enqueue("kb_extract", "not json")
+    fake.enqueue("kb_extract", "still not json")
+    job = run(db, second)
+    assert job.failed_chunk_ids
+    job_id = job.id
+    ingestion.start_failed_retry(db, job)
+    real = ingestion._check_nodes
+
+    def reject_during_the_calls(nodes, company_id):
+        other = SessionLocal()
+        other.get(KbNode, target_id).status = "rejected"
+        other.commit()
+        other.close()
+        return real(nodes, company_id)
+
+    monkeypatch.setattr(ingestion, "_check_nodes", reject_during_the_calls)
+    fake.enqueue("kb_extract", extraction([item]))
+    ingestion.run_failed_retry(job_id)
+    db.expire_all()
+    assert db.get(KbIngestionJob, job_id).status == "failed"
+    assert db.query(KbNode).filter_by(title="Annual leave").count() == 1
+    monkeypatch.setattr(ingestion, "_check_nodes", real)
+    ingestion.start_failed_retry(db, db.get(KbIngestionJob, job_id))
+    fake.enqueue("kb_extract", extraction([item]))
+    ingestion.run_failed_retry(job_id)
+    db.expire_all()
+    replacement = db.query(KbNode).filter(KbNode.title == "Annual leave", KbNode.status == "draft").one()
+    assert replacement.id != target_id and replacement.embedding is not None

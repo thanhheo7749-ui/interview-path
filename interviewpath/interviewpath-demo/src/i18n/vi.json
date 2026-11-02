@@ -498,6 +498,8 @@
     },
     "fastTracked": "Đi tắt",
     "fastTrackedNote": "Ứng viên này được đi tắt, không qua phỏng vấn, nên không có bằng chứng phỏng vấn.",
+    "notTaken": "Không tham gia phỏng vấn",
+    "anonymizedNotice": "Dữ liệu của ứng viên này đã bị xóa. Không còn gì để xem xét và không có hành động nào khả dụng.",
     "analysisFailed": "Phân tích buổi phỏng vấn này không thành công. Bạn có thể thử lại.",
     "hiddenText": "Lưu ý: tệp CV có chứa văn bản ẩn và phần này đã bị bỏ qua.",
     "stage": {
@@ -598,6 +600,72 @@
       "submit": "Lưu chỉnh sửa",
       "corrected": "Nhãn CV đã được HR chỉnh sửa",
       "reasonShown": "Lý do chỉnh sửa: {{reason}}"
+    }
+  },
+  "bridges": {
+    "nav": {
+      "hiringRequests": "Yêu cầu tuyển dụng"
+    },
+    "requests": {
+      "title": "Yêu cầu tuyển dụng",
+      "new": "Yêu cầu tuyển dụng mới",
+      "titleLabel": "Vị trí cần tuyển",
+      "managerLabel": "Quản lý tuyển dụng",
+      "chooseManager": "Chọn quản lý",
+      "departmentLabel": "Phòng ban",
+      "noManagers": "Công ty chưa có thành viên quản lý. Hãy thêm trong Cài đặt công ty trước.",
+      "create": "Tạo yêu cầu",
+      "empty": "Chưa có yêu cầu tuyển dụng nào.",
+      "startIntake": "Bắt đầu phỏng vấn đầu vào",
+      "resumeIntake": "Tiếp tục phỏng vấn đầu vào",
+      "status": {
+        "open": "Chờ quản lý trả lời phỏng vấn đầu vào",
+        "intake_in_progress": "Đang phỏng vấn đầu vào",
+        "intake_done": "Đã xong phỏng vấn đầu vào, HR đang xem xét",
+        "drafting": "Đang soạn mô tả công việc",
+        "published": "Đã đăng",
+        "cancelled": "Đã hủy"
+      }
+    },
+    "intake": {
+      "title": "Phỏng vấn đầu vào với quản lý",
+      "noticeTitle": "Trước khi bắt đầu",
+      "noticeRecorded": "Buổi này được ghi âm.",
+      "noticeTranscript": "Bản ghi lời nói của bạn được gửi cho HR xem xét. HR quyết định nội dung nào được sử dụng.",
+      "noticeNoNames": "Vui lòng không nêu tên riêng của cá nhân trong câu trả lời. Hãy nói về vị trí và tình huống.",
+      "understood": "Tôi đã đọc nội dung trên và sẵn sàng bắt đầu buổi ghi âm.",
+      "start": "Bắt đầu phỏng vấn có ghi âm",
+      "starting": "Đang bắt đầu...",
+      "completed": "Cảm ơn bạn. Câu trả lời đã được gửi và HR sẽ xem xét.",
+      "alreadyDone": "Phỏng vấn đầu vào của yêu cầu này đã hoàn tất.",
+      "notFound": "Không tìm thấy yêu cầu tuyển dụng này.",
+      "back": "Quay lại yêu cầu tuyển dụng"
+    },
+    "voice": {
+      "micTitle": "Kiểm tra micro",
+      "micHint": "Thử micro và xem mức âm thanh thay đổi khi bạn nói.",
+      "micTest": "Thử micro",
+      "micLevel": "Mức âm thanh micro",
+      "micError": "Không mở được micro. Hãy cho phép trình duyệt dùng micro rồi thử lại.",
+      "unsupported": "Trình duyệt này không ghi âm được. Hãy dùng phiên bản mới của Chrome, Edge hoặc Safari.",
+      "recordingSession": "Buổi này đang được ghi âm",
+      "recordingOn": "Đang ghi âm câu trả lời",
+      "questionOf": "Câu hỏi {{current}}/{{total}}",
+      "timeLeft": "Thời gian còn lại",
+      "followup": "Câu hỏi thêm",
+      "why": "Lý do hỏi",
+      "record": "Ghi âm câu trả lời",
+      "stop": "Dừng và gửi",
+      "retrySend": "Gửi lại",
+      "uploading": "Đang gửi câu trả lời...",
+      "uploadFailed": "Không gửi được câu trả lời. Kiểm tra kết nối rồi gửi lại.",
+      "recordError": "Ghi âm thất bại. Kiểm tra micro rồi thử lại.",
+      "paused": "Buổi phỏng vấn đang tạm dừng.",
+      "closing": "Buổi phỏng vấn sắp kết thúc.",
+      "repeat": "Chúng tôi chưa nghe rõ. Vui lòng trả lời lại câu hỏi này.",
+      "retry": "Vui lòng trả lời thêm một lần nữa.",
+      "expired": "Buổi này đã hết hạn.",
+      "ended": "Buổi này đã kết thúc."
     }
   }
 }

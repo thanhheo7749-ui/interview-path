@@ -172,8 +172,8 @@ def start_failed_retry(db: Session, job: KbIngestionJob) -> None:
 def run_failed_retry(job_id: int) -> None:
     """Re-extract only the chunks a job recorded as failed, then re-run the contradiction check.
 
-    The AI calls for extraction come first, then writing and embedding are one transaction, so a failure leaves the
-    document as it was and the job can be retried again."""
+    All the AI calls for extraction, the guard and embedding come first, then the writing is one transaction, so a
+    failure leaves the document as it was and the job can be retried again."""
     db = SessionLocal()
     try:
         job = db.get(KbIngestionJob, job_id)
@@ -183,7 +183,7 @@ def run_failed_retry(job_id: int) -> None:
             _run_failed(db, job, db.get(KbDocument, job.document_id))
         except Exception as exc:  # noqa: BLE001 - every failure must end the job cleanly
             db.rollback()
-            if not isinstance(exc, AIError):
+            if not isinstance(exc, (AIError, _GraphChangedDuringChecks)):
                 logger.exception("Retry of ingestion job %s failed", job_id)
             job = db.get(KbIngestionJob, job_id)
             job.status = "failed"
@@ -191,6 +191,11 @@ def run_failed_retry(job_id: int) -> None:
             db.commit()
     finally:
         db.close()
+
+
+class _GraphChangedDuringChecks(Exception):
+    """A node this retry meant to merge into was rejected or edited during its AI calls, so an item now needs a new node
+    the checks never saw. Nothing is written, and the job can be retried."""
 
 
 def _set_progress(db: Session, job: KbIngestionJob, value: int) -> None:
@@ -297,10 +302,10 @@ def _live_match(db: Session, graph: _Graph, item: ExtractedNode) -> KbNode | Non
     return None
 
 
-def _new_node(db: Session, graph: _Graph, item: ExtractedNode) -> KbNode:
+def _build_node(graph: _Graph, item: ExtractedNode) -> KbNode:
     document = graph.document
     is_fact = _is_fact(item)
-    node = KbNode(
+    return KbNode(
         company_id=graph.company_id, department_id=document.department_id, type=item.type,
         title=item.title.strip(), body=item.body, language=document.language,
         visibility=stricter_layer(DEFAULT_VISIBILITY_BY_TYPE[item.type], document.visibility),
@@ -308,6 +313,10 @@ def _new_node(db: Session, graph: _Graph, item: ExtractedNode) -> KbNode:
         fact_kind=item.fact_kind if is_fact else None, fact_value=item.fact_value.strip() if is_fact else None,
         fact_unit=item.fact_unit.strip() if is_fact else None, scope_text=item.scope_text.strip() if is_fact else None,
     )
+
+
+def _new_node(db: Session, graph: _Graph, item: ExtractedNode) -> KbNode:
+    node = _build_node(graph, item)
     db.add(node)
     db.flush()
     title = normalise_title(node.title)
@@ -417,25 +426,56 @@ def _apply_extraction(db: Session, graph: _Graph, chunk: KbChunk, result: Extrac
             _link(db, graph, node.id, anchor.id, "applies_to")
 
 
-def _guard_new_nodes(graph: _Graph) -> None:
-    """Flag new requirement, skill and behavior nodes that ask for a protected trait. A flagged node stays a draft that
-    HR can only reject or rewrite. A failed check is recorded as "unchecked" and never fails the job."""
+@dataclass
+class _NodeChecks:
+    """What the AI said about node texts, keyed by those texts."""
+
+    guards: dict[str, discrimination.GuardResult | None] = field(default_factory=dict)
+    embeddings: dict[str, tuple] = field(default_factory=dict)
+
+
+def _guard_text(node: KbNode) -> str:
+    return f"{node.title}\n{node.body}"
+
+
+def _check_nodes(nodes: list[KbNode], company_id: int) -> _NodeChecks:
+    """The AI calls for new nodes, run with nothing written: a vendor call must not hold locks. A failed discrimination
+    check comes back as "unchecked" and never fails the job."""
+    checks = _NodeChecks()
+    for node in nodes:
+        if node.type in discrimination.GUARDED_TYPES and _guard_text(node) not in checks.guards:
+            checks.guards[_guard_text(node)] = discrimination.check(_guard_text(node), company_id)
+    texts = list(dict.fromkeys(retriever.node_text(node) for node in nodes))
+    for start in range(0, len(texts), EMBED_BATCH):
+        batch = texts[start:start + EMBED_BATCH]
+        result = gateway.embed(batch, "document", "kb_embed", company_id)
+        for text, vector in zip(batch, result.vectors):
+            checks.embeddings[text] = (vectors.encode(vector), result.model, result.dimension)
+    return checks
+
+
+def _store_checks(graph: _Graph, checks: _NodeChecks) -> None:
+    """Flag new requirement, skill and behavior nodes that ask for a protected trait, and store every embedding. A
+    flagged node stays a draft that HR can only reject or rewrite."""
     for node in graph.new_nodes:
-        if node.type not in discrimination.GUARDED_TYPES:
-            continue
-        result = discrimination.check(f"{node.title}\n{node.body}", graph.company_id)
+        result = checks.guards.get(_guard_text(node)) if node.type in discrimination.GUARDED_TYPES else None
         if result is not None:
             node.guard_category, node.guard_reason = result.category, result.reason
+        node.embedding, node.embedding_model, node.embedding_dim = checks.embeddings[retriever.node_text(node)]
 
 
-def _embed_new_nodes(db: Session, graph: _Graph) -> None:
-    for start in range(0, len(graph.new_nodes), EMBED_BATCH):
-        batch = graph.new_nodes[start:start + EMBED_BATCH]
-        result = gateway.embed([retriever.node_text(n) for n in batch], "document", "kb_embed", graph.company_id)
-        for node, vector in zip(batch, result.vectors):
-            node.embedding = vectors.encode(vector)
-            node.embedding_model = result.model
-            node.embedding_dim = result.dimension
+def _possible_new_nodes(graph: _Graph, extracted: list[tuple[KbChunk, ExtractionResult]]) -> list[KbNode]:
+    """Unsaved nodes for every item _apply_extraction could add. The graph only grows while it runs, so an item that
+    matches nothing there has no match here either, and this list holds every node it can create."""
+    possible = []
+    for chunk, result in extracted:
+        for item in result.nodes:
+            if not _node_is_storable(item) or not _node_is_verified(item, chunk.text):
+                continue
+            named = graph.by_key.get((item.type, normalise_title(item.title)), [])
+            if not any(_same_item(item, candidate) for candidate in named):
+                possible.append(_build_node(graph, item))
+    return possible
 
 
 def _finish_job(db: Session, job: KbIngestionJob, document: KbDocument, failed_chunk_ids: list[int],
@@ -503,8 +543,8 @@ def _run(db: Session, job: KbIngestionJob, document: KbDocument, created_edges: 
         job.failed_chunk_ids = list(failed)
         _set_progress(db, job, 20 + int(70 * position / total))
 
-    _guard_new_nodes(graph)
-    _embed_new_nodes(db, graph)
+    # Every chunk's rows are committed above, so these AI calls hold nothing.
+    _store_checks(graph, _check_nodes(graph.new_nodes, company_id))
     db.commit()
     _set_progress(db, job, 95)
 
@@ -535,10 +575,12 @@ def _run_failed(db: Session, job: KbIngestionJob, document: KbDocument) -> None:
             extracted.append((chunk, extract_chunk(chunk.text, document.language, graph.known_titles, company_id)))
         except AIError:
             failed.append(chunk.id)
+    checks = _check_nodes(_possible_new_nodes(graph, extracted), company_id)
     for chunk, result in extracted:
         _apply_extraction(db, graph, chunk, result)
-    _guard_new_nodes(graph)
-    _embed_new_nodes(db, graph)
+    if any(retriever.node_text(node) not in checks.embeddings for node in graph.new_nodes):
+        raise _GraphChangedDuringChecks
+    _store_checks(graph, checks)
     new_ids = [n.id for n in graph.new_nodes]
     dropped = graph.dropped
     db.commit()

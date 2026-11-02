@@ -1,6 +1,7 @@
 """Job posting logic: versioned requirements, publishing and tracked channel links."""
 import re
 import secrets
+from dataclasses import dataclass
 from datetime import datetime, timezone
 
 from sqlalchemy.orm import Session
@@ -37,39 +38,57 @@ def _field(item, name, default=None):
     return item.get(name, default) if isinstance(item, dict) else getattr(item, name, default)
 
 
-def _guard_new_rows(job: Job, items, unmatched: dict[tuple, list]) -> list[str]:
-    """Check the text of every row that is about to be added. Raises JobError(422) for a requirement that asks for a
-    protected trait. Returns warnings for texts the automatic check could not look at: HR typed them, so they are not
-    blocked."""
-    remaining = {key: len(rows) for key, rows in unmatched.items()}
+def _active_by_key(db: Session, job_id: int | None) -> dict[tuple, list[JobRequirement]]:
+    unmatched: dict[tuple, list[JobRequirement]] = {}
+    if job_id is not None:
+        for row in active_requirements(db, job_id):
+            unmatched.setdefault(_key(row.text, row.must_have, row.visibility, row.node_id), []).append(row)
+    return unmatched
+
+
+@dataclass(frozen=True)
+class CheckedRequirements:
+    """The result of check_requirements, which update_requirements needs before it writes."""
+
+    texts: frozenset[str]
+    warnings: list[str]
+
+
+def check_requirements(db: Session, company_id: int, job_id: int | None, items) -> CheckedRequirements:
+    """Check the text of every row that update_requirements would add. Pass job_id None for a job not created yet.
+
+    This can call the AI, so run it before the request's first write: a vendor call must not hold locks. Raises
+    JobError(422) for a requirement that asks for a protected trait. Its warnings name texts the automatic check could
+    not look at: HR typed them, so they are not blocked."""
+    remaining = {key: len(rows) for key, rows in _active_by_key(db, job_id).items()}
     warnings = []
+    texts = set()
     for item in items:
         key = _key(_field(item, "text"), _field(item, "must_have", False), _field(item, "visibility", "public"),
                    _field(item, "node_id"))
         if remaining.get(key):
             remaining[key] -= 1
             continue
-        result = discrimination.check(key[0], job.company_id)
+        result = discrimination.check(key[0], company_id)
+        texts.add(key[0])
         if result is None:
             continue
         if result.unchecked:
             warnings.append(f"The discrimination check could not run for: {key[0][:80]}")
         else:
             raise JobError(422, f"Requirement not allowed ({result.category}): {result.reason}")
-    return warnings
+    return CheckedRequirements(frozenset(texts), warnings)
 
 
-def update_requirements(db: Session, job: Job, items) -> list[str]:
+def update_requirements(db: Session, job: Job, items, checked: CheckedRequirements) -> list[str]:
     """Unchanged rows stay, removed or changed rows go inactive, new rows are added. Any difference bumps version once.
 
-    Old rows are kept (inactive) so results that point at them stay valid. Raises JobError(422) before changing
-    anything when a new requirement asks for a protected trait. Returns warnings.
+    Old rows are kept (inactive) so results that point at them stay valid. Calls no AI: `checked` comes from
+    check_requirements. Raises JobError(409) when a row to add was not checked, because another request changed the
+    job's requirements after the check, and the caller rolls back. Returns the warnings of the check.
     """
     existing_any = db.query(JobRequirement.id).filter(JobRequirement.job_id == job.id).first() is not None
-    unmatched: dict[tuple, list[JobRequirement]] = {}
-    for row in active_requirements(db, job.id):
-        unmatched.setdefault(_key(row.text, row.must_have, row.visibility, row.node_id), []).append(row)
-    warnings = _guard_new_rows(job, items, unmatched)
+    unmatched = _active_by_key(db, job.id)
 
     changed = False
     for position, item in enumerate(items):
@@ -79,6 +98,8 @@ def update_requirements(db: Session, job: Job, items) -> list[str]:
         if matches:
             matches.pop(0).position = position
         else:
+            if key[0] not in checked.texts:
+                raise JobError(409, "The requirements changed while they were being checked. Please try again.")
             changed = True
             db.add(JobRequirement(
                 company_id=job.company_id, job_id=job.id, node_id=key[3], text=key[0], must_have=key[1],
@@ -92,7 +113,7 @@ def update_requirements(db: Session, job: Job, items) -> list[str]:
     if changed and existing_any:
         job.version += 1
     db.flush()
-    return warnings
+    return checked.warnings
 
 
 def prefill(db: Session, company_id: int, role_node_id: int) -> dict | None:

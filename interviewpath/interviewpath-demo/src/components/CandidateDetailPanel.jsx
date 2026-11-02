@@ -44,7 +44,12 @@ function CandidateDetailPanel({ companyId, appId, onClose, onChanged }) {
       </div>
       <ErrorAlert message={error} />
       {!detail && !error && <p className="mt-4 text-sm text-slate-500">{t('common.loading')}</p>}
-      {detail && (
+      {detail?.anonymized && (
+        <p role="status" data-testid="anonymized-notice" className="mt-4 rounded-xl bg-slate-100 p-4 text-sm font-semibold text-slate-700">
+          {t('board.anonymizedNotice')}
+        </p>
+      )}
+      {detail && !detail.anonymized && (
         <div className="mt-4 space-y-6">
           <div className="flex flex-wrap gap-1.5 text-xs font-bold">
             {detail.cv_status && <span className="rounded-full bg-slate-100 px-2.5 py-1 text-slate-700">{t(`board.cvStatus.${detail.cv_status}`)}</span>}
@@ -54,6 +59,7 @@ function CandidateDetailPanel({ companyId, appId, onClose, onChanged }) {
           </div>
           {detail.hidden_text_detected && <p className="text-xs text-slate-500">{t('board.hiddenText')}</p>}
           {detail.fast_tracked && <p className="text-sm font-semibold text-slate-700">{t('board.fastTrackedNote')}</p>}
+          {detail.analysis_status === 'not_taken' && <p data-testid="interview-note" className="text-sm font-semibold text-amber-800">{t('board.notTaken')}</p>}
           {detail.analysis_status === 'failed' && <p className="text-sm font-semibold text-red-700">{t('board.analysisFailed')}</p>}
           {detail.cv_status_correction_reason && (
             <p className="text-xs text-slate-600">{t('board.cvCorrection.reasonShown', { reason: detail.cv_status_correction_reason })}</p>

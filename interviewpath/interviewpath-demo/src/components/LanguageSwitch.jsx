@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 const LANGUAGES = [
   { code: 'en', label: 'English' },
   { code: 'vi', label: 'Tiếng Việt' },
+  { code: 'ko', label: '한국어' },
 ];
 
 function LanguageSwitch() {

@@ -753,13 +753,13 @@ def test_edit_body_longer_than_15000_characters_is_422(client, w):
 def test_version_moves_by_atomic_update_and_keeps_a_concurrent_bump(client, w, monkeypatch):
     node = w.node("Leave")
     start = set_version(w)
-    real = review.lock_for_nodes
+    real = review.settle_edges
 
-    def bump_from_elsewhere(db, company_id, *args):
+    def bump_from_elsewhere(db, company_id, node_ids):
         db.execute(text("UPDATE companies SET kb_version = kb_version + 1 WHERE id = :id"), {"id": company_id})
-        return real(db, company_id, *args)
+        real(db, company_id, node_ids)
 
-    monkeypatch.setattr(review, "lock_for_nodes", bump_from_elsewhere)
+    monkeypatch.setattr(review, "settle_edges", bump_from_elsewhere)
     decide_ok(client, w, {"action": "accept", "node_id": node.id, "title": "New title"})
     assert version(w) == start + 2
 

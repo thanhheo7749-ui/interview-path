@@ -1,11 +1,12 @@
 """HR review of extracted knowledge. Only HR actions (or the sample-only auto approve) publish a node.
 
 Every function here works inside the caller's transaction and does not commit, except `auto_approve_document`
-which has no request around it, and `recheck_edited_facts` which runs after the caller's commit.
+which has no request around it, `recheck_edited_facts` which runs after the caller's commit, and `apply_decisions`
+which ends the transaction before its AI calls.
 
 Lock order, everywhere: document, then nodes in id order, then conflicts. MySQL's plain reads see the snapshot taken
 when the transaction first read something, which is before the lock was granted, so what a decision depends on is read
-with a locking read. No AI call runs under these locks: decisions make theirs first, in `_prepare_ai`."""
+with a locking read. No AI call runs under these locks: decisions make theirs first, in `_ask_ai_first`."""
 from dataclasses import dataclass, field
 from types import SimpleNamespace
 
@@ -36,7 +37,7 @@ UNPUBLISHABLE = ("review", "published")
 # A document whose job finished. One still processing may yet be cleared, so it cannot vouch for a node.
 SETTLED = ("review", "published")
 ACTIVE_JOB = ("queued", "running")
-CHANGED_DURING_REVIEW = "This item changed while it was being reviewed. Reload and try again."
+CHANGED_DURING_CHECK = "This item changed while it was being checked. Please try again."
 
 
 class ReviewError(Exception):
@@ -101,7 +102,7 @@ def lock_for_nodes(db: Session, company_id: int, node_ids, document_ids=()) -> s
     lock_nodes(db, node_ids)
     current = documents_of_nodes(db, company_id, node_ids, fresh=True)
     if current - wanted:
-        raise ReviewError(409, CHANGED_DURING_REVIEW)
+        raise ReviewError(409, CHANGED_DURING_CHECK)
     return current
 
 
@@ -356,54 +357,29 @@ def unpublish_document(db: Session, company_id: int, document_id: int) -> dict:
 # ---------- deciding ----------
 
 @dataclass
-class _PreparedAI:
-    """What this request's AI calls answered, made before any lock. Keyed by text: if a row turns out to say something
-    else under the lock, another request changed it, and there is no answer for what it says now."""
+class _AiAnswers:
+    """What the AI said about the texts a request will leave, keyed by those texts."""
 
-    vectors: dict[str, tuple[bytes, str, int]] = field(default_factory=dict)
-    checks: dict[str, object] = field(default_factory=dict)
+    guards: dict[tuple[str, str], discrimination.GuardResult | None] = field(default_factory=dict)
+    embeddings: dict[str, list[float]] = field(default_factory=dict)
+    model: str | None = None
+    dimension: int | None = None
 
-
-def _guard_text(node) -> str:
-    return f"{node.title}\n{node.body}"
-
-
-def _prepare_ai(db: Session, company_id: int, items) -> _PreparedAI:
-    """Replay the edits on copies to learn what the guard and the embedding will be asked. A failed embedding raises
-    here, so the decision and its vector are still one commit, and locks are not held across a call to a vendor."""
-    prepared = _PreparedAI()
-    copies: dict[int, SimpleNamespace] = {}
-    reembed: dict[int, SimpleNamespace] = {}
-    for item in items:
-        if item.action not in ("edit", "accept"):
-            continue
-        node = db.query(KbNode).filter(KbNode.id == item.node_id, KbNode.company_id == company_id).first()
-        if node is None or node.type in ORG_TYPES or node.status not in ACTION_STATUSES[item.action]:
-            continue  # refused under the lock
-        copy = copies.setdefault(node.id, SimpleNamespace(
-            id=node.id, type=node.type, fact_kind=node.fact_kind, title=node.title, body=node.body,
-            visibility=node.visibility, fact_value=node.fact_value, fact_unit=node.fact_unit, scope_text=node.scope_text,
-        ))
-        before = (copy.title, copy.body)
-        _apply_fields(item, copy, reembed, {}, set())
-        if copy.type in discrimination.GUARDED_TYPES and (copy.title, copy.body) != before:
-            text = _guard_text(copy)
-            if text not in prepared.checks:
-                prepared.checks[text] = discrimination.check(text, company_id)
-    texts = list(dict.fromkeys(retriever.node_text(copy) for copy in reembed.values()))
-    if texts:
-        result = gateway.embed(texts, "document", "kb_embed", company_id)
-        for text, vector in zip(texts, result.vectors):
-            prepared.vectors[text] = (vectors.encode(vector), result.model, result.dimension)
-    return prepared
+    def stored_guard(self, node) -> discrimination.GuardResult | None:
+        try:
+            return self.guards[(node.title, node.body)]
+        except KeyError:
+            raise ReviewError(409, CHANGED_DURING_CHECK) from None
 
 
-def _store_vectors(nodes: list[KbNode], prepared: _PreparedAI) -> None:
+def _embed_nodes(nodes: list[KbNode], answers: _AiAnswers) -> None:
     for node in nodes:
-        found = prepared.vectors.get(retriever.node_text(node))
-        if found is None:
-            raise ReviewError(409, CHANGED_DURING_REVIEW)
-        node.embedding, node.embedding_model, node.embedding_dim = found
+        vector = answers.embeddings.get(retriever.node_text(node))
+        if vector is None:
+            raise ReviewError(409, CHANGED_DURING_CHECK)
+        node.embedding = vectors.encode(vector)
+        node.embedding_model = answers.model
+        node.embedding_dim = answers.dimension
 
 
 def _states_claim(node: KbNode, name: str, old: str | None) -> bool:
@@ -441,7 +417,7 @@ def _apply_fields(item, node: KbNode, reembed: dict[int, KbNode], edited_facts: 
         node.body = ""
 
 
-def _guard(node: KbNode, item, before: tuple[str, str], publishing: bool, prepared: _PreparedAI) -> None:
+def _guard(node: KbNode, item, before: tuple[str, str], publishing: bool, check) -> None:
     """The discrimination guard for a node that is edited or published. Raises ReviewError(409) when the node would
     become, or stay, a published requirement that asks for a protected trait. Edits are re-checked; unchanged text keeps
     its flag, so asking again cannot draw a different answer from the classifier."""
@@ -458,10 +434,7 @@ def _guard(node: KbNode, item, before: tuple[str, str], publishing: bool, prepar
             node.guard_category = node.guard_reason = None
             return
         raise ReviewError(409, f"Blocked ({held}): {node.guard_reason}")
-    text = _guard_text(node)
-    if text not in prepared.checks:
-        raise ReviewError(409, CHANGED_DURING_REVIEW)
-    result = prepared.checks[text]
+    result = check(node)
     node.guard_category = result.category if result else None
     node.guard_reason = result.reason if result else None
     if result is not None and not result.unchecked and publishing:
@@ -520,11 +493,61 @@ def _merge(db: Session, company_id: int, node: KbNode, into_id: int, user_id: in
     contradiction.on_node_rejected(db, node.id)
 
 
+def _ask_ai_first(db: Session, company_id: int, items) -> _AiAnswers:
+    """Get every AI answer apply_decisions will need before it writes, because a vendor call must not hold locks.
+
+    Ends the transaction, then plays the items on plain copies of their nodes to find the text each one leaves. It stops
+    at an item that will be refused: the request then needs no embedding. apply_decisions reads the nodes again, and
+    refuses an item whose text has no answer here, because another request changed it during the calls."""
+    node_ids = {item.node_id for item in items if item.action != "publish_document"}
+    columns = (*EDITABLE, "id", "type", "status", "fact_kind", "guard_category", "guard_reason")
+    copies = {
+        node.id: SimpleNamespace(**{name: getattr(node, name) for name in columns})
+        for node in db.query(KbNode).filter(KbNode.id.in_(node_ids), KbNode.company_id == company_id)
+    }
+    db.commit()
+
+    answers = _AiAnswers()
+
+    def ask_guard(node) -> discrimination.GuardResult | None:
+        key = (node.title, node.body)
+        if key not in answers.guards:
+            answers.guards[key] = discrimination.check(f"{node.title}\n{node.body}", company_id)
+        return answers.guards[key]
+
+    reembed: dict[int, SimpleNamespace] = {}
+    for item in items:
+        if item.action == "publish_document":
+            continue
+        node = copies.get(item.node_id)
+        if node is None or node.type in ORG_TYPES or node.status not in ACTION_STATUSES[item.action]:
+            return answers
+        if item.action in ("reject", "merge"):
+            node.status = "rejected"
+            continue
+        before = (node.title, node.body)
+        try:
+            _apply_fields(item, node, reembed, {}, set())
+            _guard(node, item, before, item.action == "accept" or node.status == "published", ask_guard)
+        except ReviewError:
+            return answers
+        if item.action == "accept":
+            node.status = "published"
+    if reembed:
+        texts = list(dict.fromkeys(retriever.node_text(node) for node in reembed.values()))
+        result = gateway.embed(texts, "document", "kb_embed", company_id)
+        answers.embeddings = dict(zip(texts, result.vectors))
+        answers.model, answers.dimension = result.model, result.dimension
+    return answers
+
+
 def apply_decisions(db: Session, company_id: int, user_id: int, items) -> dict[int, bool]:
     """Apply review items in order. Raises ReviewError; the caller rolls back so a bad item changes nothing.
 
-    Returns the live facts this request edited, each with whether its value, unit or scope changed. The caller
-    commits, then passes them to recheck_edited_facts."""
+    Commits once before writing anything, to end the transaction before the AI calls, so the caller must have nothing
+    pending that it may yet discard. Returns the live facts this request edited, each with whether its value, unit or
+    scope changed. The caller commits, then passes them to recheck_edited_facts."""
+    answers = _ask_ai_first(db, company_id, items)
     touched: set[int] = set()
     reembed: dict[int, KbNode] = {}
     edited_facts: dict[int, KbNode] = {}
@@ -532,7 +555,6 @@ def apply_decisions(db: Session, company_id: int, user_id: int, items) -> dict[i
     explicit_documents = [item.document_id for item in items if item.action == "publish_document"]
     changed = False
 
-    prepared = _prepare_ai(db, company_id, items)
     decided_nodes = {item.node_id for item in items if item.node_id is not None}
     decided_nodes |= {item.into_node_id for item in items if item.into_node_id is not None}
     documents = lock_for_nodes(db, company_id, decided_nodes, explicit_documents)
@@ -545,12 +567,12 @@ def apply_decisions(db: Session, company_id: int, user_id: int, items) -> dict[i
         if item.action == "edit":
             before = (node.title, node.body)
             _apply_fields(item, node, reembed, edited_facts, changed_claims)
-            _guard(node, item, before, node.status == "published", prepared)
+            _guard(node, item, before, node.status == "published", answers.stored_guard)
             changed = changed or node.status == "published"
         elif item.action == "accept":
             before = (node.title, node.body)
             _apply_fields(item, node, reembed, edited_facts, changed_claims)
-            _guard(node, item, before, True, prepared)
+            _guard(node, item, before, True, answers.stored_guard)
             publish_node(db, node, user_id)
             changed = True
         elif item.action == "reject":
@@ -569,7 +591,7 @@ def apply_decisions(db: Session, company_id: int, user_id: int, items) -> dict[i
     for node in edited_facts.values():
         if node.status in LIVE and contradiction.close_conflicts_settled_by_edit(db, node, user_id):
             changed = True
-    _store_vectors(list(reembed.values()), prepared)
+    _embed_nodes(list(reembed.values()), answers)
     db.flush()
     settle_edges(db, company_id, touched)
     db.flush()
