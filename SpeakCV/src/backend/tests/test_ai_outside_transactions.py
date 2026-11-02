@@ -17,7 +17,7 @@ from app.ai.types import AIProviderError
 from app.brain import fake_demo, ingestion, seed
 from app.database.database import Base, SessionLocal, engine
 from app.database.sql_models import (
-    AIUsageLog, AuditLog, ChannelContent, Company, CompanyMember, Job, JobChannelLink, JobDraft, JobDraftMessage,
+    AIUsageLog, Application, AuditLog, ChannelContent, Company, CompanyMember, Job, JobChannelLink, JobDraft, JobDraftMessage,
     JobRequirement, KbChunk, KbDocument, KbNode,
 )
 from app.main import create_app
@@ -434,6 +434,21 @@ def test_channel_generate(api, db, world, probe):
     assert response.status_code == 200, response.text
     assert response.json()["channels"]
     probe.assert_clean("channel_content")
+
+
+def test_channel_commentary(api, db, world, probe):
+    job = Job(company_id=world.company.id, title="Backend", slug="backend-ch", status="published", version=1,
+              interview_languages=["en"])
+    db.add(job)
+    db.commit()
+    db.add(Application(company_id=world.company.id, job_id=job.id, job_version=1, alias="#C1",
+                       source_channel="linkedin", stage="ready_for_hr", cv_status="meets", hr_decision="approved"))
+    db.commit()
+    probe.start()
+    response = api.post(_url(world, f"/jobs/{job.id}/channels/commentary"), headers=HR, json={})
+    assert response.status_code == 200, response.text
+    assert response.json()["observations"]
+    probe.assert_clean("channel_commentary")
 
 
 def test_channel_generate_saves_nothing_when_the_ai_fails(api, db, world, monkeypatch):
