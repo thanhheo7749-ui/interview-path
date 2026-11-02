@@ -67,7 +67,7 @@ def test_a_line_that_conflicts_with_a_graph_fact_blocks_until_marked_different_s
     report = lint.run(db, draft)
     conflicts = _checks(report, "conflict")
     assert report.blocks_publish and [(i.line_id, i.severity) for i in conflicts] == [("l1", "block")]
-    assert str(world.leave.id) in conflicts[0].message or world.leave.title in conflicts[0].message
+    assert conflicts[0].node_id == world.leave.id and world.leave.title not in conflicts[0].message
 
     edited = jd_studio.edit_lines(db, draft, [{"id": "l1", "conflict_dismissed": [world.leave.id]}], world.hr.id)
     assert edited.lines[0]["conflict_dismissed"] == [world.leave.id]
@@ -99,7 +99,7 @@ def test_the_same_value_or_another_topic_is_no_conflict(db, world):
 
 def test_seven_must_haves_warn_and_six_do_not(db, world):
     def lines(count):
-        return [line(f"l{i}", [world.python.id], en=f"Skill {i}", is_requirement=True, must_have=True)
+        return [line(f"l{i}", [world.python.id], en=f"Skill {'abcdefg'[i]}", is_requirement=True, must_have=True)
                 for i in range(count)]
 
     seven = lint.run(db, make_draft(db, world.company.id, lines(7)))

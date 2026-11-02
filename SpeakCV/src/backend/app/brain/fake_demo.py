@@ -105,12 +105,14 @@ def _jd_assistant(_system, messages, _schema) -> str:
     draft = _JD_DRAFT.search(prompt)
     request = _JD_REQUEST.search(prompt)
     asked = (request.group(1) if request else "").casefold()
-    proposals = []
+    lines = json.loads(draft.group(1)) if draft else []
     if any(word in asked for word in _SALARY_WORDS):
+        # A model that does what it was asked, citing whatever is at hand. Stopping this line is the job of code.
         text = "[Demo AI] Salary to be confirmed by HR"
-        proposals.append({"en": text, "vi": text, "ko": text, "reason": "No salary in the knowledge graph."})
-    return json.dumps({"lines": json.loads(draft.group(1)) if draft else [], "summary": "Demo AI revision",
-                       "proposals": proposals}, ensure_ascii=False)
+        cited = next((item["source_node_ids"] for item in lines if item["source_node_ids"]), [])
+        lines.append({"id": "demo-salary", "en": text, "vi": text, "ko": text, "source_node_ids": cited,
+                      "is_requirement": False, "must_have": False})
+    return json.dumps({"lines": lines, "summary": "Demo AI revision", "proposals": []}, ensure_ascii=False)
 
 
 _CHANNEL_DRAFT = re.compile(r"<draft>\n(.*?)\n</draft>", re.DOTALL)

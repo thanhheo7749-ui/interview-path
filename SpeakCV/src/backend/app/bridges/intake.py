@@ -18,7 +18,7 @@ from app.brain import audience as aud
 from app.brain import ingestion, retriever
 from app.brain.prompting import as_data
 from app.database.database import SessionLocal
-from app.database.sql_models import HiringRequest, KbDocument, KbIngestionJob, VoiceSession, VoiceTurn
+from app.database.sql_models import CompanyMember, HiringRequest, KbDocument, KbIngestionJob, VoiceSession, VoiceTurn
 from app.hiring import audit, identity, recordings
 from app.hiring.planner import PlannedQuestion, PlanOutput
 
@@ -106,22 +106,33 @@ def _short(text: str) -> str:
     return _TAG.sub("[tag]", " ".join((text or "").split()))[:MAX_ITEM_CHARS]
 
 
+def _reader(db, request: HiringRequest) -> aud.Audience:
+    """The assigned manager reads the questions, and they are also spoken to them. No manager: nothing above public."""
+    member = db.query(CompanyMember).filter(
+        CompanyMember.company_id == request.company_id, CompanyMember.user_id == request.manager_user_id,
+        CompanyMember.role == "manager",
+    ).first()
+    return aud.for_member(db, member) if member is not None else aud.candidate(request.company_id)
+
+
 def _known(db, request: HiringRequest) -> Known:
-    """What the graph already holds for this request. It reads as HR: this runs for the company, not for the manager."""
-    audience = aud.Audience(request.company_id, "hr")
-    nodes, _ = retriever.visible_graph(db, audience)
+    """What the graph already holds for this request. HR's read decides what to ask, since the company knows it, but the
+    titles go into a question, so they are only what the assigned manager may read."""
+    reader = _reader(db, request)
+    nodes, _ = retriever.visible_graph(db, reader)
     titles: list[str] = []
     if request.department_id is not None:
         subtree = aud.department_subtree(db, request.company_id, request.department_id)
         for node in nodes:
             if node.type == "role" and node.department_id in subtree:
-                profile = retriever.role_profile(db, audience, node.id)
+                profile = retriever.role_profile(db, reader, node.id)
                 titles += [item.title for item in profile.requirements] if profile else []
-    for item in retriever.search(db, audience, request.title, top_k=SEARCH_TOP_K).items:
+    for item in retriever.search(db, reader, request.title, top_k=SEARCH_TOP_K).items:
         if item.kind == "node" and item.node_type in retriever.REQUIREMENT_TYPES:
             titles.append(item.text.split("\n", 1)[0])
     unique = tuple(dict.fromkeys(_short(title) for title in titles if title.strip()))[:MAX_LISTED]
-    return Known(unique, any(node.type == "value" for node in nodes))
+    every_node, _ = retriever.visible_graph(db, aud.Audience(request.company_id, "hr"))
+    return Known(unique, any(node.type == "value" for node in every_node))
 
 
 def _select(known: Known, language: str) -> list[PlannedQuestion]:

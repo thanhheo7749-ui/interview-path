@@ -1,4 +1,4 @@
-from sqlalchemy import JSON, Column, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import JSON, Column, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.sql import func
 
 from .database import Base
@@ -47,6 +47,7 @@ class JobDraft(Base):
     failed_languages = Column(JSON, nullable=False, default=list)
     status = Column(String(20), nullable=False, default="draft")  # see JOB_DRAFT_STATUSES
     approved_by = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    submitted_at = Column(DateTime(timezone=True), nullable=True)  # the first submit: a manager reads nothing before it
     created_at = _created_at()
 
 
@@ -78,6 +79,7 @@ class ChannelContent(Base):
 
 class CandidateBrief(Base):
     __tablename__ = "candidate_briefs"
+    __table_args__ = (UniqueConstraint("application_id", name="uq_candidate_briefs_application"),)
 
     id = Column(Integer, primary_key=True, index=True)
     company_id = Column(Integer, ForeignKey("companies.id", ondelete="CASCADE"), nullable=False, index=True)
@@ -92,6 +94,7 @@ class CandidateBrief(Base):
 
 class InterviewScorecard(Base):
     __tablename__ = "interview_scorecards"
+    __table_args__ = (UniqueConstraint("application_id", "manager_user_id", name="uq_scorecards_application_manager"),)
 
     id = Column(Integer, primary_key=True, index=True)
     company_id = Column(Integer, ForeignKey("companies.id", ondelete="CASCADE"), nullable=False, index=True)

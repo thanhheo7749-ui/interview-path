@@ -1,6 +1,6 @@
 """Lint for a job draft. Runs on every revision and blocks publishing on discrimination, an unresolved conflict with
-a graph fact, or a line with no source. A check that could not run is "unchecked" and blocks until it runs or HR
-acknowledges it: nothing is silently passed."""
+a graph fact, or a line whose sources do not support it. A check that could not run is "unchecked" and blocks until it
+runs or HR acknowledges it: nothing is silently passed."""
 import copy
 import re
 from dataclasses import asdict, dataclass
@@ -16,6 +16,7 @@ from app.brain import audience as aud
 from app.brain import contradiction, retriever, vectors
 from app.brain.prompting import as_data
 from app.bridges import discrimination
+from app.bridges.claims import unsupported_claims
 from app.database.sql_models import JobDraft
 
 LANGS = ("en", "vi", "ko")
@@ -138,9 +139,10 @@ def _conflicts(db: Session, company_id: int, lines: list[dict]) -> tuple[list[Li
                 unchecked.setdefault(line["id"], "The conflict check could not run.")
                 continue
             if same:
+                # No title here: a stored message reaches every reader, and the fact may be above their layer.
                 issues.append(LintIssue(
                     "conflict", BLOCK, line["id"],
-                    f"The line states a different value than the company fact \"{node.title}\" (node {node.id}). "
+                    "The line states a different value than a company fact. "
                     "Fix the line, or mark it as a different scope.", node.id,
                 ))
     return issues, unchecked
@@ -152,7 +154,7 @@ def evaluate(db: Session, company_id: int, lines: list[dict]) -> list[LintIssue]
     issues: list[LintIssue] = []
     unchecked: dict[str, str] = {}
 
-    visible = {n.id for n in retriever.visible_graph(db, aud.candidate(company_id))[0]}
+    visible = {n.id: n for n in retriever.visible_graph(db, aud.candidate(company_id))[0]}
     for line in lines:
         text = line_text(line)
         verdict = discrimination.check(text, company_id) if text else None
@@ -160,10 +162,15 @@ def evaluate(db: Session, company_id: int, lines: list[dict]) -> list[LintIssue]
             unchecked.setdefault(line["id"], verdict.reason)
         elif verdict is not None:
             issues.append(LintIssue("discrimination", BLOCK, line["id"], f"{verdict.category}: {verdict.reason}"))
+        if line.get("hr_confirmed"):
+            continue
         sourced = [i for i in line.get("source_node_ids") or [] if i in visible]
-        if not sourced and not line.get("hr_confirmed"):
+        if not sourced:
             issues.append(LintIssue("no_source", BLOCK, line["id"],
                                     "The line has no source in the knowledge graph. Add a source or confirm it."))
+        elif reason := unsupported_claims({**line, "source_node_ids": sourced},
+                                          {i: retriever.node_text(visible[i]) for i in sourced}):
+            issues.append(LintIssue("no_source", BLOCK, line["id"], f"{reason} Correct the line or confirm it."))
 
     conflicts, conflict_unchecked = _conflicts(db, company_id, lines)
     issues += conflicts
@@ -194,13 +201,31 @@ def store(db: Session, draft: JobDraft, issues: list[LintIssue]) -> LintReport:
     return LintReport(issues, any(issue.severity == BLOCK for issue in issues))
 
 
+def lock_row(db: Session, draft: JobDraft) -> None:
+    """Take the draft's row and read it as it is now. Ends the transaction first, so what comes after this lock sees what
+    was committed before it was granted, not an old snapshot. Call it with nothing pending in the session."""
+    draft_id = draft.id
+    db.rollback()
+    db.query(JobDraft).filter(JobDraft.id == draft_id).populate_existing().with_for_update().one()
+
+
 def run(db: Session, draft: JobDraft) -> LintReport:
-    """Run every check, store the issues on the draft and commit. Call it with nothing pending in the session."""
-    return store(db, draft, evaluate(db, draft.company_id, draft.lines or []))
+    """Run every check, store the issues on the draft and commit. Call it with nothing pending in the session.
+
+    An edit that landed during the checks has stored its own lint, which is the one that describes the lines."""
+    version = draft.version
+    issues = evaluate(db, draft.company_id, draft.lines or [])
+    lock_row(db, draft)
+    if draft.version == version:
+        return store(db, draft, issues)
+    current = [LintIssue(**item) for item in draft.lint or []]
+    db.commit()
+    return LintReport(current, any(issue.severity == BLOCK for issue in current))
 
 
 def acknowledge_unchecked(db: Session, draft: JobDraft, user_id: int, line_id: str | None = None) -> JobDraft:
     """HR accepts that the automatic check could not run on these lines. An edit to a line voids it."""
+    lock_row(db, draft)
     pending = {i["line_id"] for i in draft.lint or [] if i["check"] == "unchecked" and (line_id in (None, i["line_id"]))}
     lines = copy.deepcopy(draft.lines or [])
     now = datetime.now(timezone.utc).isoformat()

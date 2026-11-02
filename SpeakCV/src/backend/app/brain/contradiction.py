@@ -1,5 +1,6 @@
 """Contradiction Radar: finds explicit conflicts between number, date and boolean facts across documents."""
 import re
+from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal, InvalidOperation
 
@@ -330,6 +331,98 @@ def value_in_quote(kind: str, value: str | None, quote: str) -> bool:
         return canonical in _dates_in(quote)
     raw = _folded(value)
     return bool(raw) and raw in _folded(quote)
+
+
+@dataclass(frozen=True)
+class NumberMention:
+    raw: str
+    value: str  # with its multipliers: 5 triệu is 5000000
+    bare: str  # as written: 5 triệu is 5
+    unit: str | None  # None when no unit code knows follows it
+
+
+# Not inside a word such as Python3, but "연봉5000" is a number: Korean writes it against the word before.
+_MENTION = re.compile(r"(?<![0-9a-zà-ỹ_])\d[\d.,]*")
+_SHORT_MILLION = re.compile(r"(?:m|mn|tr)(?![^\W_])")
+_SHORT_BILLION = re.compile(r"(?:b|bn)(?![^\W_])")
+_WORD_AFTER = re.compile(r"\s*(%|\$|[^\W\d_]+)")
+_CURRENCY_BEFORE = {"$": "usd", "₩": "krw", "€": "eur", "₫": "vnd"}
+_MENTION_UNITS = _UNIT_ALIASES | {
+    "hr": "hour", "hrs": "hour", "yr": "year", "yrs": "year", "vnđ": "vnd", "đ": "vnd", "dollar": "usd", "dollars": "usd",
+    "eur": "eur", "euro": "eur", "euros": "eur",
+}
+# Korean writes a particle against the unit: 3년차, 12일간, 5주년.
+_ATTACHED_UNITS = ("개월", "시간", "퍼센트", "년", "달", "주", "일", "원")
+
+
+def _unit_at(text: str, position: int) -> str | None:
+    match = _WORD_AFTER.match(text, position)
+    if not match:
+        return None
+    word = match.group(1)
+    if word in _MENTION_UNITS:
+        return _MENTION_UNITS[word]
+    return next((_MENTION_UNITS[unit] for unit in _ATTACHED_UNITS if word.startswith(unit)), None)
+
+
+def _spelled_numbers(text: str) -> list[NumberMention]:
+    """Documents spell out the small numbers that a line states as digits."""
+    found = []
+    tokens = list(_TOKEN.finditer(text))
+    for index, match in enumerate(tokens):
+        token = match.group(0)
+        following = tokens[index + 1].group(0) if index + 1 < len(tokens) else ""
+        number = _NUMBER_WORDS.get(token)
+        if number is None and following in _COUNTED:
+            number = _COUNTING_WORDS.get(token)
+        if number is not None:
+            found.append(NumberMention(token, str(number), str(number), _unit_at(text, match.end())))
+    for match in _KOREAN_COUNT.finditer(text):
+        number = str(_KOREAN_NUMBERS[match.group(1)])
+        found.append(NumberMention(match.group(0), number, number, None))
+    return found
+
+
+def number_mentions(folded: str, spelled: bool = False) -> list[NumberMention]:
+    """Every number in text that went through _folded, with its multipliers and its unit. Dates are not numbers here."""
+    text = folded
+    for start, end, _, _ in _date_matches(text):
+        text = f"{text[:start]}{' ' * (end - start)}{text[end:]}"
+    found = []
+    for match in _MENTION.finditer(text):
+        bare = _decimal(match.group(0))
+        amount = _amount_at(text, match)
+        if bare is None or amount is None:
+            found.append(NumberMention(match.group(0), match.group(0), match.group(0), None))
+            continue
+        total, end = amount
+        for short, scale in ((_SHORT_MILLION, 10 ** 6), (_SHORT_BILLION, 10 ** 9)):
+            if total == bare and (suffix := short.match(text, end)):
+                total, end = bare * scale, suffix.end()
+        unit = _unit_at(text, end) or _CURRENCY_BEFORE.get(text[match.start() - 1:match.start()])
+        found.append(NumberMention(match.group(0), _canonical_number(total), _canonical_number(bare), unit))
+    return [*found, *_spelled_numbers(text)] if spelled else found
+
+
+def _stated(mention: NumberMention, stated: list[NumberMention]) -> bool:
+    """A unit counts when the line gives one: 40 hours is not 40 days, nor 40 of nothing. A line with no unit and no
+    multiplier may also be the number before a multiplier in the source, as "5" is to 5 triệu."""
+    for other in stated:
+        if mention.value == other.value and mention.unit in (None, other.unit):
+            return True
+        if mention.unit is None and mention.value == mention.bare and mention.value == other.bare:
+            return True
+    return False
+
+
+def unsupported_numbers(text: str, source: str) -> list[str]:
+    """The numbers and dates in text that source does not state, each with its unit, in the order they appear."""
+    folded, folded_source = _folded(text), _folded(source)
+    source_dates = set(_dates_in(folded_source))
+    missing = [folded[start:end] for start, end, iso, _ in _date_matches(folded) if iso not in source_dates]
+    stated = number_mentions(folded_source, spelled=True)
+    missing += [mention.raw for mention in number_mentions(folded) if not _stated(mention, stated)]
+    return list(dict.fromkeys(missing))
 
 
 def bump_kb_version(db: Session, company_id: int) -> None:

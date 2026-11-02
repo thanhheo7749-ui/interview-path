@@ -1,10 +1,12 @@
 """Briefs, the manager's interviews, scorecards and hiring outcomes.
 
-HR routes need the hr role. Manager routes need the manager role and only see sent briefs for applications whose job
-sits in the manager's own department subtree; anything else is a 404. Every lookup filters on company_id.
+HR routes need the hr role. Manager routes need the manager role and only see sent briefs for applications of a job from
+a request assigned to them, or of a job with no request in their department subtree; anything else is a 404. A manager
+reads and scores only the requirements of their layer. Every lookup filters on company_id.
 Routes that run AI are plain `def`.
 """
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import and_, exists, or_
 from sqlalchemy.orm import Session
 
 from app.auth.dependencies import require_member
@@ -12,7 +14,7 @@ from app.brain import audience
 from app.bridges import brief
 from app.database.database import get_db
 from app.database.sql_models import (
-    Application, CandidateBrief, CompanyMember, InterviewScorecard, Job, JobRequirement, User,
+    Application, CandidateBrief, CompanyMember, HiringRequest, InterviewScorecard, Job, JobRequirement, User,
 )
 from app.hiring import decisions
 from app.schemas.bridges import BriefIn, BriefPatch, OutcomeIn, ScorecardIn
@@ -35,10 +37,11 @@ def _application(db: Session, company_id: int, application_id: int) -> Applicati
 
 
 def _managed_query(db: Session, member: CompanyMember):
-    """Sent briefs on live, approved applications in the manager's department subtree."""
+    """Sent briefs on live, approved applications this manager reads: of a job from a request assigned to them, or of a
+    job with no request in their department subtree."""
     departments = audience.for_member(db, member).department_ids
-    if not departments:
-        return None
+    from_request = exists().where(HiringRequest.job_id == Job.id, HiringRequest.company_id == member.company_id)
+    assigned = from_request.where(HiringRequest.manager_user_id == member.user_id)
     return (
         db.query(Application, Job, CandidateBrief)
         .join(Job, Job.id == Application.job_id)
@@ -46,13 +49,12 @@ def _managed_query(db: Session, member: CompanyMember):
         .filter(Application.company_id == member.company_id, Job.company_id == member.company_id,
                 CandidateBrief.company_id == member.company_id, CandidateBrief.status == "sent",
                 Application.hr_decision == "approved", Application.anonymized_at.is_(None),
-                Job.department_id.in_(departments))
+                or_(assigned, and_(~from_request, Job.department_id.in_(departments))))
     )
 
 
 def _managed(db: Session, member: CompanyMember, application_id: int):
-    query = _managed_query(db, member)
-    found = query.filter(Application.id == application_id).first() if query is not None else None
+    found = _managed_query(db, member).filter(Application.id == application_id).first()
     if found is None:
         raise HTTPException(status_code=404, detail="Interview not found")
     return found
@@ -173,10 +175,7 @@ def post_send_brief(company_id: int, app_id: int, member: CompanyMember = Depend
 @router.get(BASE + "/my-interviews")
 def list_my_interviews(company_id: int, member: CompanyMember = Depends(require_member("manager")),
                        db: Session = Depends(get_db)):
-    query = _managed_query(db, member)
-    if query is None:
-        return []
-    rows = query.order_by(CandidateBrief.sent_at.desc(), Application.id.desc()).all()
+    rows = _managed_query(db, member).order_by(CandidateBrief.sent_at.desc(), Application.id.desc()).all()
     scored = {
         application_id for (application_id,) in db.query(InterviewScorecard.application_id).filter(
             InterviewScorecard.company_id == company_id, InterviewScorecard.manager_user_id == member.user_id).all()
@@ -198,16 +197,11 @@ def get_my_interview(company_id: int, app_id: int, member: CompanyMember = Depen
     except decisions.DecisionError as error:
         db.rollback()
         raise HTTPException(status_code=error.status_code, detail=error.detail)
-    requirements = (
-        db.query(JobRequirement)
-        .filter(JobRequirement.job_id == job.id, JobRequirement.company_id == company_id,
-                JobRequirement.active.is_(True))
-        .order_by(JobRequirement.position, JobRequirement.id).all()
-    )
+    reader = audience.for_member(db, member)
     body = {
         "application_id": application.id, "alias": application.alias, "job": {"id": job.id, "title": job.title},
-        "candidate": identity, "brief": brief.serialize(row),
-        "requirements": [{"id": r.id, "text": r.text} for r in requirements],
+        "candidate": identity, "brief": brief.for_reader(db, application, row, reader),
+        "requirements": [{"id": r.id, "text": r.text} for r in brief.readable_requirements(db, application, reader)],
         "scorecard": _scorecard(_own_scorecard(db, member, application.id)),
     }
     db.commit()
@@ -218,8 +212,9 @@ def get_my_interview(company_id: int, app_id: int, member: CompanyMember = Depen
 def post_scorecard(company_id: int, app_id: int, body: ScorecardIn,
                    member: CompanyMember = Depends(require_member("manager")), db: Session = Depends(get_db)):
     application, _job, _row = _managed(db, member, app_id)
+    required = {r.id for r in brief.readable_requirements(db, application, audience.for_member(db, member))}
     try:
-        card = brief.submit_scorecard(db, application, member.user_id,
+        card = brief.submit_scorecard(db, application, member.user_id, required,
                                       [(s.requirement_id, s.score) for s in body.scores], body.recommendation,
                                       body.notes)
     except brief.BriefError as error:

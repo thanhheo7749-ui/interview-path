@@ -9,7 +9,7 @@ from app.database.database import get_db
 from app.database.sql_models import CompanyMember, Department, HiringRequest, JobDraft, VoiceSession
 from app.hiring import audit, voice
 from app.routers.screening import StateOut, state_out
-from app.schemas.bridges import HiringRequestIn, IntakeStartIn
+from app.schemas.bridges import HiringRequestIn, HiringRequestPatch, IntakeStartIn
 
 router = APIRouter()
 
@@ -17,13 +17,15 @@ BASE = "/api/companies/{company_id}"
 INTAKE_OPEN_STATUSES = ("open", "intake_in_progress")
 
 
-def _latest_drafts(db: Session, company_id: int, request_ids: list[int]) -> dict[int, tuple[int, str]]:
-    """Request id -> (id, status) of its newest draft, in one query."""
+def _latest_drafts(db: Session, member: CompanyMember, request_ids: list[int]) -> dict[int, tuple[int, str]]:
+    """Request id -> (id, status) of its newest draft this reader may open, in one query."""
     if not request_ids:
         return {}
-    rows = (db.query(JobDraft.hiring_request_id, JobDraft.id, JobDraft.status)
-            .filter(JobDraft.company_id == company_id, JobDraft.hiring_request_id.in_(request_ids))
-            .order_by(JobDraft.id).all())
+    query = db.query(JobDraft.hiring_request_id, JobDraft.id, JobDraft.status).filter(
+        JobDraft.company_id == member.company_id, JobDraft.hiring_request_id.in_(request_ids))
+    if member.role == "manager":
+        query = query.filter(JobDraft.submitted_at.isnot(None))
+    rows = query.order_by(JobDraft.id).all()
     return {request_id: (draft_id, status) for request_id, draft_id, status in rows}  # the last row of each wins
 
 
@@ -47,19 +49,26 @@ def _get(db: Session, company_id: int, req_id: int, lock: bool = False) -> Hirin
     return row
 
 
-@router.post(BASE + "/hiring-requests", status_code=201)
-def create_request(company_id: int, body: HiringRequestIn, member: CompanyMember = Depends(require_member("hr")),
-                   db: Session = Depends(get_db)):
-    if body.department_id is not None and not db.query(Department.id).filter(
-        Department.id == body.department_id, Department.company_id == company_id
+def _check_department(db: Session, company_id: int, department_id: int | None) -> None:
+    if department_id is not None and not db.query(Department.id).filter(
+        Department.id == department_id, Department.company_id == company_id
     ).first():
         raise HTTPException(status_code=404, detail="Department not found")
+
+
+def _check_manager(db: Session, company_id: int, user_id: int | None) -> None:
     manager = db.query(CompanyMember).filter(
-        CompanyMember.company_id == company_id, CompanyMember.user_id == body.manager_user_id,
-        CompanyMember.role == "manager",
+        CompanyMember.company_id == company_id, CompanyMember.user_id == user_id, CompanyMember.role == "manager",
     ).first()
     if manager is None:
         raise HTTPException(status_code=422, detail="The manager must be a manager of this company")
+
+
+@router.post(BASE + "/hiring-requests", status_code=201)
+def create_request(company_id: int, body: HiringRequestIn, member: CompanyMember = Depends(require_member("hr")),
+                   db: Session = Depends(get_db)):
+    _check_department(db, company_id, body.department_id)
+    _check_manager(db, company_id, body.manager_user_id)
     row = HiringRequest(company_id=company_id, department_id=body.department_id, title=body.title,
                         manager_user_id=body.manager_user_id, status="open", created_by=member.user_id)
     db.add(row)
@@ -77,7 +86,7 @@ def list_requests(company_id: int, member: CompanyMember = Depends(require_membe
     if member.role == "manager":
         query = query.filter(HiringRequest.manager_user_id == member.user_id)
     rows = query.order_by(HiringRequest.id.desc()).all()
-    drafts = _latest_drafts(db, company_id, [row.id for row in rows])
+    drafts = _latest_drafts(db, member, [row.id for row in rows])
     return [_out(row, drafts) for row in rows]
 
 
@@ -87,7 +96,7 @@ def read_request(company_id: int, req_id: int, member: CompanyMember = Depends(r
     row = _get(db, company_id, req_id)
     if member.role == "manager" and row.manager_user_id != member.user_id:
         raise HTTPException(status_code=404, detail="Hiring request not found")
-    return _out(row, _latest_drafts(db, company_id, [row.id]))
+    return _out(row, _latest_drafts(db, member, [row.id]))
 
 
 def _running_session(db: Session, row: HiringRequest) -> VoiceSession | None:
@@ -96,6 +105,44 @@ def _running_session(db: Session, row: HiringRequest) -> VoiceSession | None:
     return db.query(VoiceSession).filter(
         VoiceSession.id == row.intake_session_id, VoiceSession.status.in_(voice.ACTIVE_STATUSES)
     ).first()
+
+
+@router.patch(BASE + "/hiring-requests/{req_id}")
+def patch_request(company_id: int, req_id: int, body: HiringRequestPatch,
+                  member: CompanyMember = Depends(require_member("hr")), db: Session = Depends(get_db)):
+    row = _get(db, company_id, req_id, lock=True)
+    if row.status == "cancelled":
+        raise HTTPException(status_code=409, detail="A cancelled hiring request cannot be edited")
+    fields = body.model_fields_set
+    if "department_id" in fields:
+        _check_department(db, company_id, body.department_id)
+        row.department_id = body.department_id
+    if "manager_user_id" in fields and body.manager_user_id != row.manager_user_id:
+        _check_manager(db, company_id, body.manager_user_id)
+        if _running_session(db, row) is not None:
+            raise HTTPException(status_code=409, detail="The manager is in the middle of the intake of this request")
+        row.manager_user_id = body.manager_user_id
+    if "title" in fields and body.title is not None:
+        row.title = body.title
+    audit.record(db, company_id, member.user_id, "hiring_request_updated", "hiring_request", row.id,
+                 payload={"fields": sorted(fields)})
+    db.commit()
+    return _out(row, _latest_drafts(db, member, [row.id]))
+
+
+@router.post(BASE + "/hiring-requests/{req_id}/cancel")
+def cancel_request(company_id: int, req_id: int, member: CompanyMember = Depends(require_member("hr")),
+                   db: Session = Depends(get_db)):
+    """Stops the request: no more intake, drafts, approval or publishing from it. A job already published stays live."""
+    row = _get(db, company_id, req_id, lock=True)
+    if row.status in ("cancelled", "published"):
+        raise HTTPException(status_code=409, detail=f"A hiring request in status {row.status} cannot be cancelled")
+    if _running_session(db, row) is not None:
+        raise HTTPException(status_code=409, detail="The manager is in the middle of the intake of this request")
+    row.status = "cancelled"
+    audit.record(db, company_id, member.user_id, "hiring_request_cancelled", "hiring_request", row.id)
+    db.commit()
+    return _out(row, _latest_drafts(db, member, [row.id]))
 
 
 def _resume(db: Session, row: HiringRequest) -> StateOut | None:

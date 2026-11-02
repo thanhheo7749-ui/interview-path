@@ -8,6 +8,7 @@ from fastapi.testclient import TestClient
 from app.ai.providers import fake
 from app.bridges import channels
 from app.brain import fake_demo
+from app.database.database import SessionLocal
 from app.database.sql_models import (
     Application, AuditLog, ChannelContent, HiringRequest, Job, JobChannelLink, JobDraft, JobRequirement,
 )
@@ -55,7 +56,11 @@ def _draft(db, world, status="draft", lines=None):
 
 
 def _post(api, world, draft, action, headers=HR):
-    return api.post(_url(world, f"/job-drafts/{draft.id}/{action}"), headers=headers)
+    # Approve and publish name the version on the page, which is the one stored when the page reads it.
+    session = SessionLocal()
+    body = {"version": session.get(JobDraft, draft.id).version} if action in ("approve", "publish") else None
+    session.close()
+    return api.post(_url(world, f"/job-drafts/{draft.id}/{action}"), headers=headers, json=body)
 
 
 def _approved(api, db, world, lines=None):
@@ -100,10 +105,10 @@ def test_submit_moves_a_clean_draft_to_manager_review(api, db, world):
     assert _post(api, world, draft, "submit", MANAGER).status_code == 403
 
 
-def test_only_the_departments_manager_approves(api, db, world):
+def test_only_the_assigned_manager_approves(api, db, world):
     draft = _draft(db, world)
     assert _post(api, world, draft, "submit").status_code == 200
-    assert _post(api, world, draft, "approve", OTHER_MANAGER).status_code == 403
+    assert _post(api, world, draft, "approve", OTHER_MANAGER).status_code == 404
     assert _post(api, world, draft, "approve", HR).status_code == 403
     assert _post(api, world, draft, "approve", auth_header("hr@other.test")).status_code == 403
     db.expire_all()
@@ -125,7 +130,9 @@ def test_an_employee_cannot_approve(api, db, world):
 
 
 def test_approve_needs_a_submitted_draft(api, db, world):
-    assert _post(api, world, _draft(db, world), "approve", MANAGER).status_code == 409
+    # Until the first submit the draft does not exist for a manager. After it, the status decides.
+    assert _post(api, world, _draft(db, world), "approve", MANAGER).status_code == 404
+    assert _post(api, world, _draft(db, world, status="approved"), "approve", MANAGER).status_code == 409
 
 
 def _edit_patch(api, world, draft):

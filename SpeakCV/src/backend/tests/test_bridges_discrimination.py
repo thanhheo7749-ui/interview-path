@@ -363,3 +363,23 @@ def test_job_guard_failure_warns_instead_of_blocking(db, api, world, monkeypatch
 def test_clean_job_has_no_warnings(db, api, world):
     response = api.post(job_url(world), json=job_body("Python 3 years"), headers=world["hr"])
     assert response.status_code == 201 and response.json()["warnings"] == []
+
+
+def test_an_edited_accept_needs_confirmation_when_the_check_could_not_run(db, api, world, monkeypatch):
+    not_flagged()
+    ingest(db, world, [item("Mentoring", MENTOR_QUOTE, "skill")])
+    node = node_named(db, "Mentoring")
+    classifier_down(monkeypatch)
+    edited = {"action": "accept", "node_id": node.id, "title": "Mentoring juniors", "body": "Mentoring juniors"}
+
+    refused = decide(api, world, [edited])
+    assert refused.status_code == 409
+    assert refused.json()["detail"]["code"] == "unchecked"
+    db.expire_all()
+    node = db.get(KbNode, node.id)
+    assert (node.status, node.title) == ("draft", "Mentoring")
+
+    assert decide(api, world, [{**edited, "confirm_unchecked": True}]).status_code == 200
+    db.expire_all()
+    node = db.get(KbNode, node.id)
+    assert (node.status, node.title, node.guard_category) == ("published", "Mentoring juniors", None)

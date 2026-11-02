@@ -570,3 +570,31 @@ def test_recovery_erases_what_a_crash_left_and_a_second_run_is_a_no_op(client, w
     assert recording_files(tmp_path) == [] and db.query(KbDocument).filter_by(source_type="intake").count() == 1
     scheduled.clear()
     assert intake.recover_interrupted() == [] and scheduled == []
+
+
+def test_a_question_never_shows_a_requirement_above_the_managers_layer(client, db, world):
+    world.builder.node("Backend Developer must accept CANARY-KNOWN pay cut", type="requirement",
+                       visibility="confidential", department_id=world.sales.id)
+
+    assert not any("CANARY-KNOWN" in title for title in intake._known(db, world.request).requirements)
+
+    state = start(client, world, body={"language": "en"}).json()
+    assert state["status"] == "in_progress"
+    assert not any("CANARY-KNOWN" in (turn.question_text or "") for turn in db.query(VoiceTurn).all())
+    session = db.get(VoiceSession, state["session_id"])
+    assert "CANARY-KNOWN" not in json.dumps(session.plan or [], ensure_ascii=False)
+
+
+def test_a_question_shows_a_confidential_requirement_of_the_managers_own_department(db, world):
+    world.builder.node("Backend Developer own-team requirement", type="requirement", visibility="confidential",
+                       department_id=world.eng.id)
+    assert any("own-team" in title for title in intake._known(db, world.request).requirements)
+
+
+def test_the_hr_read_still_decides_what_to_ask(db, world):
+    world.builder.node("A confidential value of Sales", type="value", visibility="confidential",
+                       department_id=world.sales.id)
+    known = intake._known(db, world.request)
+    assert known.has_values is True
+    assert not any(question.source_ref == "topic:team_works" for question in intake._select(known, "en"))
+    assert "Sales" not in " ".join(known.requirements)

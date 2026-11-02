@@ -168,7 +168,7 @@ def test_salary_without_a_source_is_not_added_and_needs_confirmation(db, world):
     draft = _sourced_draft(db, world)
     fake.enqueue("jd_assistant", assistant_json([
         ai_line("l1", [world.role.id], en="We build the APIs of our hiring platform"),
-        ai_line("l2", [world.python.id], en="You have 3 years of Python experience"),
+        ai_line("l2", [world.python.id], en="You have 3 years of Python experience", is_requirement=True, must_have=True),
         ai_line("l3", [world.python.id], en="Salary is 100M VND", vi="Luong 100M", ko="Yeonbong 100M"),
         ai_line("l4", [], en="Free lunch every day", vi="An trua", ko="Jeomsim"),
     ]))
@@ -213,17 +213,20 @@ def test_assistant_restyle_that_keeps_the_numbers_passes_and_a_changed_number_do
     draft = _sourced_draft(db, world)
     fake.enqueue("jd_assistant", assistant_json([
         ai_line("l1", [world.role.id], en="Join us and build the APIs of our hiring platform"),
-        ai_line("l2", [world.python.id], en="Bring 3 years of Python", vi="3 nam Python", ko="Python 3"),
+        ai_line("l2", [world.python.id], en="Bring 3 years of Python", vi="3 nam Python", ko="Python 3",
+                is_requirement=True, must_have=True),
     ]))
     result = jd_studio.revise(db, draft, "friendlier", world.hr.id)
     assert result.needs_confirmation == [] and result.draft.lines[1]["text"]["en"] == "Bring 3 years of Python"
 
     fake.enqueue("jd_assistant", assistant_json([
         ai_line("l1", [world.role.id], en="Join us"),
-        ai_line("l2", [world.python.id], en="Bring 5 years of Python", vi="3 nam Python", ko="Python 3"),
+        ai_line("l2", [world.python.id], en="Bring 5 years of Python", vi="3 nam Python", ko="Python 3",
+                is_requirement=True, must_have=True),
     ]))
     result = jd_studio.revise(db, result.draft, "stricter", world.hr.id)
-    assert [i["id"] for i in result.draft.lines] == ["l1"]
+    assert [i["id"] for i in result.draft.lines] == ["l1", "l2"]
+    assert result.draft.lines[1]["text"]["en"] == "Bring 3 years of Python"  # the line stays as it was
     assert len(result.needs_confirmation) == 1
 
 
@@ -311,9 +314,9 @@ def test_ai_failure_in_a_route_is_a_503_and_leaves_the_draft(api, db, world):
     assert db.get(JobDraft, draft.id).version == 1
 
 
-def test_managers_see_only_their_own_departments_drafts(api, db, world):
-    draft = _sourced_draft(db, world)
-    own = api.get(_url(world, f"/job-drafts/{draft.id}"), headers=auth_header("mgr@acme.test"))
+def test_managers_see_only_the_drafts_assigned_to_them(api, db, world):
+    draft = _sourced_draft(db, world, status="manager_review")
+    own =api.get(_url(world, f"/job-drafts/{draft.id}"), headers=auth_header("mgr@acme.test"))
     other = api.get(_url(world, f"/job-drafts/{draft.id}"), headers=auth_header("mgr2@acme.test"))
     assert own.status_code == 200
     assert other.status_code == 404
