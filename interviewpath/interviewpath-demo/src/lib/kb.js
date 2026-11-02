@@ -24,6 +24,9 @@ export const retryFailedSections = (companyId, jobId) =>
 export const unpublishDocument = (companyId, documentId) =>
   api(`${kb(companyId)}/documents/${documentId}/unpublish`, { method: 'POST' });
 
+export const retryMasking = (companyId, documentId) =>
+  api(`${kb(companyId)}/documents/${documentId}/retry-masking`, { method: 'POST' });
+
 export const getReviewQueue = (companyId) => api(`${kb(companyId)}/review`);
 
 export const decideReview = (companyId, items) =>

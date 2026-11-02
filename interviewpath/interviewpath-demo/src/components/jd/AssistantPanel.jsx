@@ -4,10 +4,10 @@ import { inputClass, primaryButton, secondaryButton } from '../KbFeedback.jsx';
 
 // Chat with the JD assistant. The assistant changes wording only: a salary, a benefit or a requirement the knowledge
 // graph does not hold comes back as a proposal, which HR confirms (it is then labelled as confirmed by HR) or dismisses.
-function AssistantPanel({ messages, proposals, dismissed, busy, onSend, onConfirm, onDismiss }) {
+function AssistantPanel({ messages, proposals, busy, onSend, onConfirm, onDismiss }) {
   const { t } = useTranslation();
   const [text, setText] = useState('');
-  const open = proposals.filter((p) => !dismissed.includes(p.id));
+  const open = proposals;
 
   const submit = async (event) => {
     event.preventDefault();

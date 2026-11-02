@@ -575,3 +575,56 @@ def test_a_scorecard_whose_manager_was_deleted_has_an_empty_manager_name(db, wor
     assert response.status_code == 200, response.text
     cards = response.json()["scorecards"]
     assert len(cards) == 1 and cards[0]["manager_name"] == "" and cards[0]["recommendation"] == "hire"
+
+
+# --- Block 4 final review, group Y ---------------------------------------------------------------------------------
+
+def test_send_and_outcome_refuse_an_anonymized_application_and_the_notification_is_linked(db, world, api):
+    application = make_app(db, world)
+    send_brief(api, world, application)
+    notice = db.query(Notification).filter_by(kind="brief").one()
+    assert notice.application_id == application.id  # anonymizing removes it with the application
+    second = make_app(db, world, alias="#B2")
+    generate(api, world, second)
+    api.patch(brief_url(world, second), headers=hr(world), json={})
+    retention.anonymize_application(db, db.get(Application, second.id))
+    assert api.post(brief_url(world, second) + "/send", headers=hr(world)).status_code in (404, 409)
+    db.expire_all()
+    assert db.query(Notification).filter_by(kind="brief").count() == 1
+    assert api.post(url(world, f"/applications/{second.id}/outcome"), headers=hr(world),
+                    json={"outcome": "hired"}).status_code == 409
+    assert db.get(Application, second.id).final_outcome is None
+    # The module itself refuses too, whoever calls it.
+    with pytest.raises(brief.BriefError):
+        brief.record_outcome(db, db.get(Application, second.id), world["people"]["hr"]["id"], "hired")
+
+
+def test_sent_at_carries_a_timezone(db, world, api):
+    application = make_app(db, world)
+    send_brief(api, world, application)
+    sent = api.get(brief_url(world, application), headers=hr(world)).json()["sent_at"]
+    assert sent.endswith("+00:00") or sent.endswith("Z")
+    listed = api.get(url(world, "/my-interviews"), headers=mgr(world)).json()
+    assert listed[0]["sent_at"].endswith("+00:00") or listed[0]["sent_at"].endswith("Z")
+
+
+def test_a_retried_analysis_after_approval_marks_the_brief_stale_and_it_can_be_regenerated(db, world, api):
+    from app.hiring import analysis
+
+    application = make_app(db, world)
+    send_brief(api, world, application)
+    assert api.get(brief_url(world, application), headers=hr(world)).json()["stale"] is False
+    row = db.get(Application, application.id)
+    row.analysis_status = "failed"
+    db.commit()
+    analysis.run(application.id)
+    db.expire_all()
+    assert db.get(Application, application.id).analysis_status == "done"
+    got = api.get(brief_url(world, application), headers=hr(world)).json()
+    assert got["status"] == "sent" and got["stale"] is True
+    again = generate(api, world, application)  # a stale sent brief may be regenerated; a fresh one may not
+    assert again.status_code == 200 and again.json()["status"] == "draft" and again.json()["stale"] is False
+    assert again.json()["reviewed_by"] is None and again.json()["sent_at"] is None
+    fresh = make_app(db, world, alias="#B3")
+    send_brief(api, world, fresh)
+    assert generate(api, world, fresh).status_code == 409

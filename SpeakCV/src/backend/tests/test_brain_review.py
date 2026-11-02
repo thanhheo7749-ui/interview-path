@@ -1187,7 +1187,7 @@ def test_the_api_states_why_a_document_is_held(client, w):
     flagged_job(w, dropped_items=2, failed_chunks=2, failed_chunk_ids=[1], contradiction_check_failed=True)
     [row] = [d for d in client.get(w.url("documents"), headers=w.hr).json() if d["id"] == w.doc.id]
     assert row["publish_hold"] == {"dropped_items": 2, "failed_chunks": 2, "contradiction_check_failed": True,
-                                   "pending_drafts": False}
+                                   "masking_failed": False, "pending_drafts": False}
     w.node("Pending")
     [row] = [d for d in client.get(w.url("documents"), headers=w.hr).json() if d["id"] == w.doc.id]
     assert row["publish_hold"]["pending_drafts"] is True

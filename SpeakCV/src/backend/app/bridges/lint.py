@@ -17,6 +17,7 @@ from app.brain import contradiction, retriever, vectors
 from app.brain.prompting import as_data
 from app.bridges import discrimination
 from app.database.sql_models import JobDraft
+from app.hiring import audit
 
 LANGS = ("en", "vi", "ko")
 MAX_MUST_HAVE = 6
@@ -204,10 +205,14 @@ def acknowledge_unchecked(db: Session, draft: JobDraft, user_id: int, line_id: s
     pending = {i["line_id"] for i in draft.lint or [] if i["check"] == "unchecked" and (line_id in (None, i["line_id"]))}
     lines = copy.deepcopy(draft.lines or [])
     now = datetime.now(timezone.utc).isoformat()
+    acknowledged = []
     for line in lines:
         if line["id"] in pending:
             line["unchecked_ack"] = {"user_id": user_id, "at": now}
+            acknowledged.append(line["id"])
     draft.lines = lines
     db.add(draft)
+    audit.record(db, draft.company_id, user_id, "job_draft.unchecked_acknowledged", "job_draft", draft.id,
+                 {"line_ids": acknowledged})  # ids only: by rule an audit payload holds no text
     db.commit()
     return draft

@@ -329,7 +329,7 @@ def test_complete_is_idempotent(client, world, db):
     assert first.id == second.id and db.query(KbDocument).filter_by(source_type="intake").count() == 1
 
 
-def test_masking_failure_keeps_patterns_and_flags_the_job(client, world, db, monkeypatch):
+def failing_mask(monkeypatch):
     real = gateway.generate_structured
 
     def failing(tier, system, messages, schema, tokens, feature, company_id):
@@ -338,17 +338,219 @@ def test_masking_failure_keeps_patterns_and_flags_the_job(client, world, db, mon
         return real(tier, system, messages, schema, tokens, feature, company_id)
 
     monkeypatch.setattr(gateway, "generate_structured", failing)
+    return real
+
+
+def test_masking_failure_keeps_patterns_and_marks_the_document(client, world, db, monkeypatch):
+    failing_mask(monkeypatch)
     session = finished_session(client, db, world, text="Mail kim@acme.test about the role. Ships on time.")
     document = intake.complete(db, session)
     from app.core import storage
     assert "kim@acme.test" not in storage.read_bytes(document.file_path).decode()
-    job = db.query(KbIngestionJob).filter_by(document_id=document.id).one()
-    assert job.error == intake.MASK_FAILED_NOTE
-    # The job clears its error when it starts, so the background step puts the note back.
+    assert document.masking_note == intake.MASK_FAILED
+    # The job clears its own error when it starts: the note lives on the document, so it cannot be lost.
     fake.enqueue("kb_extract", json.dumps({"nodes": [], "edges": []}))
     intake.run_completion(session.id)
     db.expire_all()
-    assert db.get(KbIngestionJob, job.id).error == intake.MASK_FAILED_NOTE
+    assert db.get(KbDocument, document.id).masking_note == intake.MASK_FAILED
+
+
+# --- I-13: HR sees the masking note, publishing is held, and masking can be retried ------------------------------
+
+def hr_get(client, world, tail):
+    return client.get(f"/api/companies/{world.company.id}/kb{tail}", headers=auth_header(HR))
+
+
+def hr_post(client, world, tail, body=None):
+    return client.post(f"/api/companies/{world.company.id}/kb{tail}", json=body or {}, headers=auth_header(HR))
+
+
+def unmasked_document(client, world, db, monkeypatch, text="Kim Minjun ships on time without supervision."):
+    real = failing_mask(monkeypatch)
+    session = finished_session(client, db, world, text=text)
+    fake.enqueue("kb_extract", json.dumps({"nodes": [], "edges": []}))
+    intake.run_completion(session.id)
+    monkeypatch.setattr(gateway, "generate_structured", real)
+    db.rollback()  # on MySQL this session's snapshot is older than the completion that just committed
+    db.expire_all()
+    return session, db.query(KbDocument).filter_by(source_type="intake").one()
+
+
+def test_the_masking_note_shows_in_documents_and_review_and_holds_bulk_publishing(client, world, db, monkeypatch):
+    session, document = unmasked_document(client, world, db, monkeypatch)
+    assert document.status == "review"  # nothing to review, yet the chunks are not published
+    listed = {d["id"]: d for d in hr_get(client, world, "/documents").json()}[document.id]
+    assert listed["masking_note"] == "names_unchecked" and listed["publish_hold"]["masking_failed"] is True
+    queue = hr_get(client, world, "/review").json()
+    assert [d["id"] for d in queue["held_documents"]] == [document.id]
+    refused = hr_post(client, world, "/review/decide", {"items": [{"action": "publish_document", "document_id": document.id}]})
+    assert refused.status_code == 409
+    db.expire_all()
+    assert db.get(KbDocument, document.id).status == "review"
+
+
+def test_raw_transcript_is_kept_until_masking_succeeds(client, world, db, monkeypatch, tmp_path):
+    session, document = unmasked_document(client, world, db, monkeypatch)
+    assert any(t.transcript for t in raw_turns(db, session.id))
+    intake.complete(db, session)  # a repeat of the completion must not erase it either
+    assert any(t.transcript for t in raw_turns(db, session.id)) and recording_files(tmp_path)
+
+
+def test_retrying_masking_clears_the_note_rebuilds_the_document_and_erases_raw_data(client, world, db, monkeypatch, tmp_path):
+    from app.core import storage
+    session, document = unmasked_document(client, world, db, monkeypatch)
+    assert "Kim Minjun" in storage.read_bytes(document.file_path).decode()
+    fake.enqueue("intake_mask", json.dumps({"names": ["Kim Minjun"]}))
+    fake.enqueue("kb_extract", json.dumps({"nodes": [], "edges": []}))
+    response = hr_post(client, world, f"/documents/{document.id}/retry-masking")
+    assert response.status_code == 200, response.text
+    db.expire_all()
+    document = db.get(KbDocument, document.id)
+    stored = storage.read_bytes(document.file_path).decode()
+    assert document.masking_note is None and "Kim Minjun" not in stored and "[NAME]" in stored
+    assert all(t.transcript is None and t.audio_path is None for t in raw_turns(db, session.id))
+    assert recording_files(tmp_path) == []
+    assert db.query(KbIngestionJob).filter_by(document_id=document.id).count() == 2
+
+
+def test_a_retry_that_cannot_mask_keeps_the_note_and_the_raw_data(client, world, db, monkeypatch):
+    session, document = unmasked_document(client, world, db, monkeypatch)
+    failing_mask(monkeypatch)
+    response = hr_post(client, world, f"/documents/{document.id}/retry-masking")
+    assert response.status_code == 503
+    db.expire_all()
+    assert db.get(KbDocument, document.id).masking_note == "names_unchecked"
+    assert any(t.transcript for t in raw_turns(db, session.id))
+
+
+def test_retry_masking_is_hr_only_company_scoped_and_needs_a_note(client, world, db, monkeypatch):
+    session, document = unmasked_document(client, world, db, monkeypatch)
+    path = f"/api/companies/{world.company.id}/kb/documents/{document.id}/retry-masking"
+    assert client.post(path, headers=auth_header(MANAGER)).status_code == 403
+    other = f"/api/companies/{world.other.id}/kb/documents/{document.id}/retry-masking"
+    assert client.post(other, headers=auth_header(OUTSIDER)).status_code == 404
+    document.masking_note = None
+    db.commit()
+    assert client.post(path, headers=auth_header(HR)).status_code == 409
+
+
+def test_the_daily_sweep_erases_a_held_transcript_after_seven_days(client, world, db, monkeypatch, tmp_path):
+    session, document = unmasked_document(client, world, db, monkeypatch)
+    assert intake.sweep_terminal(db) == 0 and recording_files(tmp_path)
+    later = datetime.now(timezone.utc) + timedelta(days=8)
+    assert intake.sweep_terminal(db, now=later) == 1
+    assert all(t.transcript is None and t.audio_path is None for t in raw_turns(db, session.id))
+    assert recording_files(tmp_path) == []
+
+
+# --- I-14: raw data does not survive in follow-up questions, plans or abandoned sessions ------------------------
+
+def test_erase_raw_also_blanks_follow_up_questions_their_audio_and_the_plan(client, world, db, tmp_path):
+    from app.hiring import recordings
+    session = finished_session(client, db, world)
+    path = recordings.save_question_audio(world.company.id, f"session-{session.id}", 7, b"spoken", ".mp3")
+    db.add(VoiceTurn(session_id=session.id, position=7, question_text="What did Kim Chulsoo do wrong?",
+                     question_source="followup", is_followup=True, parent_position=1, question_audio_path=path))
+    db.commit()
+    intake.complete(db, session)
+    turns = raw_turns(db, session.id)
+    followups = [t for t in turns if t.is_followup]
+    assert followups and all(t.question_text == "" and t.question_audio_path is None for t in followups)
+    assert all(t.question_text for t in turns if not t.is_followup)
+    assert not (tmp_path / "rec" / path).exists()
+    assert not session_row(db, session.id).plan
+
+
+def stale_session_with_failed_stt(client, world, db, monkeypatch):
+    def down(*args, **kwargs):
+        raise AIProviderError("down")
+
+    monkeypatch.setattr(voice.gateway, "transcribe", down)
+    state = start(client, world).json()
+    answer(client, state["session_id"], 1, text="Kim Chulsoo was the problem")
+    row = session_row(db, state["session_id"])
+    row.last_activity_at = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(hours=30)
+    db.commit()
+    return state["session_id"]
+
+
+def test_an_abandoned_intake_erases_the_audio_it_saved(client, world, db, monkeypatch, tmp_path):
+    session_id = stale_session_with_failed_stt(client, world, db, monkeypatch)
+    assert recording_files(tmp_path)
+    response = client.get(f"/api/voice/{session_id}/state", headers=auth_header(MANAGER))
+    assert response.json()["status"] == "abandoned"
+    assert recording_files(tmp_path) == []
+    assert all(t.audio_path is None and t.transcript is None for t in raw_turns(db, session_id))
+
+
+def test_the_daily_sweep_erases_terminal_intake_sessions_that_nothing_links_to(client, world, db, monkeypatch, tmp_path):
+    session_id = stale_session_with_failed_stt(client, world, db, monkeypatch)
+    with monkeypatch.context() as patch:
+        patch.setattr(intake, "erase_raw", lambda sid: None)  # the abandon hook "missed" it
+        assert voice.sweep_abandoned(db) == 1
+    assert recording_files(tmp_path)
+    request = db.get(HiringRequest, world.request.id)
+    request.intake_session_id = None  # starting again overwrote the link: the old session is orphaned
+    db.commit()
+    assert intake.sweep_terminal(db) == 1
+    assert recording_files(tmp_path) == []
+    assert intake.sweep_terminal(db) == 0
+
+
+def test_the_sweep_leaves_a_finished_intake_alone_until_its_document_exists(client, world, db, tmp_path):
+    finished_session(client, db, world)
+    assert intake.sweep_terminal(db) == 0 and recording_files(tmp_path)
+    assert intake.sweep_terminal(db, now=datetime.now(timezone.utc) + timedelta(days=8)) == 1
+
+
+def test_the_daily_pass_runs_the_intake_sweep():
+    import inspect
+    assert "intake.sweep_terminal" in inspect.getsource(retention._daily_pass)
+
+
+# --- M-9: a wholly silent intake makes no document and can be started again -------------------------------------
+
+def test_a_wholly_silent_intake_is_marked_without_a_document_and_can_restart(client, world, db, tmp_path, monkeypatch):
+    from types import SimpleNamespace
+
+    def silence(*args, **kwargs):
+        return SimpleNamespace(text="", language="en", provider="fake", model="m", latency_ms=1,
+                               usage=SimpleNamespace(audio_seconds=1.0, input_tokens=0, output_tokens=0))
+
+    monkeypatch.setattr(voice.gateway, "transcribe", silence)
+    state = start(client, world).json()
+    session_id = state["session_id"]
+    for _ in range(40):
+        if state["status"] not in ("in_progress", "closing", "paused") or state["position"] is None:
+            break
+        state = answer(client, session_id, state["position"], text="...").json()
+    assert session_row(db, session_id).status == "completed"
+    intake.run_completion(session_id)
+    db.expire_all()
+    request = db.get(HiringRequest, world.request.id)
+    assert request.status == "intake_empty" and request.intake_document_id is None
+    assert db.query(KbDocument).filter_by(source_type="intake").count() == 0
+    assert recording_files(tmp_path) == []
+    listed = client.get(base(world), headers=auth_header(MANAGER)).json()[0]
+    assert listed["status"] == "intake_empty"
+    again = start(client, world)
+    assert again.status_code == 200 and again.json()["session_id"] != session_id
+
+
+# --- M-1: planning never fails because embeddings are unavailable ------------------------------------------------
+
+@pytest.mark.parametrize("error", [AIProviderError("embeddings down"), "missing"])
+def test_planning_with_embeddings_down_or_missing_uses_plain_templates(client, world, db, monkeypatch, error):
+    from app.brain import retriever
+
+    def broken(*args, **kwargs):
+        raise retriever.NoEmbeddingsError("run reembed") if error == "missing" else error
+
+    monkeypatch.setattr(retriever, "search", broken)
+    response = start(client, world)
+    assert response.status_code == 200, response.text
+    plan = intake.build_plan(db, world.request, "en")
+    assert len(plan) == 6 and all("already recorded" not in item.text for item in plan)
 
 
 def requirement_item(title, quote, node_type="requirement"):
@@ -570,3 +772,32 @@ def test_recovery_erases_what_a_crash_left_and_a_second_run_is_a_no_op(client, w
     assert recording_files(tmp_path) == [] and db.query(KbDocument).filter_by(source_type="intake").count() == 1
     scheduled.clear()
     assert intake.recover_interrupted() == [] and scheduled == []
+
+
+def test_a_manager_who_was_removed_cannot_keep_answering_their_intake(client, world, db):
+    state = start(client, world).json()
+    member = db.query(CompanyMember).filter_by(company_id=world.company.id, user_id=world.manager.id).one()
+    db.delete(member)
+    db.commit()
+    assert answer(client, state["session_id"], state["position"]).status_code == 404
+    assert client.get(f"/api/voice/{state['session_id']}/state", headers=auth_header(MANAGER)).status_code == 404
+
+
+def test_the_intake_rules_run_on_every_node_type(client, world, db):
+    queue_extraction(requirement_item("Team makeup", "30세 이하 선호", node_type="value"))
+    session = finished_session(client, db, world, text="우리 팀은 30세 이하 선호합니다. 팀은 빠르게 일합니다.", language="ko")
+    intake.run_completion(session.id)
+    db.expire_all()
+    node = db.query(KbNode).filter_by(title="Team makeup").one()
+    assert node.type == "value" and node.guard_category == "age" and node.status == "draft"
+    path = f"/api/companies/{world.company.id}/kb/review/decide"
+    blocked = client.post(path, json={"items": [{"action": "accept", "node_id": node.id}]}, headers=auth_header(HR))
+    assert blocked.status_code == 409 and "age" in blocked.text
+    reworded = client.post(path, headers=auth_header(HR), json={"items": [
+        {"action": "accept", "node_id": node.id, "title": "Team makeup", "body": "Under 30 years old only"}]})
+    assert reworded.status_code == 409  # an edit is checked again by the rules
+    clean = client.post(path, headers=auth_header(HR), json={"items": [
+        {"action": "accept", "node_id": node.id, "title": "Team style", "body": "We value fast, careful work"}]})
+    assert clean.status_code == 200, clean.text
+    db.expire_all()
+    assert db.get(KbNode, node.id).status == "published" and db.get(KbNode, node.id).guard_category is None

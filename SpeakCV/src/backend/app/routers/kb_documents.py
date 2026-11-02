@@ -6,6 +6,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPExcepti
 from sqlalchemy.orm import Session
 
 from app.auth.dependencies import require_member
+from app.bridges import intake
 from app.brain import ingestion, review
 from app.core.uploads import DOCUMENT_TYPES, read_upload
 from app.database.database import get_db
@@ -29,6 +30,7 @@ def _document_out(document: KbDocument) -> dict:
         "department_id": document.department_id,
         "effective_date": document.effective_date.isoformat() if document.effective_date else None,
         "status": document.status,
+        "masking_note": document.masking_note,
         "created_at": document.created_at.isoformat() if document.created_at else None,
     }
 
@@ -142,6 +144,24 @@ def unpublish_document(
         db.rollback()
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
     return {"document": _document_out(db.get(KbDocument, document_id)), **counts}
+
+
+@router.post(f"{KB}/documents/{{document_id}}/retry-masking")
+def retry_masking(
+    company_id: int,
+    document_id: int,
+    background_tasks: BackgroundTasks,
+    member: CompanyMember = Depends(require_member("hr")),
+    db: Session = Depends(get_db),
+):
+    """Mask the names of an intake transcript again. Plain `def`: it calls AI, with nothing held."""
+    try:
+        job = intake.retry_masking(db, company_id, document_id, member.user_id)
+    except intake.IntakeError as error:
+        db.rollback()
+        raise HTTPException(status_code=error.status_code, detail=error.detail) from error
+    background_tasks.add_task(ingestion.run_job, job.id)
+    return {"document": _document_out(db.get(KbDocument, document_id)), "job": _job_out(job)}
 
 
 @router.get(f"{KB}/jobs/{{job_id}}")

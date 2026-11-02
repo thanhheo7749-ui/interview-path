@@ -87,6 +87,10 @@ test('HR drafts, the manager approves in Korean, HR publishes and copies channel
   await expect(page.getByTestId('proposal')).toHaveCount(1);
   await page.getByTestId('proposal').getByRole('button', { name: 'Dismiss' }).click();
   await expect(page.getByTestId('proposal')).toHaveCount(0);
+  // The dismissal is stored: the proposal does not come back with the page.
+  await page.reload();
+  await expect(page.getByTestId('jd-lines')).toBeVisible();
+  await expect(page.getByTestId('proposal')).toHaveCount(0);
 
   // The Korean version is written by hand so the manager's page can be told apart from the English one.
   await page.getByRole('tab', { name: '한국어' }).click();
@@ -169,9 +173,9 @@ test('HR drafts, the manager approves in Korean, HR publishes and copies channel
     await expect(content.getByRole('button', { name: /^Copy link / })).toBeVisible();
     await expect(content.getByRole('button', { name: /^Copy text / })).toBeVisible();
   }
-  // Only tabs and copy buttons: no button posts, sends or publishes anywhere.
+  // Only tabs, copy buttons and the regenerate button: no button posts, sends or publishes anywhere.
   const buttons = await content.getByRole('button').allInnerTexts();
-  expect(buttons.filter((text) => !/^Copy/.test(text.trim()) && !CHANNELS.includes(text.trim()))).toEqual([]);
+  expect(buttons.filter((text) => !/^Copy/.test(text.trim()) && !CHANNELS.includes(text.trim()) && text.trim() !== 'Generate again')).toEqual([]);
   await content.getByRole('tab', { name: 'LinkedIn' }).click();
   await content.getByRole('button', { name: /^Copy link / }).click();
   await expect(content.getByText('Copied', { exact: true })).toBeVisible();

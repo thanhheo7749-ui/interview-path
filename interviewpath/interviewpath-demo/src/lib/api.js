@@ -4,10 +4,11 @@ export const API_URL = (import.meta.env.VITE_API_URL || 'http://localhost:8001')
 const TOKEN_KEY = 'portal_token';
 
 export class ApiError extends Error {
-  constructor(status, message, code) {
+  constructor(status, message, code, data) {
     super(message);
     this.status = status;
     this.code = code;
+    this.data = data; // the detail object of the response, when it is one
   }
 }
 
@@ -38,7 +39,8 @@ export async function api(path, { method = 'GET', body, formData, skipAuthRedire
     if (detail.code === 'ai_budget_exceeded') throw new ApiError(response.status, i18n.t('common.aiBudgetExceeded'), detail.code);
     // A detail is text, or an object whose `message` says what happened (a draft blocked by lint, for one).
     const text = typeof detail.detail === 'string' ? detail.detail : detail.detail?.message;
-    throw new ApiError(response.status, typeof text === 'string' && text ? text : `Request failed (${response.status})`);
+    const data = detail.detail && typeof detail.detail === 'object' ? detail.detail : undefined;
+    throw new ApiError(response.status, typeof text === 'string' && text ? text : `Request failed (${response.status})`, data?.code, data);
   }
   return response.status === 204 ? null : response.json();
 }

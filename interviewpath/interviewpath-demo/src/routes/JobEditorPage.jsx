@@ -39,6 +39,7 @@ function JobEditor() {
   const [departments, setDepartments] = useState([]);
   const [roles, setRoles] = useState([]);
   const [error, setError] = useState(location.state?.error ?? '');
+  const [studioDraft, setStudioDraft] = useState(null); // the JD Studio draft this job was made in
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState(false);
   // Texts the automatic discrimination check could not look at: saved, but HR should read them.
@@ -178,7 +179,10 @@ function JobEditor() {
       }
     } catch (err) {
       if (isNew && stored) navigate(`/jobs/${stored.id}`, { replace: true, state: { error: err.message, warnings: found } });
-      else setError(err.message);
+      else if (err.code === 'description_in_jd_studio') {
+        setStudioDraft(err.data?.draft_id ?? null);
+        setError(t('jobs.descriptionInJdStudio'));
+      } else setError(err.message);
     } finally {
       setBusy(false);
     }
@@ -226,6 +230,11 @@ function JobEditor() {
         )}
       </div>
       <ErrorAlert message={error} />
+      {studioDraft != null && (
+        <Link to={`/jd-studio/${studioDraft}`} data-testid="open-jd-studio" className={secondaryButton}>
+          {t('jobs.openJdStudio')}
+        </Link>
+      )}
       <WarningList
         warnings={warnings.map((warning) => (warning === NO_PUBLIC_REQUIREMENT ? t('jobs.noPublicRequirement') : warning))}
         onDismiss={() => setWarnings([])}

@@ -28,6 +28,7 @@ HISTORY_LIMIT = 10
 MAX_MESSAGE_CHARS = 2000
 PROPOSAL = "proposal"
 PROPOSAL_DONE = "proposal_confirmed"
+PROPOSAL_DISMISSED = "proposal_dismissed"
 CONFIRMED_LABEL = "Confirmed by HR"
 RESETS_ON_EDIT = ("manager_review", "approved", "published")
 
@@ -174,20 +175,25 @@ def validate_lines(lines: list[dict], allowed_node_ids, node_texts: dict[int, st
     allowed = set(allowed_node_ids)
     valid, rejected = [], []
     for item in lines:
-        reason = None
+        reason = code = None
+        detail: list = []
         sources = item.get("source_node_ids") or []
         if item.get("hr_confirmed"):
             pass
         elif not sources:
-            reason = "The line has no source in the knowledge graph."
+            code, reason = "no_source", "The line has no source in the knowledge graph."
         elif not set(sources) <= allowed:
-            reason = f"The line cites nodes that are not in the company context: {sorted(set(sources) - allowed)}."
+            detail = sorted(set(sources) - allowed)
+            code, reason = "unknown_nodes", f"The line cites nodes that are not in the company context: {detail}."
         elif node_texts is not None and (missing := _unsupported_numbers(item, node_texts)):
-            reason = f"The line states numbers that its sources do not contain: {', '.join(missing)}."
+            detail = missing
+            code, reason = "unsupported_numbers", f"The line states numbers that its sources do not contain: {', '.join(missing)}."
         if reason is None:
             valid.append(item)
         else:
-            rejected.append({"line_id": item["id"], "reason": reason, "text": dict(item.get("text") or {})})
+            # The code and detail let the portal word the reason in the reader's language; reason stays for logs and tests.
+            rejected.append({"line_id": item["id"], "code": code, "detail": detail, "reason": reason,
+                             "text": dict(item.get("text") or {})})
     return LineValidation(valid, rejected)
 
 
@@ -286,14 +292,15 @@ def generate(db: Session, source, user_id: int) -> JobDraft:
     result = validate_lines(_unique_ids([_stored(item) for item in output.lines]), set(context.texts), context.texts)
     issues = lint.evaluate(db, ctx.company_id, result.valid)
     draft = JobDraft(company_id=ctx.company_id, hiring_request_id=ctx.hiring_request_id, version=0, lines=[],
-                     requirement_lines=[], lint=[], failed_languages=[], status="draft")
+                     requirement_lines=[], lint=[], failed_languages=[], rejected=[], title=ctx.title[:255],
+                     status="draft")
     _set_lines(draft, result.valid)
     db.add(draft)
     db.flush()
     audit.record(db, ctx.company_id, user_id, "job_draft.generated", "job_draft", draft.id,
                  {"lines": len(result.valid), "rejected": len(result.rejected)})
-    lint.store(db, draft, issues)
-    draft.rejected_lines = result.rejected
+    draft.rejected = result.rejected
+    lint.store(db, draft, issues)  # commits, with the rejected lines
     return draft
 
 
@@ -305,6 +312,8 @@ def _draft_title(db: Session, draft: JobDraft) -> str:
                                                  HiringRequest.company_id == draft.company_id).first()
         if request:
             return request.title
+    if draft.title:
+        return draft.title
     return (draft.lines[0]["text"].get("en", "") if draft.lines else "")[:100]
 
 
@@ -438,6 +447,23 @@ def confirm_line(db: Session, draft: JobDraft, line_id: str, user_id: int) -> Jo
     _set_lines(draft, lines)
     audit.record(db, draft.company_id, user_id, "job_draft.line_confirmed", "job_draft", draft.id, {"line_id": line_id})
     lint.store(db, draft, issues)
+    return draft
+
+
+def dismiss_proposal(db: Session, draft: JobDraft, proposal_id: str, user_id: int) -> JobDraft:
+    """HR sets a proposal aside for good: it is no longer listed and can no longer be confirmed."""
+    row = None
+    if proposal_id in {p["id"] for p in pending_proposals(db, draft)}:
+        row = db.query(JobDraftMessage).filter(
+            JobDraftMessage.id == int(proposal_id.rsplit("-", 1)[1]), JobDraftMessage.job_draft_id == draft.id,
+            JobDraftMessage.company_id == draft.company_id, JobDraftMessage.role == PROPOSAL,
+        ).first()
+    if row is None:
+        raise JdStudioError(404, "Proposal not found")
+    row.role = PROPOSAL_DISMISSED
+    audit.record(db, draft.company_id, user_id, "job_draft.proposal_dismissed", "job_draft", draft.id,
+                 {"proposal_id": proposal_id})
+    db.commit()
     return draft
 
 

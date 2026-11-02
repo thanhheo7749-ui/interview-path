@@ -156,7 +156,12 @@
     "withdraw": "Thu hồi",
     "withdrawConfirm": "Thu hồi \"{{title}}\"? Nội dung sẽ không còn được Copilot và đồ thị sử dụng, và các mục tri thức không có tài liệu nguồn nào khác sẽ bị xóa.",
     "withdrawYes": "Thu hồi tài liệu",
-    "withdrawn": "Đã thu hồi tài liệu. Đã xóa {{removed}} mục, giữ lại {{kept}} mục vì còn tài liệu khác hỗ trợ."
+    "withdrawn": "Đã thu hồi tài liệu. Đã xóa {{removed}} mục, giữ lại {{kept}} mục vì còn tài liệu khác hỗ trợ.",
+    "retryMasking": "Che lại tên người",
+    "maskingNotes": {
+      "names_unchecked": "Không kiểm tra được tên người trong bản ghi phỏng vấn đầu vào này, nên chỉ các mẫu như email và số điện thoại được gỡ bỏ. Bản ghi gốc được giữ tạm. Tài liệu chưa được xuất bản cho đến khi bạn che lại tên. Dù sao bản gốc cũng bị xóa sau 7 ngày.",
+      "unknown": "Tài liệu này chưa được che đầy đủ. Hãy đọc kỹ trước khi duyệt bất kỳ mục nào từ nó."
+    }
   },
   "review": {
     "reasons": {
@@ -205,7 +210,9 @@
         "religion": "tôn giáo",
         "ethnicity": "dân tộc"
       }
-    }
+    },
+    "maskingHeld": "Tên người trong \"{{title}}\" chưa được che. Hãy đọc kỹ các mục của nó; tài liệu chưa được xuất bản cho đến khi che lại thành công.",
+    "maskingHeldLink": "Mở Tài liệu"
   },
   "conflicts": {
     "title": "Mâu thuẫn",
@@ -469,7 +476,9 @@
     "channelInvalid": "Dùng 1 đến 50 chữ thường, chữ số hoặc dấu gạch dưới.",
     "colBoard": "Ứng viên",
     "openBoard": "Mở bảng",
-    "noPublicRequirement": "Việc làm này không có yêu cầu công khai nào. Buổi phỏng vấn không có gì để đo, nên mức bằng chứng của mọi ứng viên sẽ ở mức thấp."
+    "noPublicRequirement": "Việc làm này không có yêu cầu công khai nào. Buổi phỏng vấn không có gì để đo, nên mức bằng chứng của mọi ứng viên sẽ ở mức thấp.",
+    "descriptionInJdStudio": "Công việc này được tạo trong JD Studio. Hãy sửa mô tả tại đó để các bước kiểm tra và phê duyệt của quản lý được áp dụng.",
+    "openJdStudio": "Mở trong JD Studio"
   },
   "board": {
     "eyebrow": "Bảng ứng viên",
@@ -663,13 +672,15 @@
         "intake_done": "Đã xong phỏng vấn đầu vào, HR đang xem xét",
         "drafting": "Đang soạn mô tả công việc",
         "published": "Đã đăng",
-        "cancelled": "Đã hủy"
+        "cancelled": "Đã hủy",
+        "intake_empty": "Chưa ghi nhận câu trả lời nào. Hãy bắt đầu lại phỏng vấn đầu vào"
       },
       "roleLabel": "Vị trí để viết mô tả",
       "anyRole": "Không chọn vị trí cụ thể",
       "generateDraft": "Tạo bản nháp",
       "openDraft": "Mở bản nháp",
-      "awaitingApproval": "Đang chờ bạn duyệt"
+      "awaitingApproval": "Đang chờ bạn duyệt",
+      "startAgain": "Bắt đầu lại phỏng vấn đầu vào"
     },
     "intake": {
       "title": "Phỏng vấn đầu vào với quản lý",
@@ -745,7 +756,9 @@
         "reviewed": "HR đã xem lại",
         "sent": "Đã gửi"
       },
-      "sentNote": "Đã gửi cho quản lý tuyển dụng. Không thể sửa nữa."
+      "sentNote": "Đã gửi cho quản lý tuyển dụng. Không thể sửa nữa.",
+      "stale": "Buổi phỏng vấn đã được phân tích lại sau khi bản tóm tắt này được tạo. Hãy tạo lại để dùng bằng chứng mới.",
+      "staleSent": "Buổi phỏng vấn đã được phân tích lại sau khi bản tóm tắt này được gửi. Hãy tạo lại, xem lại rồi gửi bản mới."
     },
     "interviews": {
       "title": "Phỏng vấn của tôi",
@@ -877,6 +890,14 @@
         "conflict": "Mâu thuẫn với dữ kiện công ty",
         "unchecked": "Không chạy được kiểm tra",
         "must_have_count": "Quá nhiều yêu cầu bắt buộc"
+      },
+      "messages": {
+        "discrimination": "Một dòng có thể đòi hỏi điều gì đó về con người thay vì công việc. HR phải sửa trước khi đăng.",
+        "no_source": "Một dòng không có nguồn trong tri thức công ty. HR phải thêm nguồn hoặc xác nhận dòng đó.",
+        "conflict": "Một dòng nêu giá trị khác với một thông tin của công ty. HR phải sửa trước khi đăng.",
+        "unchecked": "Không chạy được kiểm tra tự động cho một dòng. HR phải chạy lại hoặc xem lại dòng đó.",
+        "must_have_count": "Bản nháp này có nhiều yêu cầu bắt buộc, làm hẹp nhóm ứng viên.",
+        "other": "Một lần kiểm tra phát hiện vấn đề với bản nháp này."
       }
     },
     "channels": {
@@ -902,10 +923,18 @@
       "copyText": "Sao chép nội dung {{channel}}",
       "copyTextShort": "Sao chép nội dung",
       "copied": "Đã sao chép",
-      "copyFailed": "Không sao chép được. Hãy chọn văn bản và sao chép thủ công."
+      "copyFailed": "Không sao chép được. Hãy chọn văn bản và sao chép thủ công.",
+      "usedTemplate": "Văn bản AI không được dùng cho kênh này: nó thêm một thông tin mới, hoặc kiểm tra công bằng đã đánh dấu nó hay không chạy được. Nội dung này chỉ được dựng từ các dòng của mô tả công việc.",
+      "regenerate": "Tạo lại"
     },
     "isRequirementLine": "Dòng {{number}} là một yêu cầu",
     "isMustHaveLine": "Dòng {{number}} là yêu cầu bắt buộc",
-    "sourceNode": "Nguồn #{{id}}"
+    "sourceNode": "Nguồn #{{id}}",
+    "rejectedReasons": {
+      "no_source": "Không có nguồn trong tri thức công ty.",
+      "unknown_nodes": "Dòng này dẫn tới tri thức không có sẵn.",
+      "unsupported_numbers": "Dòng này nêu các số mà nguồn không có: {{numbers}}.",
+      "unknown": "Tri thức công ty không hỗ trợ dòng này."
+    }
   }
 }

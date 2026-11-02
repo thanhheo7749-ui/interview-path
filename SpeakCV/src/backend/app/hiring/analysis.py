@@ -17,7 +17,7 @@ from app.ai.types import AIError
 from app.brain.text import normalise_for_match, quote_in
 from app.database.database import SessionLocal
 from app.database.sql_models import (
-    Application, Company, CultureNote, CvClaim, Job, KbNode, RequirementResult, VoiceSession, VoiceTurn,
+    Application, CandidateBrief, Company, CultureNote, CvClaim, Job, KbNode, RequirementResult, VoiceSession, VoiceTurn,
 )
 from app.hiring import audit, jobs, voice
 from app.hiring.screening import _DIRECTIVE
@@ -300,6 +300,10 @@ def _analyse(db, application_id: int) -> None:
     application.interview_band = band
     application.ai_suggestion = suggestion
     application.analysis_status = "done"
+    if application.hr_decision == "approved":
+        # The brief was made from the evidence this just replaced. HR may regenerate it, even if it was sent.
+        db.query(CandidateBrief).filter(CandidateBrief.application_id == application_id).update(
+            {CandidateBrief.stale: True}, synchronize_session=False)
     if application.stage == "analyzing":
         advance(application, "ready_for_hr")
     audit.record(

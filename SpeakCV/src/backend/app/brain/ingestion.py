@@ -466,6 +466,12 @@ def _store_checks(graph: _Graph, checks: _NodeChecks) -> None:
             result = checks.guards[_guard_text(node)]
             node.guard_category = result.category if result else None
             node.guard_reason = result.reason if result else None
+        elif graph.document.source_type == "intake":
+            # A manager speaks freely, so any node can carry a preference ("the team prefers men under 30"): the rules
+            # need no AI, so they cover the types the classifier does not.
+            result = discrimination.check_rules(_guard_text(node))
+            node.guard_category = result.category if result else None
+            node.guard_reason = result.reason if result else None
         node.embedding, node.embedding_model, node.embedding_dim = checks.embeddings[retriever.node_text(node)]
 
 

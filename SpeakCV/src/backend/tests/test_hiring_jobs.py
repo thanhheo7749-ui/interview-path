@@ -265,3 +265,44 @@ def test_seed_creates_one_published_backend_job_per_sample_company(db, tmp_path,
         assert not any("salary" in r.text.lower() for r in requirements)
         channels = {c.channel for c in db.query(JobChannelLink).filter_by(job_id=job.id)}
         assert channels == {"company_site", "linkedin", "referral"}
+
+
+def test_patching_the_description_runs_the_discrimination_guard(api, world):
+    job = make_job(api, world)
+    hr = world["people"]["hr"]
+    path = url(world, f"/{job['id']}")
+    blocked = api.patch(path, json={"description": "Chi tuyen nam duoi 30 tuoi."}, headers=hr)
+    assert blocked.status_code == 422 and "age" in blocked.text
+    assert api.get(path, headers=hr).json()["description"] == "Build things."
+    assert api.patch(path, json={"description": "Build better things."}, headers=hr).status_code == 200
+
+
+def test_a_description_the_check_cannot_look_at_is_saved_with_a_warning(api, world):
+    from app.ai.providers import fake
+
+    def down(*_):
+        raise RuntimeError("down")
+
+    fake.register("discrimination_check", down)
+    job = make_job(api, world)
+    response = api.patch(url(world, f"/{job['id']}"), json={"description": "A friendly team."},
+                         headers=world["people"]["hr"])
+    assert response.status_code == 200 and response.json()["warnings"]
+
+
+def test_a_job_made_from_a_draft_refuses_description_edits(api, db, world):
+    from app.database.sql_models import JobDraft
+
+    job = make_job(api, world)
+    path = url(world, f"/{job['id']}")
+    hr = world["people"]["hr"]
+    draft = JobDraft(company_id=world["company"].id, job_id=job["id"], version=1, lines=[], requirement_lines=[],
+                     lint=[], failed_languages=[], status="published")
+    db.add(draft)
+    db.commit()
+    refused = api.patch(path, json={"description": "Something else."}, headers=hr)
+    assert refused.status_code == 409
+    assert refused.json()["detail"]["code"] == "description_in_jd_studio" and refused.json()["detail"]["draft_id"] == draft.id
+    assert api.patch(path, json={"title": "New title"}, headers=hr).status_code == 200
+    same = api.patch(path, json={"description": "Build things."}, headers=hr)
+    assert same.status_code == 200  # the unchanged text is not an edit

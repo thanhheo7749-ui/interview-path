@@ -1,9 +1,9 @@
-from sqlalchemy import JSON, Column, DateTime, ForeignKey, Integer, String, Text
-from sqlalchemy.sql import func
+from sqlalchemy import JSON, Boolean, Column, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy.sql import false as sa_false, func
 
 from .database import Base
 
-HIRING_REQUEST_STATUSES = ("open", "intake_in_progress", "intake_done", "drafting", "published", "cancelled")
+HIRING_REQUEST_STATUSES = ("open", "intake_in_progress", "intake_done", "intake_empty", "drafting", "published", "cancelled")
 JOB_DRAFT_STATUSES = ("draft", "manager_review", "approved", "published")
 
 __all__ = [
@@ -45,6 +45,9 @@ class JobDraft(Base):
     requirement_lines = Column(JSON, nullable=False, default=list)
     lint = Column(JSON, nullable=False, default=list)
     failed_languages = Column(JSON, nullable=False, default=list)
+    # Lines code removed at generation, {"line_id", "reason", "text"}: HR sees what was left out and why.
+    rejected = Column(JSON, nullable=False, default=list)
+    title = Column(String(255), nullable=True)  # the job title the draft was made for; a request's title wins
     status = Column(String(20), nullable=False, default="draft")  # see JOB_DRAFT_STATUSES
     approved_by = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     created_at = _created_at()
@@ -72,6 +75,7 @@ class ChannelContent(Base):
     channel = Column(String(50), nullable=False)
     language = Column(String(10), nullable=False)
     body = Column(Text, nullable=False)
+    used_template = Column(Boolean, nullable=False, default=False, server_default=sa_false())  # the AI text was not usable
     link_id = Column(Integer, ForeignKey("job_channel_links.id", ondelete="SET NULL"), nullable=True)
     created_at = _created_at()
 
@@ -85,6 +89,8 @@ class CandidateBrief(Base):
     language = Column(String(10), nullable=False)
     content = Column(JSON, nullable=False, default=dict)
     status = Column(String(20), nullable=False, default="draft")  # draft | sent
+    # The evidence was analysed again after this brief was made: HR may regenerate it, even a sent one.
+    stale = Column(Boolean, nullable=False, default=False, server_default=sa_false())
     reviewed_by = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     sent_at = Column(DateTime(timezone=True), nullable=True)
     created_at = _created_at()

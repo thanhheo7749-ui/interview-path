@@ -36,6 +36,9 @@ function ChannelContent({ channels, busy, error, onGenerate }) {
       )}
       {channels.length > 0 && (
         <>
+          <button type="button" disabled={busy} onClick={onGenerate} data-testid="regenerate-channels" className={secondaryButton}>
+            {t('jd.channels.regenerate')}
+          </button>
           <div role="tablist" aria-label={t('jd.channels.title')} className="flex flex-wrap gap-2">
             {channels.map((item) => (
               <button
@@ -47,11 +50,17 @@ function ChannelContent({ channels, busy, error, onGenerate }) {
                 className={`rounded-xl px-3 py-2 text-sm font-bold ${active?.channel === item.channel ? 'bg-slate-950 text-white' : 'bg-slate-100 text-slate-700'}`}
               >
                 {t(`jd.channels.names.${item.channel}`, { defaultValue: item.channel })}
+                {item.used_template && <span aria-hidden="true" title={t('jd.channels.usedTemplate')}> *</span>}
               </button>
             ))}
           </div>
           {active && (
             <div role="tabpanel" data-testid={`channel-panel-${active.channel}`} className="space-y-3">
+              {active.used_template && (
+                <p data-testid="template-notice" className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-900">
+                  {t('jd.channels.usedTemplate')}
+                </p>
+              )}
               <p className="text-xs font-semibold text-slate-500">
                 {t('jd.channels.language', { language: t(`jd.channels.languages.${active.language}`, { defaultValue: active.language }) })}
               </p>
