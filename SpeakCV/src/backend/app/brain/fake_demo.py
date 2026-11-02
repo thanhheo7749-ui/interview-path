@@ -122,6 +122,26 @@ def _channel_content(_system, messages, _schema) -> str:
     return json.dumps({"body": "[Demo AI] " + " ".join(lines) + "\n\n{link}"}, ensure_ascii=False)
 
 
+_FEEDBACK_ITEM = re.compile(r'<item ref="(\w+)" section="(\w+)">\nlabel: (.*)\nquote: (.*)\n</item>')
+_FEEDBACK_LEARNING = re.compile(r"^- id=(\d+): ", re.MULTILINE)
+
+
+def _rejection_feedback(_system, messages, _schema) -> str:
+    """One neutral sentence, one point from the first verified quote, and one from the first gap."""
+    content = messages[-1]["content"]
+    language = (_LANGUAGE.search(content) or [None, "en"])[1]
+    items = _FEEDBACK_ITEM.findall(content)
+    good = [item for item in items if item[1] == "went_well"][:1]
+    gaps = [item for item in items if item[1] == "to_build"][:1]
+    learning = content.split("<learning>")[1] if "<learning>" in content else ""
+    return json.dumps({
+        "went_well": [{"ref": ref, "text": f"[Demo AI] {label}", "quote": quote} for ref, _, label, quote in good],
+        "to_build": [{"ref": ref, "text": f"[Demo AI] {label}", "quote": ""} for ref, _, label, _ in gaps],
+        "learning_ids": [int(found) for found in _FEEDBACK_LEARNING.findall(learning)],
+        "message": f"[Demo AI] ({language}) Thank you for the time you gave us.",
+    }, ensure_ascii=False)
+
+
 def _same_topic_no(_system, _messages, _schema) -> str:
     return json.dumps({"same_topic": False})
 
@@ -134,6 +154,7 @@ def install() -> None:
         fake.register("discrimination_check", _not_discriminating)
         fake.register("lint_conflict_check", _same_topic_no)
         fake.register("channel_content", _channel_content)
+        fake.register("rejection_feedback", _rejection_feedback)
     if config.slot("reasoning").provider == "fake":
         fake.register("copilot_answer", _copilot)
         fake.register("candidate_brief", _candidate_brief)

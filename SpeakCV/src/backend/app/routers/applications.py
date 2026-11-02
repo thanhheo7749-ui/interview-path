@@ -17,6 +17,7 @@ from app.database.sql_models import Application, Company, Job, RequirementResult
 from app.hiring import applications, audit, consents, cv_processing, decisions, jobs
 from app.hiring import retention
 from app.hiring.state import InvalidTransition, advance
+from app.posthire import feedback as rejection_feedback
 
 router = APIRouter()
 
@@ -53,6 +54,23 @@ class ApplicationOut(BaseModel):
     withdraw_reason: str | None
     processing_error: str | None  # holds only the fixed messages written by cv_processing
     decision: str | None = None  # approved or rejected once HR has decided; never a reason, label or band
+    feedback: "FeedbackOut | None" = None  # only what HR approved and sent
+
+
+class LearningItem(BaseModel):
+    id: int
+    title: str
+    url: str
+    provider: str
+    language: str
+
+
+class FeedbackOut(BaseModel):
+    application_id: int
+    language: str
+    message: str
+    learning: list[LearningItem]
+    sent_at: str | None
 
 
 class FitItem(BaseModel):
@@ -102,6 +120,7 @@ def _out(db: Session, application: Application, **overrides) -> ApplicationOut:
     if decision is not None:
         fields["status"] = "decided"
         fields["decision"] = decision
+        fields["feedback"] = rejection_feedback.candidate_view(db, application)
     return ApplicationOut(**{**fields, **overrides})
 
 
@@ -185,6 +204,14 @@ def my_applications(user: User = Depends(get_authenticated_user), db: Session = 
 @router.get("/api/applications/{application_id}", response_model=ApplicationOut)
 def get_application(application_id: int, user: User = Depends(get_authenticated_user), db: Session = Depends(get_db)):
     return _out(db, _owned(db, user, application_id))
+
+
+@router.get("/api/applications/{application_id}/feedback", response_model=FeedbackOut)
+def get_feedback(application_id: int, user: User = Depends(get_authenticated_user), db: Session = Depends(get_db)):
+    view = rejection_feedback.candidate_view(db, _owned(db, user, application_id))
+    if view is None:  # a draft looks exactly like no feedback at all
+        raise HTTPException(status_code=404, detail="Feedback not found")
+    return view
 
 
 def _team_style(db: Session, job: Job) -> list[StyleItem]:

@@ -14,6 +14,7 @@ from app.database.sql_models import (
 )
 from app.hiring import audit, notify, voice
 from app.hiring.state import advance
+from app.posthire import feedback
 
 logger = logging.getLogger(__name__)
 
@@ -359,7 +360,7 @@ def send_reminders(db, now=None) -> int:
 def _daily_pass() -> None:
     db = SessionLocal()
     try:
-        for step in (voice.sweep_abandoned, run, send_reminders, notify.send_pending):
+        for step in (voice.sweep_abandoned, run, send_reminders, feedback.send_overdue_notices, notify.send_pending):
             try:
                 step(db)
             except Exception as exc:

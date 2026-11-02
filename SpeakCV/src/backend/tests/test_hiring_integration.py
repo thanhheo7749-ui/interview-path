@@ -809,7 +809,7 @@ def test_every_sender_fills_in_the_application(client, db, world, monkeypatch):
 
     row = fresh(db, Application, application_id)
     row.stage = "ready_for_hr"
-    decisions.decide(db, row, "rejected", world.hr_id)
+    decisions.decide(db, row, "approved", world.hr_id)
     db.commit()
     assert db.query(Notification).filter_by(kind="decision").one().application_id == application_id
 
