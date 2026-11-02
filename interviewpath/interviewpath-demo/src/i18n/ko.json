@@ -92,7 +92,8 @@
       "roleLabel": "설명을 작성할 직무",
       "anyRole": "특정 직무 없음",
       "generateDraft": "초안 생성",
-      "openDraft": "초안 열기"
+      "openDraft": "초안 열기",
+      "awaitingApproval": "승인 대기 중"
     },
     "intake": {
       "title": "매니저 인테이크",
@@ -260,7 +261,7 @@
     "noLines": "이 초안에는 아직 문장이 없습니다.",
     "lineText": "{{number}}번 문장 내용",
     "emptyInLanguage": "(이 언어로 작성된 내용이 없습니다)",
-    "sourceNode": "출처 #{{id}}",
+    "restrictedSource": "접근 제한된 출처",
     "unsourced": "출처 없음",
     "confirmedByHr": "HR 확인됨",
     "mustHave": "필수",

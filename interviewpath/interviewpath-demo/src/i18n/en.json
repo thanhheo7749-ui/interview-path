@@ -430,7 +430,7 @@
     "roleHint": "Choosing a role fills in the title, description and requirements from the company knowledge. You can edit everything.",
     "jobTitle": "Job title",
     "description": "Description",
-    "descriptionHint": "JD Studio, which will help write job descriptions, arrives later. For now, write or edit the description here.",
+    "descriptionHint": "Write or edit the description here. To draft one from the company knowledge, open a hiring request and use JD Studio.",
     "languages": "Interview languages",
     "language": {
       "vi": "Vietnamese",
@@ -651,7 +651,8 @@
       "roleLabel": "Role to write about",
       "anyRole": "No specific role",
       "generateDraft": "Generate draft",
-      "openDraft": "Open draft"
+      "openDraft": "Open draft",
+      "awaitingApproval": "Awaiting your approval"
     },
     "intake": {
       "title": "Manager intake",
@@ -819,7 +820,7 @@
     "noLines": "This draft has no lines yet.",
     "lineText": "Text of line {{number}}",
     "emptyInLanguage": "(nothing written in this language)",
-    "sourceNode": "Source #{{id}}",
+    "restrictedSource": "Restricted source",
     "unsourced": "No source",
     "confirmedByHr": "Confirmed by HR",
     "mustHave": "Must-have",

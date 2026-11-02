@@ -53,6 +53,7 @@ class LintIssue:
     severity: str
     line_id: str | None
     message: str
+    node_id: int | None = None
 
 
 @dataclass(frozen=True)
@@ -140,7 +141,7 @@ def _conflicts(db: Session, company_id: int, lines: list[dict]) -> tuple[list[Li
                 issues.append(LintIssue(
                     "conflict", BLOCK, line["id"],
                     f"The line states a different value than the company fact \"{node.title}\" (node {node.id}). "
-                    "Fix the line, or mark it as a different scope.",
+                    "Fix the line, or mark it as a different scope.", node.id,
                 ))
     return issues, unchecked
 

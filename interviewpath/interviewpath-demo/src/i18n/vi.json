@@ -429,7 +429,7 @@
     "roleHint": "Chọn vai trò sẽ điền sẵn tiêu đề, mô tả và yêu cầu từ tri thức công ty. Bạn có thể sửa mọi thứ.",
     "jobTitle": "Tiêu đề việc làm",
     "description": "Mô tả",
-    "descriptionHint": "JD Studio, công cụ hỗ trợ viết mô tả công việc, sẽ có sau. Hiện tại hãy tự viết hoặc sửa mô tả tại đây.",
+    "descriptionHint": "Hãy viết hoặc sửa mô tả tại đây. Để soạn bản nháp từ kiến thức của công ty, hãy mở một yêu cầu tuyển dụng và dùng JD Studio.",
     "languages": "Ngôn ngữ phỏng vấn",
     "language": {
       "vi": "Tiếng Việt",
@@ -650,7 +650,8 @@
       "roleLabel": "Vị trí để viết mô tả",
       "anyRole": "Không chọn vị trí cụ thể",
       "generateDraft": "Tạo bản nháp",
-      "openDraft": "Mở bản nháp"
+      "openDraft": "Mở bản nháp",
+      "awaitingApproval": "Đang chờ bạn duyệt"
     },
     "intake": {
       "title": "Phỏng vấn đầu vào với quản lý",
@@ -818,7 +819,7 @@
     "noLines": "Bản nháp này chưa có dòng nào.",
     "lineText": "Nội dung dòng {{number}}",
     "emptyInLanguage": "(chưa viết gì bằng ngôn ngữ này)",
-    "sourceNode": "Nguồn #{{id}}",
+    "restrictedSource": "Nguồn bị hạn chế",
     "unsourced": "Không có nguồn",
     "confirmedByHr": "HR đã xác nhận",
     "mustHave": "Bắt buộc",

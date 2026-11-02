@@ -11,7 +11,6 @@ import {
   acknowledgeUnchecked, approveDraft, askAssistant, confirmDraftLine, generateChannelContent, getChannelContent, getDraft,
   patchDraftLines, publishDraft, rerunLint, submitDraft,
 } from '../lib/bridges.js';
-import { getGraph } from '../lib/kb.js';
 
 const LANGUAGES = [
   { code: 'en', label: 'English' },
@@ -28,7 +27,6 @@ function JdStudio() {
   const isManager = membership?.role === 'manager';
 
   const [draft, setDraft] = useState(null);
-  const [titles, setTitles] = useState({});
   // Until a tab is chosen, the page opens in the interface language: a manager reads the Korean version.
   const [chosenLang, setLang] = useState(null);
   const lang = chosenLang ?? (LANGUAGES.some((l) => l.code === i18n.language) ? i18n.language : 'en');
@@ -61,20 +59,6 @@ function JdStudio() {
       cancelled = true;
     };
   }, [companyId, draftId, isHr]);
-
-  // Titles for the source chips. Only HR may read the graph; a manager's chips name the node id.
-  useEffect(() => {
-    if (companyId == null || !isHr) return undefined;
-    let cancelled = false;
-    getGraph(companyId)
-      .then((graph) => {
-        if (!cancelled) setTitles(Object.fromEntries(graph.nodes.map((n) => [Number(n.id), n.title])));
-      })
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, [companyId, isHr]);
 
   // Runs one action. `call` returns the new draft (or throws); the result tells the caller whether it worked.
   const act = useCallback(async (call) => {
@@ -223,7 +207,6 @@ function JdStudio() {
                 line={line}
                 number={index + 1}
                 lang={lang}
-                titles={titles}
                 canEdit={isHr}
                 busy={busy}
                 onSave={saveLine}

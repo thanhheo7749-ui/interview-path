@@ -1,5 +1,4 @@
 import { useTranslation } from 'react-i18next';
-import { conflictNodeId } from '../../lib/bridges.js';
 import { secondaryButton } from '../KbFeedback.jsx';
 
 // The lint result of the draft: what blocks publishing and what only warns. HR can mark a conflicting line as a
@@ -26,7 +25,7 @@ function LintPanel({ issues, lineNumbers, canAct, busy, onDifferentScope, onReru
       <ul className="space-y-2">
         {issues.map((issue, index) => {
           const isBlock = issue.severity === 'block';
-          const nodeId = issue.check === 'conflict' ? conflictNodeId(issue) : null;
+          const nodeId = issue.check === 'conflict' ? issue.node_id ?? null : null;
           return (
             <li
               key={`${issue.check}-${issue.line_id}-${index}`}

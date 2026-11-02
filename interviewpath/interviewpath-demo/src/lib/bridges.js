@@ -102,15 +102,3 @@ export const publishDraft = (companyId, draftId) => api(`${drafts(companyId)}/${
 export const getChannelContent = (companyId, draftId) => api(`${drafts(companyId)}/${draftId}/channels`);
 export const generateChannelContent = (companyId, draftId) =>
   api(`${drafts(companyId)}/${draftId}/channels/generate`, { method: 'POST' });
-
-// The API has no call that lists drafts and a hiring request does not carry its draft's id, so HR's browser remembers
-// which draft it made for a request. A manager opens a draft from the address HR passes on.
-const draftKey = (companyId, requestId) => `portal_draft_${companyId}_${requestId}`;
-export const rememberDraft = (companyId, requestId, draftId) => localStorage.setItem(draftKey(companyId, requestId), String(draftId));
-export const rememberedDraft = (companyId, requestId) => localStorage.getItem(draftKey(companyId, requestId));
-
-// A conflict issue names the graph node in its message ("... (node 12) ..."); the issue has no field for it.
-export const conflictNodeId = (issue) => {
-  const match = /\(node (\d+)\)/.exec(issue?.message ?? '');
-  return match ? Number(match[1]) : null;
-};
