@@ -39,6 +39,7 @@ const en = {
   unsupportedType: "Only PDF and DOCX files are accepted.",
   cvTooLong: "This CV is too long to read. Please shorten it and try again.",
   rateLimited: "Too many uploads. Please wait a while and try again.",
+  cvConsentWithdrawn: "You withdrew consent to CV processing for this application, so we cannot take a new CV. To erase your data, use Delete my application in My data.",
   consentChanged: "The consent text has changed. Please read it again and confirm.",
   genericError: "Something went wrong. Please try again.",
   appsTitle: "My applications",
@@ -96,7 +97,10 @@ const en = {
     "We will delete your CV, the recording and transcript, and the answers tied to this application. HR will no longer be able to see them. This cannot be undone.",
   deleting: "Deleting...",
   withdrawConsentTitle: "Withdraw this consent?",
-  withdrawConsentBody: "We will stop using your data for this purpose.",
+  withdrawRecordingBody:
+    "We will end your interview if it is still running, cancel any analysis, and delete your recordings, your transcripts and the results drawn from them. Your application stays with HR, marked as having withdrawn consent to recording, and HR can still decide on it. This does not remove your CV or your application. To erase everything, use Delete my application below.",
+  withdrawCvBody:
+    "We will stop all further AI work on your CV. You will not be able to upload a new CV or start an interview for this application. Results already produced stay with HR, and an interview you have already started is covered by your recording consent. To erase everything, use Delete my application below.",
   loginNeeded: "Please log in to see this page.",
   logIn: "Log in",
 } as const;
@@ -136,6 +140,7 @@ const vi: Strings = {
   unsupportedType: "Chỉ nhận tệp PDF và DOCX.",
   cvTooLong: "CV quá dài để đọc. Vui lòng rút gọn rồi thử lại.",
   rateLimited: "Bạn đã tải lên quá nhiều lần. Vui lòng chờ một lúc rồi thử lại.",
+  cvConsentWithdrawn: "Bạn đã rút đồng ý xử lý CV cho hồ sơ này nên chúng tôi không thể nhận CV mới. Để xóa dữ liệu, hãy dùng Xóa hồ sơ của tôi trong mục Dữ liệu của tôi.",
   consentChanged: "Nội dung đồng ý đã thay đổi. Vui lòng đọc lại và xác nhận.",
   genericError: "Đã có lỗi. Vui lòng thử lại.",
   appsTitle: "Hồ sơ của tôi",
@@ -193,7 +198,10 @@ const vi: Strings = {
     "Chúng tôi sẽ xóa CV, bản ghi âm và bản ghi lời thoại, cùng các câu trả lời gắn với hồ sơ này. Nhân sự sẽ không xem được nữa. Không thể hoàn tác.",
   deleting: "Đang xóa...",
   withdrawConsentTitle: "Rút đồng ý này?",
-  withdrawConsentBody: "Chúng tôi sẽ ngừng dùng dữ liệu của bạn cho mục đích này.",
+  withdrawRecordingBody:
+    "Chúng tôi sẽ kết thúc buổi phỏng vấn nếu vẫn đang diễn ra, hủy mọi phân tích, và xóa bản ghi âm, bản ghi lời thoại cùng các kết quả rút ra từ chúng. Hồ sơ của bạn vẫn ở chỗ nhân sự, được đánh dấu là đã rút đồng ý ghi âm, và nhân sự vẫn có thể quyết định về hồ sơ. Việc này không xóa CV hay hồ sơ của bạn. Để xóa tất cả, hãy dùng Xóa hồ sơ của tôi ở bên dưới.",
+  withdrawCvBody:
+    "Chúng tôi sẽ ngừng mọi xử lý AI tiếp theo đối với CV của bạn. Bạn sẽ không thể tải CV mới hoặc bắt đầu phỏng vấn cho hồ sơ này. Các kết quả đã có vẫn ở chỗ nhân sự, và buổi phỏng vấn bạn đã bắt đầu thuộc phạm vi đồng ý ghi âm. Để xóa tất cả, hãy dùng Xóa hồ sơ của tôi ở bên dưới.",
   loginNeeded: "Vui lòng đăng nhập để xem trang này.",
   logIn: "Đăng nhập",
 };
@@ -288,6 +296,10 @@ const screeningEn = {
   playQuestion: "Play question",
   genericError: "Something went wrong. Please try again.",
   recordError: "The recording failed. Please try again.",
+  recordingConsentWithdrawn:
+    "You withdrew consent to recording, so this interview has ended and this answer was not kept. Your application is with HR.",
+  cvConsentWithdrawn:
+    "You withdrew consent to CV processing for this application, so this interview cannot start. Your application stays where it is. To erase your data, use Delete my application in My data.",
 };
 
 const screeningVi: typeof screeningEn = {
@@ -339,6 +351,10 @@ const screeningVi: typeof screeningEn = {
   playQuestion: "Nghe câu hỏi",
   genericError: "Đã có lỗi. Vui lòng thử lại.",
   recordError: "Ghi âm thất bại. Vui lòng thử lại.",
+  recordingConsentWithdrawn:
+    "Bạn đã rút đồng ý ghi âm nên buổi phỏng vấn đã kết thúc và câu trả lời này không được giữ lại. Hồ sơ của bạn đang ở chỗ HR.",
+  cvConsentWithdrawn:
+    "Bạn đã rút đồng ý xử lý CV cho hồ sơ này nên không thể bắt đầu buổi phỏng vấn. Hồ sơ của bạn vẫn giữ nguyên. Để xóa dữ liệu, hãy dùng Xóa hồ sơ của tôi trong mục Dữ liệu của tôi.",
 };
 
 export const screeningText = { en: screeningEn, vi: screeningVi };

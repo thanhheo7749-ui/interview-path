@@ -40,7 +40,6 @@ function ApplyForm({ job, src }: { job: PublicJob; src: string | null }) {
   const { t, lang } = useLang();
   const router = useRouter();
   const [consent, setConsent] = useState<ConsentText | null>(null);
-  const [consentLang, setConsentLang] = useState(lang);
   const [consentError, setConsentError] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const [agreed, setAgreed] = useState(false);
@@ -50,7 +49,7 @@ function ApplyForm({ job, src }: { job: PublicJob; src: string | null }) {
   useEffect(() => {
     let cancelled = false;
     getConsentText("cv_processing", lang)
-      .then((c) => !cancelled && (setConsent(c), setConsentLang(lang), setConsentError(false)))
+      .then((c) => !cancelled && (setConsent(c), setConsentError(false)))
       .catch(() => !cancelled && setConsentError(true));
     return () => {
       cancelled = true;
@@ -80,13 +79,13 @@ function ApplyForm({ job, src }: { job: PublicJob; src: string | null }) {
     setBusy(true);
     setError("");
     try {
-      await applyToJob(job.slug, file, consent.version, consentLang, src);
+      await applyToJob(job.slug, file, consent.version, consent.language, src);
       router.push("/applications");
     } catch (err) {
       setError(applyErrorText(err, t, lang));
       if (err instanceof HiringError && err.status === 409 && typeof err.detail === "object") {
         setAgreed(false);
-        getConsentText("cv_processing", lang).then((c) => (setConsent(c), setConsentLang(lang))).catch(() => {});
+        getConsentText("cv_processing", lang).then(setConsent).catch(() => {});
       }
       setBusy(false);
     }

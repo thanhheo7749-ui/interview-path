@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
 import { Strings, useLang } from "@/lib/i18n";
-import { Application, HiringError, listMyApplications, reuploadCv } from "@/services/hiring";
+import { Application, CV_CONSENT_WITHDRAWN, errorCode, HiringError, listMyApplications, reuploadCv } from "@/services/hiring";
 import { LangToggle } from "@/components/Hiring/SampleNotice";
 
 const POLL_MS = 3000;
@@ -39,7 +39,8 @@ function Reupload({ id, onDone }: { id: number; onDone: () => void }) {
     } catch (err) {
       const status = err instanceof HiringError ? err.status : 0;
       setError(
-        status === 413 ? t.tooLarge : status === 415 ? t.unsupportedType : status === 422 ? t.cvTooLong
+        errorCode(err) === CV_CONSENT_WITHDRAWN ? t.cvConsentWithdrawn
+          : status === 413 ? t.tooLarge : status === 415 ? t.unsupportedType : status === 422 ? t.cvTooLong
           : status === 429 ? t.rateLimited : t.genericError,
       );
     } finally {

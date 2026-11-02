@@ -6,11 +6,14 @@ import { MicCheck } from "@/components/Hiring/MicCheck";
 import { MAX_ANSWER_SECONDS, supportsRecording, useAnswerRecorder } from "@/hooks/useAnswerRecorder";
 import { detectLocale, screeningText, type Locale } from "@/lib/i18n";
 import {
+  CV_CONSENT_WITHDRAWN,
   HiringError,
+  RECORDING_CONSENT_WITHDRAWN,
   declineRecording,
+  errorCode,
   fetchQuestionAudio,
   getApplication,
-  getConsent,
+  getApplicationConsent,
   getSessionState,
   startSession,
   submitAnswer,
@@ -73,6 +76,16 @@ export function ScreeningRoom({ applicationId }: { applicationId: number }) {
     };
   }, []);
 
+  // A message with no retry, and the microphone let go.
+  const endWith = useCallback((final: string) => {
+    streamRef.current?.getTracks().forEach((track) => track.stop());
+    streamRef.current = null;
+    setStream(null);
+    pendingRef.current = null;
+    setMessage(final);
+    setPhase("message");
+  }, []);
+
   const applyState = useCallback((next: SessionState) => {
     sessionRef.current = next;
     setSession(next);
@@ -95,17 +108,19 @@ export function ScreeningRoom({ applicationId }: { applicationId: number }) {
         const application = await getApplication(applicationId);
         if (cancelled) return;
         const offered = LANGUAGES.filter((l) => application.interview_languages?.includes(l.code));
+        // The consent text follows the interview language shown, so the two never differ.
+        const initial = offered.length > 0 && !offered.some((l) => l.code === locale) ? offered[0].code : locale;
         if (offered.length > 0) {
           setLanguages(offered);
-          if (!offered.some((l) => l.code === locale)) setLanguage(offered[0].code);
+          setLanguage(initial);
         }
         if (application.status === "invited" || application.status === "interview_in_progress") {
-          const current = await getConsent(CONSENT_PURPOSE, locale);
+          const current = await getApplicationConsent(applicationId, CONSENT_PURPOSE, initial);
           if (cancelled) return;
           setConsent(current);
           if (application.status === "interview_in_progress") {
             // Starting again returns the running session; the consent and language sent are not used then.
-            const resumed = await startSession(applicationId, current.version, locale);
+            const resumed = await startSession(applicationId, current, initial);
             if (!cancelled) applyState(resumed);
             return;
           }
@@ -135,7 +150,7 @@ export function ScreeningRoom({ applicationId }: { applicationId: number }) {
   const changeLanguage = async (code: string) => {
     setLanguage(code);
     try {
-      setConsent(await getConsent(CONSENT_PURPOSE, code));
+      setConsent(await getApplicationConsent(applicationId, CONSENT_PURPOSE, code));
     } catch {
       /* keep the text already shown */
     }
@@ -146,11 +161,15 @@ export function ScreeningRoom({ applicationId }: { applicationId: number }) {
     setStarting(true);
     setError(null);
     try {
-      applyState(await startSession(applicationId, consent.version, language));
+      applyState(await startSession(applicationId, consent, language));
     } catch (e) {
+      if (errorCode(e) === CV_CONSENT_WITHDRAWN) {
+        endWith(text.cvConsentWithdrawn);
+        return;
+      }
       if (e instanceof HiringError && e.status === 409 && typeof e.detail === "object") {
         setAgreed(false);
-        setConsent(await getConsent(CONSENT_PURPOSE, language).catch(() => consent));
+        setConsent(await getApplicationConsent(applicationId, CONSENT_PURPOSE, language).catch(() => consent));
       }
       setError(e instanceof Error ? e.message : text.genericError);
     } finally {
@@ -183,7 +202,11 @@ export function ScreeningRoom({ applicationId }: { applicationId: number }) {
       setUploadFailed(false);
       try {
         applyState(await submitAnswer(current.session_id, position, blob));
-      } catch {
+      } catch (e) {
+        if (errorCode(e) === RECORDING_CONSENT_WITHDRAWN) {
+          endWith(text.recordingConsentWithdrawn);
+          return;
+        }
         try {
           const latest = await getSessionState(current.session_id);
           if (latest.position !== position || !ACTIVE.includes(latest.status)) {
@@ -198,7 +221,7 @@ export function ScreeningRoom({ applicationId }: { applicationId: number }) {
         setUploading(false);
       }
     },
-    [applyState],
+    [applyState, endWith, text.recordingConsentWithdrawn],
   );
 
   const position = session?.position ?? null;

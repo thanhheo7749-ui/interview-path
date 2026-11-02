@@ -11,6 +11,15 @@ export class HiringError extends Error {
   }
 }
 
+export const RECORDING_CONSENT_WITHDRAWN = "recording_consent_withdrawn";
+export const CV_CONSENT_WITHDRAWN = "cv_consent_withdrawn";
+
+/** The code a 409 carries when retrying can never work, because the candidate withdrew a consent. */
+export function errorCode(error: unknown): string | null {
+  if (!(error instanceof HiringError) || typeof error.detail !== "object" || error.detail === null) return null;
+  return (error.detail as { code?: string }).code ?? null;
+}
+
 export interface PublicRequirement { text: string; must_have: boolean }
 export interface PublicJob {
   slug: string;
@@ -46,7 +55,8 @@ export interface Application {
 export interface FitItem { requirement_id: number; text: string; fit: "matches" | "partly" | "not_seen" }
 export interface StyleItem { type: string; title: string; body: string }
 export interface Fit { requirements: FitItem[]; team_style: StyleItem[] }
-export interface ConsentText { purpose: string; version: string; text: string }
+/** `language` is the language of `text`, which may not be the one asked for. It is what the consent ledger records. */
+export interface ConsentText { purpose: string; version: string; language: string; text: string }
 
 export interface AskCitation { title: string; page: number | null; effective_date: string | null; shared: boolean }
 export interface AskAnswer {
@@ -151,14 +161,15 @@ export interface SessionState {
   notice: string | null;
 }
 
-export const getConsent = (purpose: string, language: string) =>
-  call<ConsentText>(`/consents/${purpose}?language=${encodeURIComponent(language)}`);
+/** The text for this application: it states the retention period of the company that receives the recording. */
+export const getApplicationConsent = (applicationId: number, purpose: string, language: string) =>
+  call<ConsentText>(`/applications/${applicationId}/consents/${purpose}?language=${encodeURIComponent(language)}`);
 
-export const startSession = (applicationId: number, consentVersion: string, language: string) =>
+export const startSession = (applicationId: number, consent: ConsentText, language: string) =>
   call<SessionState>(`/screening/${applicationId}/start`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ consent_version: consentVersion, language }),
+    body: JSON.stringify({ consent_version: consent.version, language, consent_language: consent.language }),
   });
 
 export const getSessionState = (sessionId: number) => call<SessionState>(`/screening/${sessionId}/state`);

@@ -9,7 +9,7 @@ import {
 } from "@/services/hiring";
 import { ConfirmDialog, LangToggle } from "@/components/Hiring/SampleNotice";
 
-type Pending = { kind: "consent"; id: number } | { kind: "application"; id: number } | null;
+type Pending = { kind: "consent"; id: number; purpose: string } | { kind: "application"; id: number } | null;
 
 export default function MyDataPage() {
   const { t, lang } = useLang();
@@ -92,7 +92,7 @@ export default function MyDataPage() {
                   {c.withdrawn_at ? `. ${format(t.consentWithdrawnOn, { date: date(c.withdrawn_at) })}` : ""}
                 </p>
                 {!c.withdrawn_at && (
-                  <button onClick={() => setPending({ kind: "consent", id: c.id })} className="mt-2 text-sm text-red-400 underline">
+                  <button onClick={() => setPending({ kind: "consent", id: c.id, purpose: c.purpose })} className="mt-2 text-sm text-red-400 underline">
                     {t.withdrawConsent}
                   </button>
                 )}
@@ -120,7 +120,7 @@ export default function MyDataPage() {
         {pending && (
           <ConfirmDialog
             title={pending.kind === "application" ? t.deleteTitle : t.withdrawConsentTitle}
-            body={pending.kind === "application" ? t.deleteBody : t.withdrawConsentBody}
+            body={pending.kind === "application" ? t.deleteBody : pending.purpose === "recording_screening" ? t.withdrawRecordingBody : t.withdrawCvBody}
             confirmLabel={busy ? (pending.kind === "application" ? t.deleting : t.sending) : pending.kind === "application" ? t.deleteApplication : t.withdrawConsent}
             busy={busy}
             error={dialogError}
