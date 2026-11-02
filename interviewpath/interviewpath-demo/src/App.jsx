@@ -1,3 +1,5 @@
+import { useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Navigate, Outlet, Route, Routes } from 'react-router-dom';
 import RequireAuth from './auth/RequireAuth.jsx';
 import { CompanyProvider } from './company/CompanyContext.jsx';
@@ -16,6 +18,8 @@ import TrustPage from './routes/TrustPage.jsx';
 import JobEditorPage from './routes/JobEditorPage.jsx';
 import JobsPage from './routes/JobsPage.jsx';
 import BoardPage from './routes/BoardPage.jsx';
+import HiringRequestsPage from './routes/HiringRequestsPage.jsx';
+import IntakePage from './routes/IntakePage.jsx';
 import DemoAiNotice from './components/DemoAiNotice.jsx';
 import { useCompany } from './company/CompanyContext.jsx';
 
@@ -25,8 +29,30 @@ function HrOnly() {
   return membership?.role === 'hr' ? <Outlet /> : <Navigate to="/copilot" replace />;
 }
 
+// Hiring requests are for HR, who open them, and for managers, who answer their own.
+function HrOrManager() {
+  const { membership } = useCompany();
+  return membership?.role === 'hr' || membership?.role === 'manager' ? <Outlet /> : <Navigate to="/copilot" replace />;
+}
+
+function ManagerOnly() {
+  const { membership } = useCompany();
+  return membership?.role === 'manager' ? <Outlet /> : <Navigate to="/hiring-requests" replace />;
+}
+
+// A manager sees Korean unless they have chosen a language themselves; the switch stores that choice.
+function useDefaultLanguage(role) {
+  const { i18n } = useTranslation();
+  useEffect(() => {
+    if (!role || localStorage.getItem('portal_lang')) return;
+    const wanted = role === 'manager' ? 'ko' : 'en';
+    if (i18n.language !== wanted) i18n.changeLanguage(wanted);
+  }, [role, i18n]);
+}
+
 function PortalLayout() {
   const { membership } = useCompany();
+  useDefaultLanguage(membership?.role);
   return (
     <div className="min-h-[100dvh] bg-slate-100 text-slate-950">
       <Sidebar />
@@ -66,6 +92,12 @@ function App() {
           <Route path="/jobs/new" element={<JobEditorPage />} />
           <Route path="/jobs/:jobId" element={<JobEditorPage />} />
           <Route path="/jobs/:jobId/board" element={<BoardPage />} />
+        </Route>
+        <Route element={<HrOrManager />}>
+          <Route path="/hiring-requests" element={<HiringRequestsPage />} />
+        </Route>
+        <Route element={<ManagerOnly />}>
+          <Route path="/intake/:requestId" element={<IntakePage />} />
         </Route>
         <Route path="/copilot" element={<CopilotPage />} />
         <Route path="*" element={<Navigate to="/settings" replace />} />

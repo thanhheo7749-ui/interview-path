@@ -595,5 +595,71 @@
       "corrected": "CV label corrected by HR",
       "reasonShown": "Correction reason: {{reason}}"
     }
+  },
+  "bridges": {
+    "nav": {
+      "hiringRequests": "Hiring requests"
+    },
+    "requests": {
+      "title": "Hiring requests",
+      "new": "New hiring request",
+      "titleLabel": "Role to hire",
+      "managerLabel": "Hiring manager",
+      "chooseManager": "Choose a manager",
+      "departmentLabel": "Department",
+      "noManagers": "This company has no manager members yet. Add one in Company settings first.",
+      "create": "Create request",
+      "empty": "No hiring requests yet.",
+      "startIntake": "Start intake",
+      "resumeIntake": "Continue intake",
+      "status": {
+        "open": "Waiting for the manager's intake",
+        "intake_in_progress": "Intake in progress",
+        "intake_done": "Intake done, HR is reviewing",
+        "drafting": "Drafting the job description",
+        "published": "Published",
+        "cancelled": "Cancelled"
+      }
+    },
+    "intake": {
+      "title": "Manager intake",
+      "noticeTitle": "Before you start",
+      "noticeRecorded": "This session is recorded.",
+      "noticeTranscript": "A transcript of your answers goes to HR for review. HR decides what is used.",
+      "noticeNoNames": "Please do not name individual people in your answers. Speak about roles and situations.",
+      "understood": "I have read this and I am ready to start the recorded session.",
+      "start": "Start recorded intake",
+      "starting": "Starting...",
+      "completed": "Thank you. Your answers have been sent and HR will review them.",
+      "alreadyDone": "The intake for this request is already done.",
+      "notFound": "This hiring request was not found.",
+      "back": "Back to hiring requests"
+    },
+    "voice": {
+      "micTitle": "Microphone check",
+      "micHint": "Test your microphone and watch the level move while you speak.",
+      "micTest": "Test microphone",
+      "micLevel": "Microphone level",
+      "micError": "The microphone could not be opened. Allow microphone access in the browser and try again.",
+      "unsupported": "This browser cannot record audio. Use a current version of Chrome, Edge or Safari.",
+      "recordingSession": "This session is being recorded",
+      "recordingOn": "Recording your answer",
+      "questionOf": "Question {{current}} of {{total}}",
+      "timeLeft": "Time left",
+      "followup": "Follow-up",
+      "why": "Why we ask",
+      "record": "Record answer",
+      "stop": "Stop and send",
+      "retrySend": "Send again",
+      "uploading": "Sending your answer...",
+      "uploadFailed": "Your answer could not be sent. Check your connection and send it again.",
+      "recordError": "Recording failed. Check your microphone and try again.",
+      "paused": "The session is paused.",
+      "closing": "The session is about to close.",
+      "repeat": "We could not hear you clearly. Please answer the same question again.",
+      "retry": "Please answer once more.",
+      "expired": "This session has expired.",
+      "ended": "This session has ended."
+    }
   }
 }
