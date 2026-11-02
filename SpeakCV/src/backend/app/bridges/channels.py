@@ -171,12 +171,15 @@ def generate(db: Session, draft: JobDraft, user_id: int) -> list[dict]:
     nodes = retriever.visible_graph(db, aud.candidate(draft.company_id))[0]
     types = {n.id: n.type for n in nodes}
     default = publishing.default_language(company)
-    links = {link.channel: link for link in jobs.ensure_channels(db, job, [c.token for c in CHANNELS])}
-
-    pieces = []
+    written = []
     for channel in CHANNELS:
         lang = channel.language or default
-        body = _body(channel, title, lines, lang, types, draft.company_id)
+        written.append((channel, lang, _body(channel, title, lines, lang, types, draft.company_id)))
+
+    # Only now: the AI calls above must not hold the new links' uncommitted rows.
+    links = {link.channel: link for link in jobs.ensure_channels(db, job, [c.token for c in CHANNELS])}
+    pieces = []
+    for channel, lang, body in written:
         link = links[channel.token]
         pieces.append(ChannelContent(company_id=draft.company_id, job_draft_id=draft.id, channel=channel.token,
                                      language=lang, body=body.replace(LINK, tracked_url(job, link)), link_id=link.id))

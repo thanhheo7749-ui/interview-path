@@ -173,17 +173,19 @@ def _seed_job(db, company: Company) -> None:
     profile = retriever.role_profile(db, aud.simulated(db, company.id, "hr", None), role.id)
     if profile is None or not profile.requirements:
         return
+    requirements = [
+        {"text": item.body.strip() or item.title, "must_have": item.must_have, "visibility": item.visibility,
+         "node_id": item.node_id}
+        for item in profile.requirements
+    ]
+    checked = jobs.check_requirements(db, company.id, None, requirements)
     job = Job(
         company_id=company.id, department_id=role.department_id, role_node_id=role.id, title=role.title,
         description=role.body, status="draft", version=1, interview_languages=["vi", "en", "ko"],
     )
     db.add(job)
     db.flush()
-    jobs.update_requirements(db, job, [
-        {"text": item.body.strip() or item.title, "must_have": item.must_have, "visibility": item.visibility,
-         "node_id": item.node_id}
-        for item in profile.requirements
-    ])
+    jobs.update_requirements(db, job, requirements, checked)
     jobs.publish(db, job, company)
     jobs.ensure_channels(db, job, ["company_site", "linkedin", "referral"])
     db.commit()
