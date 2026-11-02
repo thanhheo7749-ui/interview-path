@@ -1,7 +1,11 @@
 """HR review of extracted knowledge. Only HR actions (or the sample-only auto approve) publish a node.
 
 Every function here works inside the caller's transaction and does not commit, except `auto_approve_document`
-which has no request around it, and `recheck_edited_facts` which runs after the caller's commit."""
+which has no request around it, `recheck_edited_facts` which runs after the caller's commit, and `apply_decisions`
+which ends the transaction before its AI calls."""
+from dataclasses import dataclass, field
+from types import SimpleNamespace
+
 import numpy as np
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
@@ -27,6 +31,7 @@ DEAD = ("rejected", "superseded")
 ACTION_STATUSES = {"accept": ("draft",), "merge": ("draft",), "edit": LIVE, "reject": LIVE}
 UNPUBLISHABLE = ("review", "published")
 ACTIVE_JOB = ("queued", "running")
+CHANGED_DURING_CHECK = "This item changed while it was being checked. Please try again."
 
 
 class ReviewError(Exception):
@@ -238,14 +243,30 @@ def unpublish_document(db: Session, company_id: int, document_id: int) -> dict:
 
 # ---------- deciding ----------
 
-def _embed_nodes(db: Session, company_id: int, nodes: list[KbNode]) -> None:
-    if not nodes:
-        return
-    result = gateway.embed([retriever.node_text(n) for n in nodes], "document", "kb_embed", company_id)
-    for node, vector in zip(nodes, result.vectors):
+@dataclass
+class _AiAnswers:
+    """What the AI said about the texts a request will leave, keyed by those texts."""
+
+    guards: dict[tuple[str, str], discrimination.GuardResult | None] = field(default_factory=dict)
+    embeddings: dict[str, list[float]] = field(default_factory=dict)
+    model: str | None = None
+    dimension: int | None = None
+
+    def stored_guard(self, node) -> discrimination.GuardResult | None:
+        try:
+            return self.guards[(node.title, node.body)]
+        except KeyError:
+            raise ReviewError(409, CHANGED_DURING_CHECK) from None
+
+
+def _embed_nodes(nodes: list[KbNode], answers: _AiAnswers) -> None:
+    for node in nodes:
+        vector = answers.embeddings.get(retriever.node_text(node))
+        if vector is None:
+            raise ReviewError(409, CHANGED_DURING_CHECK)
         node.embedding = vectors.encode(vector)
-        node.embedding_model = result.model
-        node.embedding_dim = result.dimension
+        node.embedding_model = answers.model
+        node.embedding_dim = answers.dimension
 
 
 def _apply_fields(item, node: KbNode, reembed: dict[int, KbNode], edited_facts: dict[int, KbNode],
@@ -266,7 +287,7 @@ def _apply_fields(item, node: KbNode, reembed: dict[int, KbNode], edited_facts: 
         setattr(node, name, value)
 
 
-def _guard(node: KbNode, item, before: tuple[str, str], publishing: bool) -> None:
+def _guard(node: KbNode, item, before: tuple[str, str], publishing: bool, check) -> None:
     """The discrimination guard for a node that is edited or published. Raises ReviewError(409) when the node would
     become, or stay, a published requirement that asks for a protected trait. Edits are re-checked; unchanged text keeps
     its flag, so asking again cannot draw a different answer from the classifier."""
@@ -283,7 +304,7 @@ def _guard(node: KbNode, item, before: tuple[str, str], publishing: bool) -> Non
             node.guard_category = node.guard_reason = None
             return
         raise ReviewError(409, f"Blocked ({held}): {node.guard_reason}")
-    result = discrimination.check(f"{node.title}\n{node.body}", node.company_id)
+    result = check(node)
     node.guard_category = result.category if result else None
     node.guard_reason = result.reason if result else None
     if result is not None and not result.unchecked and publishing:
@@ -335,11 +356,61 @@ def _merge(db: Session, company_id: int, node: KbNode, into_id: int, user_id: in
     contradiction.on_node_rejected(db, node.id)
 
 
+def _ask_ai_first(db: Session, company_id: int, items) -> _AiAnswers:
+    """Get every AI answer apply_decisions will need before it writes, because a vendor call must not hold locks.
+
+    Ends the transaction, then plays the items on plain copies of their nodes to find the text each one leaves. It stops
+    at an item that will be refused: the request then needs no embedding. apply_decisions reads the nodes again, and
+    refuses an item whose text has no answer here, because another request changed it during the calls."""
+    node_ids = {item.node_id for item in items if item.action != "publish_document"}
+    columns = (*EDITABLE, "id", "type", "status", "fact_kind", "guard_category", "guard_reason")
+    copies = {
+        node.id: SimpleNamespace(**{name: getattr(node, name) for name in columns})
+        for node in db.query(KbNode).filter(KbNode.id.in_(node_ids), KbNode.company_id == company_id)
+    }
+    db.commit()
+
+    answers = _AiAnswers()
+
+    def ask_guard(node) -> discrimination.GuardResult | None:
+        key = (node.title, node.body)
+        if key not in answers.guards:
+            answers.guards[key] = discrimination.check(f"{node.title}\n{node.body}", company_id)
+        return answers.guards[key]
+
+    reembed: dict[int, SimpleNamespace] = {}
+    for item in items:
+        if item.action == "publish_document":
+            continue
+        node = copies.get(item.node_id)
+        if node is None or node.type in ORG_TYPES or node.status not in ACTION_STATUSES[item.action]:
+            return answers
+        if item.action in ("reject", "merge"):
+            node.status = "rejected"
+            continue
+        before = (node.title, node.body)
+        try:
+            _apply_fields(item, node, reembed, {}, set())
+            _guard(node, item, before, item.action == "accept" or node.status == "published", ask_guard)
+        except ReviewError:
+            return answers
+        if item.action == "accept":
+            node.status = "published"
+    if reembed:
+        texts = list(dict.fromkeys(retriever.node_text(node) for node in reembed.values()))
+        result = gateway.embed(texts, "document", "kb_embed", company_id)
+        answers.embeddings = dict(zip(texts, result.vectors))
+        answers.model, answers.dimension = result.model, result.dimension
+    return answers
+
+
 def apply_decisions(db: Session, company_id: int, user_id: int, items) -> dict[int, bool]:
     """Apply review items in order. Raises ReviewError; the caller rolls back so a bad item changes nothing.
 
-    Returns the live facts this request edited, each with whether its value, unit or scope changed. The caller
-    commits, then passes them to recheck_edited_facts."""
+    Commits once before writing anything, to end the transaction before the AI calls, so the caller must have nothing
+    pending that it may yet discard. Returns the live facts this request edited, each with whether its value, unit or
+    scope changed. The caller commits, then passes them to recheck_edited_facts."""
+    answers = _ask_ai_first(db, company_id, items)
     touched: set[int] = set()
     documents: set[int] = set()
     reembed: dict[int, KbNode] = {}
@@ -358,12 +429,12 @@ def apply_decisions(db: Session, company_id: int, user_id: int, items) -> dict[i
         if item.action == "edit":
             before = (node.title, node.body)
             _apply_fields(item, node, reembed, edited_facts, changed_claims)
-            _guard(node, item, before, publishing=node.status == "published")
+            _guard(node, item, before, node.status == "published", answers.stored_guard)
             changed = changed or node.status == "published"
         elif item.action == "accept":
             before = (node.title, node.body)
             _apply_fields(item, node, reembed, edited_facts, changed_claims)
-            _guard(node, item, before, publishing=True)
+            _guard(node, item, before, True, answers.stored_guard)
             publish_node(db, node, user_id)
             changed = True
         elif item.action == "reject":
@@ -380,7 +451,7 @@ def apply_decisions(db: Session, company_id: int, user_id: int, items) -> dict[i
     for node in edited_facts.values():
         if node.status in LIVE and contradiction.close_conflicts_settled_by_edit(db, node, user_id):
             changed = True
-    _embed_nodes(db, company_id, list(reembed.values()))
+    _embed_nodes(list(reembed.values()), answers)
     db.flush()
     settle_edges(db, company_id, touched)
     db.flush()

@@ -115,15 +115,19 @@ def _role_node_id(db: Session, draft: JobDraft) -> int | None:
     return next((i for i in cited if i in nodes and nodes[i].type == "role"), None)
 
 
-def _job_for(db: Session, draft: JobDraft, request: HiringRequest | None, lang: str, user_id: int) -> Job:
+def _existing_job(db: Session, draft: JobDraft, request: HiringRequest | None) -> Job | None:
     job_id = draft.job_id or (request.job_id if request else None)
-    if job_id is not None:
-        job = db.query(Job).filter(Job.id == job_id, Job.company_id == draft.company_id).first()
-        if job is None:
-            raise PublishError(404, "The job of this draft no longer exists.")
-        if job.status == "closed":
-            raise PublishError(409, "A closed job cannot be published again.")
-        return job
+    if job_id is None:
+        return None
+    job = db.query(Job).filter(Job.id == job_id, Job.company_id == draft.company_id).first()
+    if job is None:
+        raise PublishError(404, "The job of this draft no longer exists.")
+    if job.status == "closed":
+        raise PublishError(409, "A closed job cannot be published again.")
+    return job
+
+
+def _new_job(db: Session, draft: JobDraft, lang: str, user_id: int) -> Job:
     title = (jd_studio._draft_title(db, draft) or "Job")[:MAX_TITLE]
     job = Job(company_id=draft.company_id, department_id=department_id(db, draft),
               role_node_id=_role_node_id(db, draft), title=title, description="", status="draft", version=1,
@@ -147,9 +151,13 @@ def publish(db: Session, draft: JobDraft, user_id: int) -> tuple[Job, list[str]]
                                                  HiringRequest.company_id == draft.company_id).first()
     lang = default_language(company)
     try:
-        job = _job_for(db, draft, request, lang, user_id)
+        job = _existing_job(db, draft, request)
+        requirements = _requirements(db, draft, lang)
+        # Before the first write: this can call the AI, and a vendor call must not hold locks.
+        checked = jobs.check_requirements(db, draft.company_id, job.id if job else None, requirements)
+        job = job or _new_job(db, draft, lang, user_id)
         job.description = _description(draft, lang)
-        warnings = jobs.update_requirements(db, job, _requirements(db, draft, lang))
+        warnings = jobs.update_requirements(db, job, requirements, checked)
         if job.status == "draft":
             jobs.publish(db, job, company)
     except jobs.JobError as error:
