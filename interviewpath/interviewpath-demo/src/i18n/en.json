@@ -156,7 +156,12 @@
     "withdraw": "Withdraw",
     "withdrawConfirm": "Withdraw \"{{title}}\"? Its content stops being used by the Copilot and the graph, and knowledge items with no other source document are removed.",
     "withdrawYes": "Withdraw document",
-    "withdrawn": "Document withdrawn. {{removed}} items removed, {{kept}} kept because another document supports them."
+    "withdrawn": "Document withdrawn. {{removed}} items removed, {{kept}} kept because another document supports them.",
+    "retryMasking": "Mask names again",
+    "maskingNotes": {
+      "names_unchecked": "The names in this intake transcript could not be checked, so only patterns such as emails and phone numbers were removed. The raw transcript is kept for now. It stays unpublished until you mask the names again. It is erased after 7 days either way.",
+      "unknown": "This document was not fully masked. Read it before approving anything from it."
+    }
   },
   "review": {
     "reasons": {
@@ -205,7 +210,9 @@
         "religion": "religion",
         "ethnicity": "ethnicity"
       }
-    }
+    },
+    "maskingHeld": "The names in \"{{title}}\" were not masked. Its items need your careful reading and the document stays unpublished until masking is retried.",
+    "maskingHeldLink": "Open Documents"
   },
   "conflicts": {
     "title": "Conflicts",
@@ -470,7 +477,9 @@
     "channelInvalid": "Use 1 to 50 lowercase letters, digits or underscores.",
     "colBoard": "Candidates",
     "openBoard": "Open board",
-    "noPublicRequirement": "This job has no public requirement. The interview has nothing to measure, so every candidate's evidence band will be low."
+    "noPublicRequirement": "This job has no public requirement. The interview has nothing to measure, so every candidate's evidence band will be low.",
+    "descriptionInJdStudio": "This job was made in JD Studio. Edit its description there, so the checks and the manager's approval apply.",
+    "openJdStudio": "Open it in JD Studio"
   },
   "board": {
     "eyebrow": "Candidate board",
@@ -661,13 +670,15 @@
         "intake_done": "Intake done, HR is reviewing",
         "drafting": "Drafting the job description",
         "published": "Published",
-        "cancelled": "Cancelled"
+        "cancelled": "Cancelled",
+        "intake_empty": "No answer was recorded. Start the intake again"
       },
       "roleLabel": "Role to write about",
       "anyRole": "No specific role",
       "generateDraft": "Generate draft",
       "openDraft": "Open draft",
-      "awaitingApproval": "Awaiting your approval"
+      "awaitingApproval": "Awaiting your approval",
+      "startAgain": "Start the intake again"
     },
     "intake": {
       "title": "Manager intake",
@@ -743,7 +754,9 @@
         "reviewed": "Reviewed by HR",
         "sent": "Sent"
       },
-      "sentNote": "Sent to the hiring manager. It can no longer be edited."
+      "sentNote": "Sent to the hiring manager. It can no longer be edited.",
+      "stale": "The interview was analysed again after this brief was made. Generate it again to use the new evidence.",
+      "staleSent": "The interview was analysed again after this brief was sent. Generate it again, review it and send the new one."
     },
     "interviews": {
       "title": "My interviews",
@@ -875,6 +888,14 @@
         "conflict": "Conflicts with a company fact",
         "unchecked": "Check could not run",
         "must_have_count": "Many must-haves"
+      },
+      "messages": {
+        "discrimination": "A line may ask for something about the person rather than the job. HR must change it before it can be published.",
+        "no_source": "A line has no source in the company knowledge. HR must add a source or confirm it.",
+        "conflict": "A line states a different value than a company fact. HR must fix it before it can be published.",
+        "unchecked": "An automatic check could not run on a line. HR must run it again or review the line.",
+        "must_have_count": "This draft has many must-have requirements, which narrows the pool of candidates.",
+        "other": "A check found an issue with this draft."
       }
     },
     "channels": {
@@ -900,10 +921,18 @@
       "copyText": "Copy text {{channel}}",
       "copyTextShort": "Copy text",
       "copied": "Copied",
-      "copyFailed": "Could not copy. Select the text and copy it by hand."
+      "copyFailed": "Could not copy. Select the text and copy it by hand.",
+      "usedTemplate": "The AI text was not used for this channel: it added a fact, or the fairness check flagged it or could not run. This text is built from the job description lines only.",
+      "regenerate": "Generate again"
     },
     "isRequirementLine": "Line {{number}} is a requirement",
     "isMustHaveLine": "Line {{number}} is a must-have",
-    "sourceNode": "Source #{{id}}"
+    "sourceNode": "Source #{{id}}",
+    "rejectedReasons": {
+      "no_source": "It has no source in the company knowledge.",
+      "unknown_nodes": "It cites knowledge that is not available.",
+      "unsupported_numbers": "It states numbers that its sources do not contain: {{numbers}}.",
+      "unknown": "The company knowledge does not support it."
+    }
   }
 }

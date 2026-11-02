@@ -153,6 +153,7 @@ export function BriefWorkflow({ companyId, appId, audioPositions }) {
   const send = () => run(async () => take(await sendBrief(companyId, appId)));
 
   const sent = brief?.status === 'sent';
+  const stale = Boolean(brief?.stale);
   const reviewed = brief != null && brief.reviewed_by != null && !dirty;
   const statusKey = sent ? 'sent' : reviewed ? 'reviewed' : 'draft';
 
@@ -169,7 +170,12 @@ export function BriefWorkflow({ companyId, appId, audioPositions }) {
       <p className="text-xs text-slate-500">{t('bridges.brief.hint')}</p>
       <ErrorAlert message={error} />
 
-      {loaded && !sent && (
+      {stale && (
+        <p role="note" data-testid="brief-stale" className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-900">
+          {t(sent ? 'bridges.brief.staleSent' : 'bridges.brief.stale')}
+        </p>
+      )}
+      {loaded && (!sent || stale) && (
         <div className="flex flex-wrap items-end gap-2">
           <label className="text-xs font-bold text-slate-600">
             {t('bridges.brief.language')}
@@ -183,7 +189,7 @@ export function BriefWorkflow({ companyId, appId, audioPositions }) {
         </div>
       )}
       {!loaded && !error && <p className="text-xs text-slate-500">{t('common.loading')}</p>}
-      {loaded && !sent && <p className="text-xs text-slate-500">{t('bridges.brief.replacesNote')}</p>}
+      {loaded && (!sent || stale) && <p className="text-xs text-slate-500">{t('bridges.brief.replacesNote')}</p>}
       {confirming && (
         <ConfirmBar message={t('bridges.brief.regenerateConfirm')} confirmLabel={t('bridges.brief.regenerate')} busy={busy} onConfirm={generate} onCancel={() => setConfirming(false)} />
       )}

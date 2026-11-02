@@ -8,7 +8,7 @@ import { supportsRecording } from '../hooks/useAnswerRecorder.js';
 import { getHiringRequest, startIntake } from '../lib/bridges.js';
 
 const SESSION_LANGUAGES = ['ko', 'vi', 'en'];
-const OPEN = ['open', 'intake_in_progress'];
+const OPEN = ['open', 'intake_in_progress', 'intake_empty'];
 
 // The manager's voice interview about a hiring request. Everything the manager must know is shown before the
 // microphone is used: that it is recorded, where the transcript goes, and not to name people.

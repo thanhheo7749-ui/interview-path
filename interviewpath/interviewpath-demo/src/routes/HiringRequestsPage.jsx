@@ -8,7 +8,7 @@ import {
 } from '../lib/bridges.js';
 import { listRoleOptions } from '../lib/jobs.js';
 
-const INTAKE_OPEN = ['open', 'intake_in_progress'];
+const INTAKE_OPEN = ['open', 'intake_in_progress', 'intake_empty'];
 
 function CreateForm({ companyId, onCreated }) {
   const { t } = useTranslation();
@@ -223,7 +223,7 @@ function HiringRequestsPage() {
               {!isHr && request.latest_draft_id != null && <ManagerDraftLink request={request} />}
               {!isHr && INTAKE_OPEN.includes(request.status) && (
                 <Link to={`/intake/${request.id}`} className={primaryButton}>
-                  {request.status === 'intake_in_progress' ? t('bridges.requests.resumeIntake') : t('bridges.requests.startIntake')}
+                  {request.status === 'intake_in_progress' ? t('bridges.requests.resumeIntake') : request.status === 'intake_empty' ? t('bridges.requests.startAgain') : t('bridges.requests.startIntake')}
                 </Link>
               )}
             </li>

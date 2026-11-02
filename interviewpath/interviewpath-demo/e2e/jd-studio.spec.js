@@ -87,6 +87,10 @@ test('HR drafts, the manager approves in Korean, HR publishes and copies channel
   await expect(page.getByTestId('proposal')).toHaveCount(1);
   await page.getByTestId('proposal').getByRole('button', { name: 'Dismiss' }).click();
   await expect(page.getByTestId('proposal')).toHaveCount(0);
+  // The dismissal is stored: the proposal does not come back with the page.
+  await page.reload();
+  await expect(page.getByTestId('jd-lines')).toBeVisible();
+  await expect(page.getByTestId('proposal')).toHaveCount(0);
 
   // The Korean version is written by hand so the manager's page can be told apart from the English one.
   await page.getByRole('tab', { name: '한국어' }).click();
