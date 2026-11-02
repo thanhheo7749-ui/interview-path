@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from app.auth.dependencies import require_member
 from app.database.database import get_db
 from app.database.sql_models import Application, CompanyMember, Job, VoiceSession, VoiceTurn
-from app.hiring import analysis, audit, board, decisions
+from app.hiring import analysis, audit, board, decisions, notify
 
 router = APIRouter()
 
@@ -71,7 +71,7 @@ def get_application(company_id: int, app_id: int, member: CompanyMember = Depend
 
 
 @router.post(BASE + "/applications/{app_id}/decision")
-def post_decision(company_id: int, app_id: int, body: DecisionIn,
+def post_decision(company_id: int, app_id: int, body: DecisionIn, background: BackgroundTasks,
                   member: CompanyMember = Depends(require_member("hr")), db: Session = Depends(get_db)):
     application = _application(db, company_id, app_id, lock=True)
     try:
@@ -80,6 +80,7 @@ def post_decision(company_id: int, app_id: int, body: DecisionIn,
         db.rollback()
         raise _translate(error)
     db.commit()
+    background.add_task(notify.deliver_pending)  # the candidate hears now, not at the next daily run
     return {"id": application.id, "hr_decision": application.hr_decision}
 
 
@@ -110,8 +111,8 @@ def post_reveal(company_id: int, app_id: int, member: CompanyMember = Depends(re
 
 
 @router.post(BASE + "/applications/{app_id}/restart")
-def post_restart(company_id: int, app_id: int, member: CompanyMember = Depends(require_member("hr")),
-                 db: Session = Depends(get_db)):
+def post_restart(company_id: int, app_id: int, background: BackgroundTasks,
+                 member: CompanyMember = Depends(require_member("hr")), db: Session = Depends(get_db)):
     application = _application(db, company_id, app_id, lock=True)
     try:
         decisions.grant_restart(db, application, member.user_id)
@@ -119,6 +120,7 @@ def post_restart(company_id: int, app_id: int, member: CompanyMember = Depends(r
         db.rollback()
         raise _translate(error)
     db.commit()
+    background.add_task(notify.deliver_pending)
     return {"id": application.id, "stage": application.stage}
 
 
@@ -148,7 +150,7 @@ def post_retry_analysis(company_id: int, app_id: int, background: BackgroundTask
 
 
 @router.post(BASE + "/jobs/{job_id}/decisions/bulk")
-def post_bulk_reject(company_id: int, job_id: int, body: BulkIn,
+def post_bulk_reject(company_id: int, job_id: int, body: BulkIn, background: BackgroundTasks,
                      member: CompanyMember = Depends(require_member("hr")), db: Session = Depends(get_db)):
     if db.query(Job.id).filter(Job.id == job_id, Job.company_id == company_id).first() is None:
         raise HTTPException(status_code=404, detail="Job not found")
@@ -168,6 +170,7 @@ def post_bulk_reject(company_id: int, job_id: int, body: BulkIn,
         db.rollback()
         raise _translate(error)
     db.commit()
+    background.add_task(notify.deliver_pending)
     return {"rejected": len(rows)}
 
 

@@ -120,8 +120,8 @@ def _verified(output: AssessOutput, requirements: tuple[AssessedRequirement, ...
         verified.append({"requirement_id": requirement.id, "status": status, "quote": quote})
     claims = []
     for claim in output.claims:
-        if not _is_evidence(claim.quote, blind_text):
-            failures += 1
+        if not _is_evidence(claim.quote, blind_text) or _DIRECTIVE.search(normalise_for_match(claim.text)):
+            failures += 1  # the claim's own words are free model output that HR may read, so they are checked too
         elif claim.text.strip():
             claims.append({"text": claim.text, "quote": claim.quote})
     return {"requirements": verified, "claims": claims[:MAX_CLAIMS], "verification_failures": failures}
