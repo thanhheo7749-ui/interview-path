@@ -20,12 +20,14 @@ router = APIRouter()
 
 PURPOSE = "screening"
 CONSENT_PURPOSE = "recording_screening"
+CV_CONSENT_PURPOSE = "cv_processing"
 NOT_FOUND = "Not found"
 
 
 class StartIn(BaseModel):
     consent_version: str = Field(max_length=30)
     language: str = Field(max_length=10)
+    consent_language: str | None = Field(default=None, max_length=10)  # the language the consent route said it returned
 
 
 class StateOut(BaseModel):
@@ -93,7 +95,11 @@ def _resume(db: Session, session: VoiceSession) -> StateOut | None:
     return None if state.status in voice.TERMINAL_STATUSES else state_out(session_id, state)
 
 
-def _check_can_start(application: Application) -> None:
+def _check_can_start(db: Session, application: Application) -> None:
+    if consents.was_withdrawn(db, application.id, CV_CONSENT_PURPOSE):  # planning runs AI over the CV
+        raise HTTPException(status_code=409, detail={
+            "code": consents.CV_CONSENT_WITHDRAWN, "message": "You withdrew consent to CV processing for this application.",
+        })
     if application.stage != "invited":
         raise HTTPException(status_code=409, detail="This interview cannot be started now")
 
@@ -109,7 +115,7 @@ def start(application_id: int, body: StartIn, user: User = Depends(get_authentic
         raise HTTPException(status_code=409, detail={
             "message": "The consent text has changed. Please read it again.", "current_version": consents.VERSION,
         })
-    _check_can_start(application)
+    _check_can_start(db, application)
     job = db.get(Job, application.job_id)
     allowed = job.interview_languages or [db.get(Company, application.company_id).default_locale]
     if body.language not in allowed:
@@ -124,9 +130,9 @@ def start(application_id: int, body: StartIn, user: User = Depends(get_authentic
     active = _active_session(db, application_id)
     if active is not None and (resumed := _resume(db, active)) is not None:
         return resumed
-    _check_can_start(application)
+    _check_can_start(db, application)
     consents.record(db, user_id, application.company_id, application_id, CONSENT_PURPOSE, body.consent_version,
-                    language=body.language)
+                    language=body.consent_language)
     session = voice.create_session(
         db, company_id=application.company_id, purpose=PURPOSE, owner_user_id=user_id, language=body.language,
         plan=plan, application_id=application_id,
@@ -173,6 +179,12 @@ async def _read_audio(file: UploadFile) -> tuple[bytes, str]:
     return b"".join(chunks), mime_type
 
 
+def _recording_consent_withdrawn() -> HTTPException:
+    return HTTPException(status_code=409, detail={
+        "code": consents.RECORDING_CONSENT_WITHDRAWN, "message": "Your recording consent has been withdrawn",
+    })
+
+
 def _submit(db: Session, user_id: int, session_id: int, position: int, audio: bytes, mime_type: str,
             purpose: str | None) -> StateOut:
     session = _owned_session(db, user_id, session_id, purpose)
@@ -180,9 +192,11 @@ def _submit(db: Session, user_id: int, session_id: int, position: int, audio: by
     if session.purpose == PURPOSE and not consents.has_active(
         db, user_id, CONSENT_PURPOSE, application_id=session.application_id
     ):
-        raise HTTPException(status_code=409, detail="Your recording consent has been withdrawn")
+        raise _recording_consent_withdrawn()
     try:
         return state_out(session_id, voice.submit_answer(db, session, position, audio, mime_type))
+    except voice.ConsentWithdrawn as exc:
+        raise _recording_consent_withdrawn() from exc
     except voice.PositionNotCurrent as exc:
         raise HTTPException(status_code=409, detail="This is not the current question") from exc
     except voice.SessionGone as exc:

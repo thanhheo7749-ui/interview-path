@@ -28,7 +28,7 @@ from app.ai import gateway
 from app.ai.types import AIError
 from app.database.sql_models import Application, VoiceSession, VoiceTurn
 from app.hiring import audit, recordings
-from app.hiring.state import NOT_TAKEN, advance
+from app.hiring.state import CONSENT_WITHDRAWN, NOT_TAKEN, advance
 
 logger = logging.getLogger(__name__)
 
@@ -97,6 +97,10 @@ class PositionNotCurrent(Exception):
 
 class SessionGone(Exception):
     """The session's application was deleted. Whatever was being done for it is discarded."""
+
+
+class ConsentWithdrawn(Exception):
+    """The candidate withdrew recording consent. Whatever was being done for this answer is discarded."""
 
 
 @dataclass(frozen=True)
@@ -500,6 +504,15 @@ def _commit_or_current(db, session_id: int, position: int, path: str) -> bool:
         return False
 
 
+def _refuse_if_consent_withdrawn(db, session: VoiceSession) -> None:
+    """On a session just locked: `_lock` has refreshed the application, so this sees a withdrawal made at any moment."""
+    if session.application_id is None:
+        return
+    if db.get(Application, session.application_id).analysis_status == CONSENT_WITHDRAWN:
+        db.rollback()
+        raise ConsentWithdrawn
+
+
 def submit_answer(db, session: VoiceSession, position: int, audio: bytes, mime_type: str,
                   decide_followup: FOLLOWUP_HOOK | None = None) -> SessionState:
     """Take one answer. Idempotent per (session, position): an answered position returns the state and changes nothing.
@@ -507,7 +520,8 @@ def submit_answer(db, session: VoiceSession, position: int, audio: bytes, mime_t
     Discards anything pending in `db` and commits. The row lock is held only to check and to store, never during AI
     calls, so an upload that overlaps this one waits briefly at most. Each re-checks under the lock before storing, so
     the first to finish wins; files are written only then, so the stored audio always matches the stored transcript.
-    Raises SessionGone if the application was deleted, including during the AI calls: no file has been written by then.
+    Raises SessionGone if the application was deleted, and ConsentWithdrawn if recording consent was withdrawn, both
+    including during the AI calls: no file has been written by then.
     """
     suffix = ALLOWED_AUDIO.get(mime_type)
     if suffix is None:
@@ -517,6 +531,7 @@ def submit_answer(db, session: VoiceSession, position: int, audio: bytes, mime_t
 
     session_id = session.id
     session = _lock(db, session_id)
+    _refuse_if_consent_withdrawn(db, session)
     if session.status in TERMINAL_STATUSES:
         return _released_state(db, session)
     if _apply_clock(db, session):
@@ -548,6 +563,7 @@ def submit_answer(db, session: VoiceSession, position: int, audio: bytes, mime_t
         followup = _ask_followup(hook, info, replace(question, transcript=text))
 
     session = _lock(db, session_id)
+    _refuse_if_consent_withdrawn(db, session)
     turn = _current_turn(_turns(db, session_id))
     if session.status in TERMINAL_STATUSES or turn is None or turn.position != position:
         return _released_state(db, session)  # another upload of this position finished first

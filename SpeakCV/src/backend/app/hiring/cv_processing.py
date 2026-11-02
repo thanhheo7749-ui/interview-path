@@ -6,7 +6,7 @@ from app.core import storage
 from app.core.text_extract import NoExtractableText
 from app.database.database import SessionLocal
 from app.database.sql_models import Application, Company, Job, User
-from app.hiring import identity, notify, screening
+from app.hiring import consents, identity, notify, screening
 from app.hiring.hidden_text import CvTooLarge, extract_cv
 from app.hiring.state import InvalidTransition, advance
 
@@ -42,7 +42,8 @@ def _locked_processing(db, application_id: int) -> Application:
 def _claim(db, application_id: int) -> bool:
     """Only one job may process an application. A second task for it finds the stage moved on, and stops."""
     application = _locked(db, application_id)
-    if application is None or application.anonymized_at is not None:
+    # The lock comes first in this transaction, so the read of the consent sees a withdrawal committed before it.
+    if application is None or application.anonymized_at is not None or consents.was_withdrawn(db, application_id, "cv_processing"):
         db.rollback()
         return False
     try:

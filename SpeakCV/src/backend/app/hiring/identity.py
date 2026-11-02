@@ -131,6 +131,12 @@ def apply_terms(text: str, terms: dict[str, list[str]]) -> str:
     return pattern.sub(lambda m: ordered[m.lastindex - 1][1] if m.lastindex else m[0], normalised)
 
 
+def mask_spoken(text: str, known_terms: list[str]) -> str:
+    """What a candidate said, as HR reads it before a reveal. At read time, so no AI is involved. Words such as "anh"
+    and "chị" and anything else said about oneself can remain: the portal tells HR so."""
+    return apply_terms(regex_mask(text), {_NAME: list(known_terms)})
+
+
 def _collapse(text: str) -> str:
     return "\n".join(" ".join(line.split()) for line in text.splitlines()).strip()
 

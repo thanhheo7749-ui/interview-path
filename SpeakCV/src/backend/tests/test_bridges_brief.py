@@ -532,7 +532,7 @@ def test_application_detail_carries_brief_status_and_final_outcome(db, world, ap
     assert after["brief_status"] == "sent" and after["final_outcome"] == "hired"
 
 
-def test_an_anonymized_application_answers_404_for_both_reads_and_the_detail_stays_up(db, world, api):
+def test_an_anonymized_application_answers_404_for_both_reads_and_the_detail(db, world, api):
     application = make_app(db, world)
     send_brief(api, world, application)
     submit_card(api, world, application)
@@ -540,9 +540,7 @@ def test_an_anonymized_application_answers_404_for_both_reads_and_the_detail_sta
     retention.anonymize_application(db, db.get(Application, application.id))
     assert api.get(brief_url(world, application), headers=hr(world)).status_code == 404
     assert api.get(card_url(world, application), headers=hr(world)).status_code == 404
-    detail = api.get(url(world, f"/applications/{application.id}"), headers=hr(world))
-    assert detail.status_code == 200
-    assert detail.json()["brief_status"] is None
+    assert api.get(url(world, f"/applications/{application.id}"), headers=hr(world)).status_code == 404
 
 
 def second_manager(db, world):

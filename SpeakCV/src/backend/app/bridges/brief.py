@@ -14,10 +14,11 @@ from app.brain.audience import department_subtree
 from app.brain.prompting import as_data
 from app.brain.text import quote_in
 from app.database.sql_models import (
-    CandidateBrief, CompanyMember, CvClaim, InterviewScorecard, Job, JobRequirement, RequirementResult, VoiceSession,
+    Application, CandidateBrief, CompanyMember, CvClaim, InterviewScorecard, Job, JobRequirement, RequirementResult, VoiceSession,
     VoiceTurn,
 )
 from app.hiring import audit, notify
+from app.hiring.state import CONSENT_WITHDRAWN
 
 PROMPT_VERSION = "candidate-brief-1"
 MAX_OUTPUT_TOKENS = 3000
@@ -194,6 +195,7 @@ def generate(db, application, reviewer_id, language: str = DEFAULT_LANGUAGE) -> 
     if row is not None and row.status == "sent":
         raise BriefError(409, "This brief was already sent")
     evidence = collect_evidence(db, application)
+    had_withdrawn = application.analysis_status == CONSENT_WITHDRAWN  # then the evidence holds nothing from the interview
     provider = model = None
     if not evidence:
         content = _empty(language)
@@ -203,6 +205,16 @@ def generate(db, application, reviewer_id, language: str = DEFAULT_LANGUAGE) -> 
             [{"role": "user", "content": _prompt(evidence, language)}], BriefOutput, MAX_OUTPUT_TOKENS,
             "candidate_brief", application.company_id,
         )
+        # Withdrawn consent or a deletion during the call: nothing drawn from this evidence is written.
+        locked = (
+            db.query(Application).filter(Application.id == application.id)
+            .populate_existing().with_for_update().first()
+        )
+        if (
+            locked is None or locked.anonymized_at is not None
+            or (locked.analysis_status == CONSENT_WITHDRAWN and not had_withdrawn)
+        ):
+            raise BriefError(409, "This application changed while the brief was being written. Please try again.")
         out = response.value
         content = assemble(
             evidence,

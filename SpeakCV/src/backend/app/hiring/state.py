@@ -16,6 +16,8 @@ TRANSITIONS = {
 }
 # `analysis_status` when there was nothing to analyse: the candidate said nothing.
 NOT_TAKEN = "not_taken"
+# `analysis_status` once the candidate withdrew recording consent: nothing said is kept, and none of it is analysed.
+CONSENT_WITHDRAWN = "consent_withdrawn"
 
 
 class InvalidTransition(ValueError):

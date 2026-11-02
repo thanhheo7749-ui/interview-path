@@ -10,6 +10,7 @@ from app.auth.dependencies import require_member
 from app.database.database import get_db
 from app.database.sql_models import Application, CompanyMember, Job, VoiceSession, VoiceTurn
 from app.hiring import analysis, audit, board, decisions
+from app.hiring.state import CONSENT_WITHDRAWN
 
 router = APIRouter()
 
@@ -51,6 +52,14 @@ def _application(db: Session, company_id: int, application_id: int, lock: bool =
     return application
 
 
+def _live_application(db: Session, company_id: int, application_id: int) -> Application:
+    """Once deleted, nothing of it is served, whatever a row still holds."""
+    application = _application(db, company_id, application_id)
+    if application.anonymized_at is not None:
+        raise HTTPException(status_code=404, detail="Application not found")
+    return application
+
+
 def _translate(error: decisions.DecisionError) -> HTTPException:
     return HTTPException(status_code=error.status_code, detail=error.detail)
 
@@ -67,7 +76,7 @@ def get_board(company_id: int, job_id: int, member: CompanyMember = Depends(requ
 @router.get(BASE + "/applications/{app_id}")
 def get_application(company_id: int, app_id: int, member: CompanyMember = Depends(require_member("hr")),
                     db: Session = Depends(get_db)):
-    return board.detail(db, _application(db, company_id, app_id))
+    return board.detail(db, _live_application(db, company_id, app_id), viewer_id=member.user_id)
 
 
 @router.post(BASE + "/applications/{app_id}/decision")
@@ -161,6 +170,9 @@ def post_bulk_reject(company_id: int, job_id: int, body: BulkIn,
     if len(rows) != len(ids):
         db.rollback()
         raise HTTPException(status_code=404, detail="Application not found")
+    if any(application.analysis_status == CONSENT_WITHDRAWN for application in rows):
+        db.rollback()
+        raise HTTPException(status_code=409, detail="A candidate who withdrew consent to recording is decided one at a time")
     try:
         for application in rows:
             decisions.decide(db, application, "rejected", member.user_id, body.reason)
@@ -177,6 +189,8 @@ def get_audio(company_id: int, app_id: int, position: int, member: CompanyMember
     from app.hiring import recordings  # Task 5 owns this module
 
     application = _application(db, company_id, app_id)
+    if application.anonymized_at is not None:
+        raise HTTPException(status_code=404, detail="Recording not found")
     turn = (
         db.query(VoiceTurn)
         .join(VoiceSession, VoiceSession.id == VoiceTurn.session_id)

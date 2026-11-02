@@ -6,10 +6,11 @@ from datetime import datetime, timezone
 
 from app.database.sql_models import Company, Job, VoiceSession
 from app.hiring import audit, notify
-from app.hiring.state import InvalidTransition, advance
+from app.hiring.state import CONSENT_WITHDRAWN, InvalidTransition, advance
 
 DECISIONS = ("approved", "rejected")
 CV_STATUSES = ("meets", "not_met")
+REVEAL_ACTION = "identity_revealed"
 
 # One plain message per decision and language. It names no reason, label or band.
 NOTIFICATIONS = {
@@ -102,7 +103,7 @@ def reveal(db, application, actor_user_id) -> dict:
     user = db.get(User, application.candidate_user_id) if application.candidate_user_id else None
     if user is None:
         raise DecisionError(404, "Identity is no longer available")
-    audit.record(db, application.company_id, actor_user_id, "identity_revealed", "application", application.id)
+    audit.record(db, application.company_id, actor_user_id, REVEAL_ACTION, "application", application.id)
     db.flush()
     return {"name": user.full_name, "email": user.email}
 
@@ -110,6 +111,8 @@ def reveal(db, application, actor_user_id) -> dict:
 def grant_restart(db, application, actor_user_id) -> None:
     """One restart per application. The old session and its audio stay as they are."""
     _check_not_anonymized(application)
+    if application.analysis_status == CONSENT_WITHDRAWN:
+        raise DecisionError(409, "The candidate withdrew consent to recording, so the interview cannot be restarted")
     if application.stage != "ready_for_hr" or application.hr_decision != "pending":
         raise DecisionError(409, "A restart can only be granted while the application awaits review")
     sessions = (

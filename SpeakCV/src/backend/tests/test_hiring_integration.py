@@ -355,15 +355,11 @@ def test_an_anonymized_interview_in_progress_leaves_no_lane_behind(client, quiet
     assert body["lanes"]["not_interviewed"] == []
 
 
-def test_the_detail_route_shows_an_anonymized_application_as_empty(client, quiet_client, db, world):
+def test_the_detail_route_refuses_an_anonymized_application(client, quiet_client, db, world):
     anonymized_with_session(client, db, world)
     response = quiet_client.get(hr_url(world, f"/applications/{world.application_id}"), headers=auth_header(HR))
-    assert response.status_code == 200, response.text
-    body = response.json()
-    assert body["anonymized"] is True
-    assert body["cv_text_blind"] is None and body["suggestion"] is None
+    assert response.status_code == 404, response.text
     assert ANSWER not in response.text
-    assert all(turn["transcript"] is None and turn["has_audio"] is False for turn in body["transcript"])
 
 
 def test_a_live_application_is_marked_as_not_anonymized(client, world):
@@ -858,7 +854,12 @@ def test_a_candidate_lists_their_own_consents_with_the_job_title(client, db, wor
     db.add(Consent(user_id=other_user.id, company_id=world.company_id, application_id=world.application_id,
                    purpose="cv_processing", text_version="v0", language="en"))
     db.commit()
-    assert start(client, world, language="vi").status_code == 200
+    shown = client.get(f"/api/applications/{world.application_id}/consents/recording_screening?language=vi",
+                       headers=auth_header(CANDIDATE)).json()
+    response = client.post(f"/api/screening/{world.application_id}/start", headers=auth_header(CANDIDATE), json={
+        "consent_version": shown["version"], "language": "vi", "consent_language": shown["language"],
+    })
+    assert response.status_code == 200
 
     response = client.get("/api/me/consents", headers=auth_header(CANDIDATE))
     assert response.status_code == 200, response.text

@@ -1106,3 +1106,31 @@ def test_only_the_masking_module_reads_raw_text_before_it_is_stored():
     root = Path(__file__).resolve().parents[1] / "app"
     assert "cv_text_raw" not in (root / "hiring/screening.py").read_text(encoding="utf-8")
     assert "cv_text_raw" not in (root / "hiring/fake_demo.py").read_text(encoding="utf-8")
+
+
+# Deleting does not reset the limit (I-11)
+
+
+def _with_session(db, application_id):
+    from app.database.sql_models import VoiceSession
+
+    application = db.get(Application, application_id)
+    db.add(VoiceSession(company_id=application.company_id, purpose="screening", application_id=application_id,
+                        owner_user_id=application.candidate_user_id, language="en", status="completed"))
+    db.commit()
+
+
+def test_deleting_after_a_session_does_not_reset_the_limit(client, world, db):
+    first = apply(client).json()["id"]
+    _with_session(db, first)
+    assert client.delete(f"/api/me/applications/{first}", headers=auth_header(CANDIDATE)).status_code == 204
+    again = apply(client)
+    assert again.status_code == 409
+    assert again.json()["detail"]["reapply_after"]
+
+
+def test_deleting_before_any_session_or_decision_leaves_the_job_open(client, world, db):
+    first = apply(client).json()["id"]
+    db.rollback()
+    assert client.delete(f"/api/me/applications/{first}", headers=auth_header(CANDIDATE)).status_code == 204
+    assert apply(client).status_code == 201

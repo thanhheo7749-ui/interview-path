@@ -38,6 +38,7 @@ FIT_WORDS = {"met": "matches", "partial": "partly", "not_found": "not_seen"}
 FIT_NOT_READY = {"submitted", "cv_processing", "cv_failed"}
 STYLE_TYPES = ("value", "behavior")
 NOT_FOUND = "Application not found"
+CV_CONSENT = "cv_processing"
 
 
 class ApplicationOut(BaseModel):
@@ -79,6 +80,7 @@ class WithdrawIn(BaseModel):
 class ConsentOut(BaseModel):
     purpose: str
     version: str
+    language: str  # of the text returned, which is what the ledger records
     text: str
 
 
@@ -110,7 +112,11 @@ def _not_found() -> HTTPException:
 
 
 def _owned(db: Session, user: User, application_id: int, lock: bool = False) -> Application:
-    query = db.query(Application).filter(Application.id == application_id, Application.candidate_user_id == user.id)
+    return _owned_by(db, user.id, application_id, lock)
+
+
+def _owned_by(db: Session, user_id: int, application_id: int, lock: bool = False) -> Application:
+    query = db.query(Application).filter(Application.id == application_id, Application.candidate_user_id == user_id)
     if lock:  # a locking read returns the latest committed row, not this request's earlier snapshot
         query = query.populate_existing().with_for_update()
     application = query.first()
@@ -233,14 +239,29 @@ def withdraw(
     return _out(db, application)
 
 
+def _cv_consent_withdrawn() -> HTTPException:
+    return HTTPException(status_code=409, detail={
+        "code": consents.CV_CONSENT_WITHDRAWN, "message": "You withdrew consent to CV processing for this application.",
+    })
+
+
 def _check_can_reupload(db: Session, user: User, application_id: int) -> None:
-    if _owned(db, user, application_id).stage != "cv_failed":
+    application = _owned(db, user, application_id)
+    if consents.was_withdrawn(db, application.id, CV_CONSENT):
+        raise _cv_consent_withdrawn()
+    if application.stage != "cv_failed":
         raise HTTPException(status_code=409, detail="This application is not waiting for a new CV")
 
 
 def _replace_cv(db: Session, user: User, application_id: int, data: bytes, suffix: str) -> ApplicationOut:
     _ensure_fits(data, suffix)
-    application = _owned(db, user, application_id, lock=True)
+    user_id = user.id
+    # The upload took a while. The rollback ends this request's snapshot and the lock comes first in the new transaction,
+    # so the read of the consent below sees a withdrawal committed in the meantime.
+    db.rollback()
+    application = _owned_by(db, user_id, application_id, lock=True)
+    if consents.was_withdrawn(db, application_id, CV_CONSENT):
+        raise _cv_consent_withdrawn()
     if application.stage != "cv_failed":
         raise HTTPException(status_code=409, detail="This application is not waiting for a new CV")
     old_path = application.cv_file_path
@@ -313,4 +334,21 @@ def consent_text(
             raise HTTPException(status_code=404, detail="Consent text not found")
         retention_days = company.retention_days
     current = consents.current_text(purpose, language, retention_days=retention_days)
-    return ConsentOut(purpose=purpose, version=current.version, text=current.text)
+    return ConsentOut(purpose=purpose, version=current.version, language=current.language, text=current.text)
+
+
+@router.get("/api/applications/{application_id}/consents/{purpose}", response_model=ConsentOut)
+def application_consent_text(
+    application_id: int,
+    purpose: str,
+    language: str = Query("en", max_length=10),
+    user: User = Depends(get_authenticated_user),
+    db: Session = Depends(get_db),
+):
+    """The text this candidate agrees to: with this company's retention period, in the language it says it is in."""
+    application = _owned(db, user, application_id)
+    if purpose not in consents.PURPOSES:
+        raise HTTPException(status_code=404, detail="Consent text not found")
+    company = db.get(Company, application.company_id)
+    current = consents.current_text(purpose, language, retention_days=company.retention_days)
+    return ConsentOut(purpose=purpose, version=current.version, language=current.language, text=current.text)

@@ -5,12 +5,13 @@ from datetime import datetime, timedelta, timezone
 import pytest
 from fastapi.testclient import TestClient
 
-from app.database.sql_models import Application, AuditLog, CultureNote, RequirementResult
+from app.database.sql_models import Application, AuditLog, CompanyMember, CultureNote, RequirementResult
 from app.hiring import board
 from app.main import create_app
 from tests.helpers_board import (
     CANDIDATE_EMAIL, CANDIDATE_NAME, CONFIDENTIAL, CV_RAW, add_claims, make_application, make_session, make_world,
 )
+from tests.helpers import auth_header, make_user
 
 
 @pytest.fixture
@@ -262,3 +263,107 @@ def test_board_module_does_not_reference_raw_cv_text():
     import inspect
     assert "cv_text_raw" not in inspect.getsource(board)
     assert types.ModuleType  # keep import used
+
+
+# Before a reveal, what the candidate said reaches HR masked (I-13)
+
+
+SPOKEN = f"My name is {CANDIDATE_NAME}, call me on 0901234567 or at canary.candidate@example.test. I built billing."
+PLAIN_QUOTE = "I built billing."
+IDENTIFYING_QUOTE = "call me on 0901234567"
+
+
+def _spoken_world(db, world):
+    application = make_application(db, world["job"], "#A1", cv_status="meets", band="many", ai_suggestion="Ask Nguyen about 0901234567")
+    _, turns = make_session(db, application, [(1, "Tell me about Nguyen?", SPOKEN, None)])
+    db.add_all([
+        RequirementResult(application_id=application.id, requirement_id=world["requirements"][0].id, source="interview",
+                          status="evidence", quote=PLAIN_QUOTE, voice_turn_id=turns[0].id),
+        CultureNote(application_id=application.id, value_node_id=world["value"].id, note="Nguyen is candid",
+                    quote=IDENTIFYING_QUOTE, voice_turn_id=turns[0].id),
+    ])
+    claim = add_claims(db, application, ["A claim"])[0]
+    claim.status, claim.evidence_quote, claim.voice_turn_id = "explained", "0901234", turns[0].id  # cuts the number in half
+    db.commit()
+    return application
+
+
+def _detail(api, world, application, headers=None):
+    response = api.get(url(world, f"/applications/{application.id}"), headers=headers or hr(world))
+    assert response.status_code == 200, response.text
+    return response
+
+
+def test_before_a_reveal_transcripts_and_quotes_are_masked(api, db, world):
+    application = _spoken_world(db, world)
+    response = _detail(api, world, application)
+    for secret in ("0901234567", "canary.candidate", "Nguyen", "Canary Candidate"):
+        assert secret not in response.text, secret
+    body = response.json()
+    assert body["identity_masked"] is True
+    assert "[NAME]" in body["transcript"][0]["transcript"] and "[ID]" in body["transcript"][0]["transcript"]
+    assert body["suggestion"]["text"] == "Ask [NAME] about [ID]"
+
+
+def test_a_masked_quote_still_matches_the_masked_transcript(api, db, world):
+    application = _spoken_world(db, world)
+    body = _detail(api, world, application).json()
+    transcript = body["transcript"][0]["transcript"]
+    interview = next(item["interview"] for item in body["requirements"] if item["interview"])
+    assert interview["quote"] == PLAIN_QUOTE and interview["quote"] in transcript
+    culture_quote = body["culture_notes"][0]["quote"]
+    assert culture_quote == "call me on [ID]" and culture_quote in transcript
+
+
+def test_a_quote_that_cannot_match_after_masking_is_not_shown(api, db, world):
+    """The AI cut the phone number in half. Masking it alone would leave digits next to a transcript showing [ID]."""
+    application = _spoken_world(db, world)
+    response = _detail(api, world, application)
+    claim = response.json()["claims"][0]
+    assert claim["evidence_quote"] is None and claim["position"] == 1
+    assert "0901234" not in response.text
+
+
+def test_after_a_logged_reveal_this_member_reads_the_raw_text(api, db, world):
+    application = _spoken_world(db, world)
+    assert api.post(url(world, f"/applications/{application.id}/reveal"), headers=hr(world)).status_code == 200
+    body = _detail(api, world, application).json()
+    assert body["identity_masked"] is False
+    assert body["transcript"][0]["transcript"] == SPOKEN
+    assert body["culture_notes"][0]["quote"] == IDENTIFYING_QUOTE
+    assert body["claims"][0]["evidence_quote"] == "0901234"
+    db.rollback()
+    assert db.query(AuditLog).filter_by(action="identity_revealed", target_id=application.id).count() == 1
+
+
+def test_another_hr_member_stays_masked_until_they_reveal_too(api, db, world):
+    application = _spoken_world(db, world)
+    second = make_user(db, "second-hr@example.test")
+    db.add(CompanyMember(company_id=world["company"].id, user_id=second.id, role="hr"))
+    db.commit()
+    assert api.post(url(world, f"/applications/{application.id}/reveal"), headers=hr(world)).status_code == 200
+    body = _detail(api, world, application, headers=auth_header("second-hr@example.test")).json()
+    assert body["identity_masked"] is True
+    assert "0901234567" not in body["transcript"][0]["transcript"]
+
+
+def test_a_reveal_of_another_application_does_not_count(api, db, world):
+    application = _spoken_world(db, world)
+    other = make_application(db, world["job"], "#A2", cv_status="meets", band="many")
+    assert api.post(url(world, f"/applications/{other.id}/reveal"), headers=hr(world)).status_code == 200
+    assert _detail(api, world, application).json()["identity_masked"] is True
+
+
+def test_the_hr_audio_and_detail_routes_refuse_an_anonymized_application(api, db, world, tmp_path, monkeypatch):
+    from app.hiring import recordings
+
+    monkeypatch.setenv("RECORDINGS_DIR", str(tmp_path))
+    application = make_application(db, world["job"], "#A1", cv_status="meets", band="many")
+    path = recordings.save_turn_audio(world["company"].id, application.id, 1, b"a late answer", ".webm")
+    make_session(db, application, [(1, "q", "t", path)])
+    application_url = url(world, f"/applications/{application.id}")
+    assert api.get(f"{application_url}/turns/1/audio", headers=hr(world)).status_code == 200
+    db.query(Application).filter_by(id=application.id).update({"anonymized_at": datetime.now(timezone.utc)})
+    db.commit()
+    assert api.get(application_url, headers=hr(world)).status_code == 404
+    assert api.get(f"{application_url}/turns/1/audio", headers=hr(world)).status_code == 404
