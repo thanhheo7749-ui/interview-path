@@ -40,5 +40,18 @@ def _analysis_with_quotes(_system, messages, _schema) -> str:
     })
 
 
+UNCHECKED_MARKER = "UNCHECKEDCANARY"
+
+
+def _classifier_down_for_marker(_system, messages, _schema) -> str:
+    """The demo classifier never flags anything. A statement with the marker gets an answer that is not valid output,
+    which is what a failing classifier looks like: the guard then records the text as "unchecked"."""
+    # A retry appends a message, so look at all of them.
+    if any(UNCHECKED_MARKER in message["content"] for message in messages):
+        return "the classifier is down"
+    return json.dumps({"flagged": False, "category": "age", "reason": ""})
+
+
 fake.register("session_analysis", _analysis_with_quotes)
+fake.register("discrimination_check", _classifier_down_for_marker)
 uvicorn.run(app, port=int(sys.argv[1]))

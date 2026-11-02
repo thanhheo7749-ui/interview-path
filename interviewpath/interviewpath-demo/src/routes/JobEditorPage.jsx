@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useCompany } from '../company/CompanyContext.jsx';
 import ChannelLinks from '../components/ChannelLinks.jsx';
-import { ErrorAlert, cardClass, inputClass, primaryButton, secondaryButton } from '../components/KbFeedback.jsx';
+import { ErrorAlert, WarningList, cardClass, inputClass, primaryButton, secondaryButton } from '../components/KbFeedback.jsx';
 import { api } from '../lib/api.js';
 import {
   DEFAULT_CHANNELS, INTERVIEW_LANGUAGES, REQUIREMENT_VISIBILITIES, addChannels, closeJob, createJob, getJob, getPrefill,
@@ -41,6 +41,8 @@ function JobEditor() {
   const [error, setError] = useState(location.state?.error ?? '');
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState(false);
+  // Texts the automatic discrimination check could not look at: saved, but HR should read them.
+  const [warnings, setWarnings] = useState(location.state?.warnings ?? []);
 
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -154,23 +156,27 @@ function JobEditor() {
     }
     setError('');
     setSaved(false);
+    setWarnings([]);
     setBusy(true);
     let stored = null;
+    let found = [];
     try {
       stored = await persist();
+      found = stored.warnings ?? [];
       if (publish) {
         stored = await publishJob(companyId, stored.id);
         await addChannels(companyId, stored.id, DEFAULT_CHANNELS);
         stored = await getJob(companyId, stored.id);
       }
       if (isNew) {
-        navigate(`/jobs/${stored.id}`, { replace: true });
+        navigate(`/jobs/${stored.id}`, { replace: true, state: { warnings: found } });
       } else {
         applyJob(stored);
+        setWarnings(found);
         setSaved(true);
       }
     } catch (err) {
-      if (isNew && stored) navigate(`/jobs/${stored.id}`, { replace: true, state: { error: err.message } });
+      if (isNew && stored) navigate(`/jobs/${stored.id}`, { replace: true, state: { error: err.message, warnings: found } });
       else setError(err.message);
     } finally {
       setBusy(false);
@@ -219,6 +225,7 @@ function JobEditor() {
         )}
       </div>
       <ErrorAlert message={error} />
+      <WarningList warnings={warnings} onDismiss={() => setWarnings([])} />
       {saved && (
         <p role="status" className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-900">
           {t('jobs.saved')}

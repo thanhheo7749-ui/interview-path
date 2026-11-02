@@ -1,9 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useCompany } from '../company/CompanyContext.jsx';
-import { EmptyState, ErrorAlert, cardClass, inputClass, primaryButton } from '../components/KbFeedback.jsx';
-import { createHiringRequest, listDepartments, listHiringRequests, listMembers } from '../lib/bridges.js';
+import { EmptyState, ErrorAlert, cardClass, inputClass, primaryButton, secondaryButton } from '../components/KbFeedback.jsx';
+import {
+  createHiringRequest, generateDraft, listDepartments, listHiringRequests, listMembers, rememberDraft, rememberedDraft,
+} from '../lib/bridges.js';
+import { listRoleOptions } from '../lib/jobs.js';
 
 const INTAKE_OPEN = ['open', 'intake_in_progress'];
 
@@ -92,6 +95,58 @@ function CreateForm({ companyId, onCreated }) {
   );
 }
 
+// HR makes the first job description draft of a request from the company knowledge, optionally around one role.
+function DraftActions({ companyId, request, roles }) {
+  const { t } = useTranslation();
+  const navigate = useNavigate();
+  const [roleId, setRoleId] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const existing = rememberedDraft(companyId, request.id);
+
+  const generate = async () => {
+    setError('');
+    setBusy(true);
+    try {
+      const draft = await generateDraft(companyId, request.id, roleId === '' ? null : Number(roleId));
+      rememberDraft(companyId, request.id, draft.id);
+      navigate(`/jd-studio/${draft.id}`);
+    } catch (err) {
+      setError(err.message);
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="space-y-2">
+      <div className="flex flex-wrap items-center gap-2">
+        <select
+          aria-label={`${t('bridges.requests.roleLabel')}: ${request.title}`}
+          value={roleId}
+          onChange={(e) => setRoleId(e.target.value)}
+          className={inputClass}
+        >
+          <option value="">{t('bridges.requests.anyRole')}</option>
+          {roles.map((r) => (
+            <option key={r.id} value={r.id}>
+              {r.title}
+            </option>
+          ))}
+        </select>
+        <button type="button" disabled={busy} onClick={generate} className={primaryButton}>
+          {t('bridges.requests.generateDraft')}
+        </button>
+        {existing && (
+          <Link to={`/jd-studio/${existing}`} className={secondaryButton}>
+            {t('bridges.requests.openDraft')}
+          </Link>
+        )}
+      </div>
+      <ErrorAlert message={error} />
+    </div>
+  );
+}
+
 function HiringRequestsPage() {
   const { t } = useTranslation();
   const { membership } = useCompany();
@@ -100,6 +155,7 @@ function HiringRequestsPage() {
   const [requests, setRequests] = useState(null);
   const [error, setError] = useState('');
   const [version, setVersion] = useState(0);
+  const [roles, setRoles] = useState([]);
   const reload = useCallback(() => setVersion((v) => v + 1), []);
 
   useEffect(() => {
@@ -117,6 +173,19 @@ function HiringRequestsPage() {
     };
   }, [companyId, version]);
 
+  useEffect(() => {
+    if (companyId == null || !isHr) return undefined;
+    let cancelled = false;
+    listRoleOptions(companyId)
+      .then((data) => {
+        if (!cancelled) setRoles(data);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [companyId, isHr]);
+
   return (
     <div className="space-y-6 p-8">
       <h1 className="text-2xl font-extrabold tracking-tight">{t('bridges.requests.title')}</h1>
@@ -133,6 +202,7 @@ function HiringRequestsPage() {
                   {t(`bridges.requests.status.${request.status}`, { defaultValue: request.status })}
                 </p>
               </div>
+              {isHr && <DraftActions companyId={companyId} request={request} roles={roles} />}
               {!isHr && INTAKE_OPEN.includes(request.status) && (
                 <Link to={`/intake/${request.id}`} className={primaryButton}>
                   {request.status === 'intake_in_progress' ? t('bridges.requests.resumeIntake') : t('bridges.requests.startIntake')}

@@ -2,13 +2,19 @@ import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useCompany } from '../company/CompanyContext.jsx';
 import {
-  EmptyState, ErrorAlert, WarningList, cardClass, inputClass, primaryButton, secondaryButton,
+  ConfirmBar, EmptyState, ErrorAlert, WarningList, cardClass, inputClass, primaryButton, secondaryButton,
 } from '../components/KbFeedback.jsx';
 import { decideReview, getReviewQueue, notifyKbChanged, uniqueSources } from '../lib/kb.js';
 
 const VISIBILITIES = ['public', 'internal', 'confidential'];
 
 const isFact = (node) => Boolean(node.fact_kind) && node.fact_kind !== 'none';
+
+// The discrimination guard. A flagged item can only be rejected or rewritten; one the check could not look at
+// ("unchecked") can be accepted after HR confirms that they read it.
+const UNCHECKED = 'unchecked';
+const isHeld = (node) => Boolean(node.guard_category);
+const isUnchecked = (node) => node.guard_category === UNCHECKED;
 
 function groupByDocument(nodes) {
   const groups = new Map();
@@ -29,6 +35,7 @@ function ReviewPage() {
   const [error, setError] = useState('');
   const [warnings, setWarnings] = useState([]);
   const [busy, setBusy] = useState(false);
+  const [confirming, setConfirming] = useState(null);
 
   const load = useCallback(async () => {
     const data = await getReviewQueue(companyId);
@@ -69,8 +76,13 @@ function ReviewPage() {
     }
   };
 
-  const accept = (node) => ({
+  const rewritten = (node) => valueOf(node, 'title') !== node.title || valueOf(node, 'body') !== node.body;
+  // A flagged item stays blocked until its text is rewritten; the server checks the new text again.
+  const blocked = (node) => isHeld(node) && !isUnchecked(node) && !rewritten(node);
+
+  const accept = (node, confirmUnchecked = false) => ({
     action: 'accept',
+    ...(confirmUnchecked ? { confirm_unchecked: true } : {}),
     node_id: node.id,
     title: valueOf(node, 'title'),
     body: valueOf(node, 'body'),
@@ -95,7 +107,7 @@ function ReviewPage() {
         <section key={group.name} className={`${cardClass} space-y-4`}>
           <div className="flex flex-wrap items-center justify-between gap-3">
             <h2 className="text-lg font-extrabold tracking-tight">{group.name || t('review.unknownDocument')}</h2>
-            <button type="button" disabled={busy} onClick={() => decide(group.items.map(accept))} className={primaryButton}>
+            <button type="button" disabled={busy || group.items.every(isHeld)} onClick={() => decide(group.items.filter((node) => !isHeld(node)).map((node) => accept(node)))} className={primaryButton}>
               {t('review.acceptAll')}
             </button>
           </div>
@@ -186,6 +198,21 @@ function ReviewPage() {
                     </footer>
                   </blockquote>
                 ))}
+                {isHeld(node) && (
+                  <div
+                    role="note"
+                    data-testid={isUnchecked(node) ? 'guard-unchecked' : 'guard-flagged'}
+                    className={`space-y-1 rounded-xl border px-3 py-2 text-sm ${isUnchecked(node) ? 'border-amber-200 bg-amber-50 text-amber-900' : 'border-red-200 bg-red-50 text-red-900'}`}
+                  >
+                    <p className="font-bold">
+                      {isUnchecked(node)
+                        ? t('review.guard.uncheckedTitle')
+                        : t('review.guard.flaggedTitle', { category: t(`review.guard.categories.${node.guard_category}`, { defaultValue: node.guard_category }) })}
+                    </p>
+                    <p data-testid="guard-reason">{node.guard_reason}</p>
+                    <p>{isUnchecked(node) ? t('review.guard.uncheckedHint') : t('review.guard.flaggedHint')}</p>
+                  </div>
+                )}
                 {proposal && (
                   <div className="flex flex-wrap items-center gap-3 rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-900">
                     <p>
@@ -202,7 +229,12 @@ function ReviewPage() {
                   </div>
                 )}
                 <div className="flex gap-3">
-                  <button type="button" disabled={busy} onClick={() => decide([accept(node)])} className={primaryButton}>
+                  <button
+                    type="button"
+                    disabled={busy || blocked(node)}
+                    onClick={() => (isUnchecked(node) && !rewritten(node) ? setConfirming(node.id) : decide([accept(node)]))}
+                    className={primaryButton}
+                  >
                     {t('review.accept')}
                   </button>
                   <button
@@ -214,6 +246,18 @@ function ReviewPage() {
                     {t('review.reject')}
                   </button>
                 </div>
+                {confirming === node.id && (
+                  <ConfirmBar
+                    message={t('review.guard.confirmMessage')}
+                    confirmLabel={t('review.guard.confirm')}
+                    busy={busy}
+                    onConfirm={async () => {
+                      await decide([accept(node, true)]);
+                      setConfirming(null);
+                    }}
+                    onCancel={() => setConfirming(null)}
+                  />
+                )}
               </article>
             );
           })}

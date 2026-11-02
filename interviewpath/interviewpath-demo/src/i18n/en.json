@@ -187,7 +187,24 @@
     "factValue": "Fact value",
     "factUnit": "Fact unit",
     "factScope": "Applies to",
-    "effective": "effective {{date}}"
+    "effective": "effective {{date}}",
+    "guard": {
+      "uncheckedTitle": "The automatic discrimination check did not run",
+      "flaggedTitle": "Blocked: asks for a protected trait ({{category}})",
+      "uncheckedHint": "Read this item yourself. If it is fine, accept it and confirm that you reviewed it.",
+      "flaggedHint": "This item cannot be accepted as it is. Reject it, or rewrite the title or body so that it does not ask for a protected trait.",
+      "confirmMessage": "Confirm that you read this item and it does not ask for a protected trait.",
+      "confirm": "I reviewed it, accept",
+      "categories": {
+        "age": "age",
+        "gender": "gender",
+        "marital_status": "marital status",
+        "appearance": "appearance",
+        "region": "region",
+        "religion": "religion",
+        "ethnicity": "ethnicity"
+      }
+    }
   },
   "conflicts": {
     "title": "Conflicts",
@@ -630,7 +647,11 @@
         "drafting": "Drafting the job description",
         "published": "Published",
         "cancelled": "Cancelled"
-      }
+      },
+      "roleLabel": "Role to write about",
+      "anyRole": "No specific role",
+      "generateDraft": "Generate draft",
+      "openDraft": "Open draft"
     },
     "intake": {
       "title": "Manager intake",
@@ -766,5 +787,106 @@
       "confirmButton": "Yes, record it",
       "recorded": "Recorded: {{outcome}}"
     }
+  },
+  "jd": {
+    "title": "JD Studio",
+    "back": "Back to hiring requests",
+    "version": "Version {{version}}",
+    "status": {
+      "draft": "Draft",
+      "manager_review": "Waiting for the manager",
+      "approved": "Approved",
+      "published": "Published"
+    },
+    "hint": {
+      "draft": "Edit the lines or ask the assistant, then submit the draft to the manager.",
+      "draftManager": "HR is still editing this draft. You will be able to approve it once HR submits it.",
+      "manager_review": "Submitted. Waiting for the manager to read and approve it.",
+      "manager_reviewManager": "Read the description in your language. Approve it if it is right.",
+      "approved": "The manager approved this version. HR can publish it.",
+      "approvedManager": "You approved this version. HR can publish it.",
+      "published": "This description is published. Editing it again needs a new approval.",
+      "publishedManager": "This description is published.",
+      "blocked": "Fix what blocks the draft, or complete the missing languages, before you submit it."
+    },
+    "submit": "Submit to manager",
+    "publish": "Publish",
+    "approve": "Approve",
+    "lines": "Description lines",
+    "languageTabs": "Language of the description",
+    "incomplete": "These languages are not complete: {{languages}}.",
+    "rejected": "{{count}} generated line(s) were left out because the knowledge graph does not support them.",
+    "noLines": "This draft has no lines yet.",
+    "lineText": "Text of line {{number}}",
+    "emptyInLanguage": "(nothing written in this language)",
+    "sourceNode": "Source #{{id}}",
+    "unsourced": "No source",
+    "confirmedByHr": "Confirmed by HR",
+    "mustHave": "Must-have",
+    "requirement": "Requirement",
+    "edit": "Edit",
+    "editLine": "Edit line {{number}}",
+    "confirmLine": "Confirm line {{number}} without a source",
+    "confirmLineShort": "Confirm",
+    "removeLine": "Remove line {{number}}",
+    "assistant": {
+      "title": "Assistant",
+      "hint": "Ask for a change in wording, length or tone. The assistant never adds a salary, benefit or requirement the knowledge graph does not hold; it proposes it and you decide.",
+      "empty": "No messages yet.",
+      "role": {
+        "user": "You",
+        "assistant": "Assistant"
+      },
+      "proposed": "Proposed line, not in the draft yet",
+      "confirm": "Confirm",
+      "dismiss": "Dismiss",
+      "input": "Message to the assistant",
+      "placeholder": "For example: make it shorter",
+      "send": "Send"
+    },
+    "lint": {
+      "title": "Checks",
+      "rerun": "Run checks again",
+      "clear": "No issues found.",
+      "blocking": "Blocks publishing",
+      "warning": "Warning",
+      "line": "line {{number}}",
+      "differentScope": "This is a different scope",
+      "acknowledge": "Acknowledge: the check could not run",
+      "checks": {
+        "discrimination": "Discrimination",
+        "no_source": "No source",
+        "conflict": "Conflicts with a company fact",
+        "unchecked": "Check could not run",
+        "must_have_count": "Many must-haves"
+      }
+    },
+    "channels": {
+      "title": "Channel content",
+      "manualNotice": "Copy and post by hand. This system does not post to job boards.",
+      "generate": "Generate channel content",
+      "names": {
+        "linkedin": "LinkedIn",
+        "facebook": "Facebook",
+        "itviec": "ITviec",
+        "topcv": "TopCV",
+        "university_email": "University email",
+        "university_post": "University post"
+      },
+      "languages": {
+        "en": "English",
+        "vi": "Vietnamese",
+        "ko": "Korean"
+      },
+      "language": "Written in {{language}}",
+      "copyLink": "Copy link {{channel}}",
+      "copyLinkShort": "Copy link",
+      "copyText": "Copy text {{channel}}",
+      "copyTextShort": "Copy text",
+      "copied": "Copied",
+      "copyFailed": "Could not copy. Select the text and copy it by hand."
+    },
+    "isRequirementLine": "Line {{number}} is a requirement",
+    "isMustHaveLine": "Line {{number}} is a must-have"
   }
 }
