@@ -151,6 +151,10 @@ def registered_terms(full_name: str | None, email: str | None) -> list[str]:
     return list(dict.fromkeys(term for term in found if len(term) >= _MIN_TERM_LENGTH))
 
 
+def hash_of(blind_text: str) -> str:
+    return hashlib.sha256(blind_text.encode("utf-8")).hexdigest()
+
+
 def mask(raw_text: str, *, company_id: int, known_terms: list[str] = ()) -> MaskResult:
     masked = regex_mask(raw_text)
     prompt = f"List the identifying details in this CV.\n\n{cv_section(masked)}"
@@ -161,4 +165,4 @@ def mask(raw_text: str, *, company_id: int, known_terms: list[str] = ()) -> Mask
     blind = _collapse(apply_terms(masked, {
         _NAME: [*found.names, *known_terms], "[GENDER]": found.gender_terms, "[AGE]": found.ages, "[ADDRESS]": found.addresses,
     }))
-    return MaskResult(blind_text=blind, blind_hash=hashlib.sha256(blind.encode("utf-8")).hexdigest())
+    return MaskResult(blind_text=blind, blind_hash=hash_of(blind))

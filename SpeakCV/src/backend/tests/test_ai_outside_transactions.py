@@ -18,9 +18,13 @@ from app.brain import fake_demo, ingestion, seed
 from app.database.database import Base, SessionLocal, engine
 from app.database.sql_models import (
     AIUsageLog, AuditLog, ChannelContent, Company, CompanyMember, Job, JobChannelLink, JobDraft, JobDraftMessage,
-    JobRequirement, KbChunk, KbDocument, KbNode,
+    JobRequirement, KbChunk, KbDocument, KbNode, User,
 )
+from app.hiring import consents, cv_processing
+from app.hiring import fake_demo as hiring_fake_demo
 from app.main import create_app
+from app.posthire import talent_pool
+from tests import helpers_board
 from tests.helpers import auth_header
 from tests.helpers_jd import ai_line, assistant_json, line, make_draft, make_world
 from tests.test_brain_ingestion import TEXT, TWO_CHUNKS, extraction, fact, real_extract
@@ -559,3 +563,56 @@ def test_seeding_a_sample_company(db, probe):
     assert db.query(Job).filter_by(status="published").count() == 1
     assert db.query(CompanyMember).count() > 0
     probe.assert_clean("kb_embed", "discrimination_check")
+
+
+# The talent pool
+
+
+def _pool_world(db):
+    hiring_fake_demo.install()
+    world = helpers_board.make_world(db)
+    application = helpers_board.make_application(db, world["job"], alias="#A1", hr_decision="rejected")
+    application.cv_text_blind = helpers_board.CV_BLIND
+    target = Job(company_id=world["company"].id, title="Platform", slug="platform", status="published", version=1,
+                 interview_languages=["en"])
+    db.add(target)
+    db.commit()
+    db.add(JobRequirement(company_id=target.company_id, job_id=target.id, text="FastAPI", must_have=True, position=0))
+    db.commit()
+    return application, target, world
+
+
+def _join_pool(db, application):
+    user = db.get(User, application.candidate_user_id)
+    talent_pool.give_consent(db, application, user, consents.VERSION)
+    return talent_pool.opt_in(db, application, user)
+
+
+def test_talent_pool_opt_in(db, probe):
+    application, _, _ = _pool_world(db)
+    probe.start()
+    entry = _join_pool(db, application)
+    assert entry.embedding is not None
+    probe.assert_clean("talent_pool_embed")
+
+
+def test_talent_pool_matches(db, probe):
+    application, target, world = _pool_world(db)
+    entry = _join_pool(db, application)
+    entry.embedding = None  # so matching embeds it as well
+    db.commit()
+    probe.start()
+    assert len(talent_pool.matches(db, world["company"].id, target.id)) == 1
+    probe.assert_clean("talent_pool_query", "talent_pool_embed", "cv_assess")
+
+
+def test_talent_pool_invitation_job(db, probe):
+    application, target, world = _pool_world(db)
+    entry = _join_pool(db, application)
+    invited = talent_pool.invite(db, entry, target, world["people"]["hr"]["id"])
+    invited_id = invited.id
+    probe.start()
+    cv_processing.run_from_blind_text(invited_id, helpers_board.CV_BLIND)
+    db.expire_all()
+    assert db.get(type(invited), invited_id).stage == "invited"
+    probe.assert_clean("cv_assess")

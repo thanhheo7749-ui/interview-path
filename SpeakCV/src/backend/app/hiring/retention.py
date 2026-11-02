@@ -82,7 +82,8 @@ KEPT = {
 
 
 def has_extension(db, application) -> bool:
-    """Whether a consent extends this application's retention. Block 5's talent pool and onboarding change this body."""
+    """Whether a consent extends this application's retention. The talent pool does not: its consent keeps a masked copy
+    on the entry, and audio and transcripts still go on time. See app.posthire.talent_pool."""
     return False
 
 
@@ -196,8 +197,20 @@ def _delete_files(cv_path: str | None, audio_paths: list[str]) -> None:
             recordings.delete(path)
 
 
-def anonymize_application(db, application, *, trigger: str = TRIGGER_RETENTION) -> None:
-    """Commits. Files go after the rows are flushed and before the commit: if a file cannot be deleted, the caller
+def _settle_talent_pool(db, application, user_id: int | None, trigger: str) -> None:
+    from app.posthire import talent_pool  # Imported here: talent_pool is built on this module.
+
+    talent_pool.on_application_anonymized(db, application, user_id, by_candidate=trigger == TRIGGER_CANDIDATE)
+
+
+def _expire_talent_pool(db) -> int:
+    from app.posthire import talent_pool
+
+    return talent_pool.expire(db)
+
+
+def anonymize_application(db, application, *, trigger: str = TRIGGER_RETENTION, commit: bool = True) -> None:
+    """Commits, unless the caller owns the transaction and the application has no file to delete. Files go after the rows are flushed and before the commit: if a file cannot be deleted, the caller
     rolls back and the paths survive for a retry, and a file already deleted is no obstacle to that retry."""
     if application.anonymized_at is not None:
         return
@@ -219,6 +232,7 @@ def anonymize_application(db, application, *, trigger: str = TRIGGER_RETENTION) 
     for row in (*sessions, *turns):
         _erase(row)
     _delete_notifications(db, application, user_id)
+    _settle_talent_pool(db, application, user_id, trigger)
     if user_id is not None:
         _unlink_audit(db, application, user_id)
     _stop_cv_job(application)
@@ -228,7 +242,8 @@ def anonymize_application(db, application, *, trigger: str = TRIGGER_RETENTION) 
     db.flush()
     _delete_cache(db, application_id, blind_hash)
     _delete_files(cv_path, audio_paths)
-    db.commit()
+    if commit:
+        db.commit()
 
 
 def try_anonymize(db, application, *, trigger: str) -> bool:
@@ -359,7 +374,7 @@ def send_reminders(db, now=None) -> int:
 def _daily_pass() -> None:
     db = SessionLocal()
     try:
-        for step in (voice.sweep_abandoned, run, send_reminders, notify.send_pending):
+        for step in (voice.sweep_abandoned, run, _expire_talent_pool, send_reminders, notify.send_pending):
             try:
                 step(db)
             except Exception as exc:

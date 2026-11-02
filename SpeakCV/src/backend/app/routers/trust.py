@@ -184,6 +184,7 @@ def withdraw_consent(consent_id: int, user: User = Depends(get_authenticated_use
         raise HTTPException(status_code=404, detail="Consent not found")
     if consent.withdrawn_at is None:
         consents.withdraw(db, consent.id, user.id)
-        audit.record(db, consent.company_id, user.id, "consent_withdrawn", "consent", consent.id)
+        # A consent with no user left belongs to an anonymized application, so this row must not name them either.
+        audit.record(db, consent.company_id, user.id if consent.user_id else None, "consent_withdrawn", "consent", consent.id)
         db.commit()
     return WithdrawnConsent(id=consent.id, purpose=consent.purpose, withdrawn_at=consent.withdrawn_at)
