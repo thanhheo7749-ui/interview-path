@@ -14,6 +14,7 @@ export const CHANNEL_PATTERN = /^[a-z0-9_]{1,50}$/;
 export const channelUrl = (slug, token) => `${SPEAKCV_URL}/jobs/${slug}?src=${encodeURIComponent(token)}`;
 
 export const listJobs = (companyId) => api(jobsPath(companyId));
+export const NO_PUBLIC_REQUIREMENT = 'no_public_requirement';
 export const getJob = (companyId, jobId) => api(`${jobsPath(companyId)}/${jobId}`);
 export const listRoleOptions = (companyId) => api(`${jobsPath(companyId)}/role-options`);
 export const getPrefill = (companyId, roleNodeId) => api(`${jobsPath(companyId)}/prefill?role_node_id=${roleNodeId}`);

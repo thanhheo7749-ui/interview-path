@@ -370,7 +370,10 @@
       "consent_withdrawn": "Consent withdrawn",
       "application_withdrawn": "Application withdrawn",
       "application_anonymized": "Application anonymized",
-      "reminder_queued": "Reminder queued"
+      "reminder_queued": "Reminder queued",
+      "invited_without_cv": "Invited without a CV result",
+      "transcription_retried": "Transcription retried",
+      "transcription_failed": "Transcription failed"
     },
     "retention": {
       "period": "Retention period",
@@ -465,7 +468,8 @@
     "addChannel": "Add channel",
     "channelInvalid": "Use 1 to 50 lowercase letters, digits or underscores.",
     "colBoard": "Candidates",
-    "openBoard": "Open board"
+    "openBoard": "Open board",
+    "noPublicRequirement": "This job has no public requirement. The interview has nothing to measure, so every candidate's evidence band will be low."
   },
   "board": {
     "eyebrow": "Candidate board",
@@ -541,7 +545,9 @@
       "analysis_failed": "Analysis failed",
       "not_interviewed": "Not interviewed",
       "refused_recording": "Refused recording",
-      "withdrawn": "Withdrawn"
+      "withdrawn": "Withdrawn",
+      "transcription_failed": "Technical problem: audio available",
+      "cv_failed": "CV could not be processed"
     },
     "bulk": {
       "button": "Reject {{count}} selected",
@@ -605,7 +611,9 @@
       "restart": "Grant a restart",
       "fastTrack": "Fast-track",
       "retry": "Retry analysis",
-      "reveal": "Reveal identity"
+      "reveal": "Reveal identity",
+      "retryTranscription": "Retry transcription",
+      "inviteAnyway": "Invite to interview anyway"
     },
     "reveal": {
       "title": "Reveal identity",
@@ -621,7 +629,9 @@
       "submit": "Save correction",
       "corrected": "CV label corrected by HR",
       "reasonShown": "Correction reason: {{reason}}"
-    }
+    },
+    "transcriptionFailed": "This candidate answered, but speech-to-text failed. The audio is available. This is a technical problem, not a missing interview. You can retry the transcription.",
+    "cvFailed": "This candidate's CV could not be processed, so AI has not looked at it. You can invite them to the interview anyway."
   },
   "bridges": {
     "nav": {
