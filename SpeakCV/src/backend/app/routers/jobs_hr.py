@@ -87,6 +87,11 @@ def create_job(company_id: int, body: JobCreate, member: CompanyMember = Depends
     if body.role_node_id is not None:
         node_ids.add(body.role_node_id)
     _check_nodes(db, company_id, node_ids)
+    try:
+        checked = jobs.check_requirements(db, company_id, None, body.requirements)  # before the first write: it can call AI
+    except jobs.JobError as error:
+        db.rollback()
+        raise _translate(error) from error
     job = Job(
         company_id=company_id, department_id=body.department_id, role_node_id=body.role_node_id, title=body.title,
         description=body.description, status="draft", version=1, interview_languages=list(body.interview_languages),
@@ -95,7 +100,7 @@ def create_job(company_id: int, body: JobCreate, member: CompanyMember = Depends
     db.add(job)
     db.flush()
     try:
-        warnings = jobs.update_requirements(db, job, body.requirements)
+        warnings = jobs.update_requirements(db, job, body.requirements, checked)
     except jobs.JobError as error:
         db.rollback()
         raise _translate(error) from error
@@ -124,12 +129,20 @@ def patch_job(company_id: int, job_id: int, body: JobPatch, member: CompanyMembe
     fields = body.model_fields_set
     if "department_id" in fields:
         _check_department(db, company_id, body.department_id)
-        job.department_id = body.department_id
     warnings: list[str] = []
+    checked = None
     if body.requirements is not None:
         _check_nodes(db, company_id, {r.node_id for r in body.requirements if r.node_id is not None})
         try:
-            warnings = jobs.update_requirements(db, job, body.requirements)
+            checked = jobs.check_requirements(db, company_id, job.id, body.requirements)  # before any write: it can call AI
+        except jobs.JobError as error:
+            db.rollback()
+            raise _translate(error) from error
+    if "department_id" in fields:
+        job.department_id = body.department_id
+    if checked is not None:
+        try:
+            warnings = jobs.update_requirements(db, job, body.requirements, checked)
         except jobs.JobError as error:
             db.rollback()
             raise _translate(error) from error

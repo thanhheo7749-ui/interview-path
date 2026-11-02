@@ -284,6 +284,7 @@ def generate(db: Session, source, user_id: int) -> JobDraft:
         "jd_generate", ctx.company_id,
     ).value
     result = validate_lines(_unique_ids([_stored(item) for item in output.lines]), set(context.texts), context.texts)
+    issues = lint.evaluate(db, ctx.company_id, result.valid)
     draft = JobDraft(company_id=ctx.company_id, hiring_request_id=ctx.hiring_request_id, version=0, lines=[],
                      requirement_lines=[], lint=[], failed_languages=[], status="draft")
     _set_lines(draft, result.valid)
@@ -291,7 +292,7 @@ def generate(db: Session, source, user_id: int) -> JobDraft:
     db.flush()
     audit.record(db, ctx.company_id, user_id, "job_draft.generated", "job_draft", draft.id,
                  {"lines": len(result.valid), "rejected": len(result.rejected)})
-    lint.run(db, draft)
+    lint.store(db, draft, issues)
     draft.rejected_lines = result.rejected
     return draft
 
@@ -395,6 +396,7 @@ def revise(db: Session, draft: JobDraft, message: str, user_id: int) -> Revision
     if proposals:
         summary += (f" {len(proposals)} proposed line(s) were not added because the knowledge graph has no source for "
                     "them. Confirm a proposal to add it as a line confirmed by HR.")
+    issues = lint.evaluate(db, draft.company_id, ordered)
     _set_lines(draft, ordered)
     db.add(JobDraftMessage(company_id=draft.company_id, job_draft_id=draft.id, role="user", content=message,
                            created_by=user_id))
@@ -405,7 +407,7 @@ def revise(db: Session, draft: JobDraft, message: str, user_id: int) -> Revision
     db.flush()
     audit.record(db, draft.company_id, user_id, "job_draft.revised", "job_draft", draft.id,
                  {"version": draft.version, "proposals": len(proposals)})
-    lint.run(db, draft)
+    lint.store(db, draft, issues)
     return RevisionResult(draft, summary, [{"id": f"{PROPOSAL}-{row.id}", **json.loads(row.content)} for row in rows])
 
 
@@ -416,6 +418,7 @@ def confirm_line(db: Session, draft: JobDraft, line_id: str, user_id: int) -> Jo
     lines = copy.deepcopy(draft.lines or [])
     confirmation = {"user_id": user_id, "at": _now()}
     target = next((item for item in lines if item["id"] == line_id), None)
+    row = None
     if target is not None:
         if target.get("hr_confirmed"):
             raise JdStudioError(409, "This line is already confirmed")
@@ -425,14 +428,16 @@ def confirm_line(db: Session, draft: JobDraft, line_id: str, user_id: int) -> Jo
         if proposal is None:
             raise JdStudioError(404, "Line or proposal not found")
         row = db.get(JobDraftMessage, int(line_id.rsplit("-", 1)[1]))
-        row.role = PROPOSAL_DONE
         lines.append({
             "id": _new_id(lines), "text": {lang: proposal[lang] for lang in LANGS}, "source_node_ids": [],
             "hr_confirmed": confirmation, "is_requirement": False, "must_have": False, "conflict_dismissed": [],
         })
+    issues = lint.evaluate(db, draft.company_id, lines)
+    if row is not None:
+        row.role = PROPOSAL_DONE
     _set_lines(draft, lines)
     audit.record(db, draft.company_id, user_id, "job_draft.line_confirmed", "job_draft", draft.id, {"line_id": line_id})
-    lint.run(db, draft)
+    lint.store(db, draft, issues)
     return draft
 
 
@@ -471,7 +476,8 @@ def edit_lines(db: Session, draft: JobDraft, patches: list[dict], user_id: int) 
             if not set(ids) <= known:
                 raise JdStudioError(422, "That node is not in this company")
             target["conflict_dismissed"] = ids
+    issues = lint.evaluate(db, draft.company_id, lines)
     _set_lines(draft, lines)
     audit.record(db, draft.company_id, user_id, "job_draft.edited", "job_draft", draft.id, {"lines": len(patches)})
-    lint.run(db, draft)
+    lint.store(db, draft, issues)
     return draft
