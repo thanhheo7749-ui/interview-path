@@ -470,3 +470,103 @@ def test_startup_completes_a_finished_intake_that_has_no_document(client, world,
     intake.complete(db, session)
     scheduled.clear()
     assert intake.recover_interrupted() == []
+
+
+# --- 9: raw intake data is erased once the masked document exists -----------------------------------------------
+
+def raw_turns(db, session_id):
+    db.rollback()
+    db.expire_all()
+    return db.query(VoiceTurn).filter_by(session_id=session_id).order_by(VoiceTurn.position).all()
+
+
+def recording_files(tmp_path):
+    root = tmp_path / "rec"
+    return [p for p in root.rglob("*") if p.is_file()] if root.exists() else []
+
+
+def test_raw_audio_and_transcripts_are_erased_after_the_document_exists(client, world, db, tmp_path):
+    fake.enqueue("intake_mask", json.dumps({"names": ["Kim Minjun"]}))
+    session = finished_session(client, db, world, text="Kim Minjun ships on time without supervision.")
+    assert recording_files(tmp_path) and any(t.transcript for t in raw_turns(db, session.id))
+    document = intake.complete(db, session)
+    turns = raw_turns(db, session.id)
+    assert turns and all(t.transcript is None and t.audio_path is None for t in turns)
+    assert recording_files(tmp_path) == []
+    from app.core import storage
+    stored = storage.read_bytes(document.file_path).decode()
+    assert "[NAME]" in stored and "Kim Minjun" not in stored and "[Q1] " in stored and "[Q6] " in stored
+    # The finished session can still be read, and a second completion neither fails nor makes another document.
+    response = client.get(f"/api/voice/{session.id}/state", headers=auth_header(MANAGER))
+    assert response.status_code == 200 and response.json()["status"] == "completed"
+    assert intake.complete(db, session).id == document.id
+    assert db.query(KbDocument).filter_by(source_type="intake").count() == 1
+
+
+def test_citations_still_point_to_position_markers_after_the_erase(client, world, db):
+    queue_extraction(requirement_item("Ships on time", "ships on time without supervision"))
+    session = finished_session(client, db, world)
+    intake.run_completion(session.id)
+    assert all(t.transcript is None for t in raw_turns(db, session.id))
+    document_id = db.query(KbDocument.id).filter_by(source_type="intake").scalar()
+    chunk_text = " ".join(row.text for row in db.query(KbChunk).filter_by(document_id=document_id))
+    for position in range(1, 7):
+        assert f"[Q{position}]" in chunk_text
+    assert "ships on time without supervision" in chunk_text
+
+
+def test_a_failed_document_keeps_raw_data_and_the_retry_cleans_up(client, world, db, tmp_path, monkeypatch):
+    from app.brain import ingestion
+    session = finished_session(client, db, world)
+    real = ingestion.create_document
+
+    def broken(*args, **kwargs):
+        raise RuntimeError("disk full")
+
+    monkeypatch.setattr(ingestion, "create_document", broken)
+    with pytest.raises(RuntimeError):
+        intake.complete(db, session)
+    turns = raw_turns(db, session.id)
+    assert all(t.transcript and t.audio_path for t in turns) and recording_files(tmp_path)
+    monkeypatch.setattr(ingestion, "create_document", real)
+    intake.complete(db, session)
+    assert all(t.transcript is None and t.audio_path is None for t in raw_turns(db, session.id))
+    assert recording_files(tmp_path) == []
+
+
+def test_a_missing_audio_file_is_not_an_error(client, world, db, tmp_path):
+    session = finished_session(client, db, world)
+    for path in recording_files(tmp_path)[:2]:
+        path.unlink()
+    intake.complete(db, session)
+    assert all(t.transcript is None and t.audio_path is None for t in raw_turns(db, session.id))
+    assert recording_files(tmp_path) == []
+
+
+def test_a_screening_session_keeps_its_audio_and_transcript(client, db, world, tmp_path):
+    from app.hiring import recordings
+    session = VoiceSession(company_id=world.company.id, purpose="screening", status=voice.COMPLETED, language="en")
+    db.add(session)
+    db.flush()
+    path = recordings.save_turn_audio(world.company.id, f"session-{session.id}", 1, b"audio", ".webm")
+    db.add(VoiceTurn(session_id=session.id, position=1, question_text="Q?", question_source="x",
+                     audio_path=path, transcript="kept words", transcript_status="transcribed"))
+    db.commit()
+    intake.erase_raw(session.id)
+    (turn,) = raw_turns(db, session.id)
+    assert turn.transcript == "kept words" and turn.audio_path == path and recording_files(tmp_path)
+
+
+def test_recovery_erases_what_a_crash_left_and_a_second_run_is_a_no_op(client, world, db, scheduled, tmp_path, monkeypatch):
+    session = finished_session(client, db, world)
+    with monkeypatch.context() as patch:
+        patch.setattr(intake, "erase_raw", lambda session_id: None)
+        intake.complete(db, session)  # the document exists; the erase "crashed"
+    assert recording_files(tmp_path)
+    scheduled.clear()
+    monkeypatch.setenv("APP_ENV", "dev")
+    assert intake.recover_interrupted() == [session.id] and scheduled == [session.id]
+    intake.run_completion(session.id)
+    assert recording_files(tmp_path) == [] and db.query(KbDocument).filter_by(source_type="intake").count() == 1
+    scheduled.clear()
+    assert intake.recover_interrupted() == [] and scheduled == []
