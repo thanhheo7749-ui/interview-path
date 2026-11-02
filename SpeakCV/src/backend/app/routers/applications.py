@@ -14,7 +14,7 @@ from app.core.rate_limit import limiter, user_key
 from app.core.uploads import CV_UPLOAD_TYPES, read_upload
 from app.database.database import get_db
 from app.database.sql_models import Application, Company, Job, RequirementResult, User
-from app.hiring import applications, audit, consents, cv_processing, decisions, jobs
+from app.hiring import applications, audit, consents, cv_processing, decisions, jobs, notify
 from app.hiring import retention
 from app.hiring.state import InvalidTransition, advance
 
@@ -54,6 +54,9 @@ class ApplicationOut(BaseModel):
     withdraw_reason: str | None
     processing_error: str | None  # holds only the fixed messages written by cv_processing
     decision: str | None = None  # approved or rejected once HR has decided; never a reason, label or band
+    failure_reason: str | None = None  # a fixed code for why the CV failed; the app words it
+    email_enabled: bool = False  # whether this deployment can send email at all
+    contact_email: str | None = None  # the candidate's own account email, only once they are approved
 
 
 class FitItem(BaseModel):
@@ -98,11 +101,16 @@ def _out(db: Session, application: Application, **overrides) -> ApplicationOut:
         "created_at": application.created_at.isoformat() if application.created_at else None,
         "withdraw_reason": application.withdraw_reason,
         "processing_error": application.processing_error,
+        "failure_reason": cv_processing.failure_reason(application.processing_error),
+        "email_enabled": notify.is_configured(),
     }
     decision = decisions.visible_to_candidate(application)
     if decision is not None:
         fields["status"] = "decided"
         fields["decision"] = decision
+        if decision == "approved" and application.candidate_user_id is not None:
+            owner = db.get(User, application.candidate_user_id)
+            fields["contact_email"] = owner.email if owner is not None else None
     return ApplicationOut(**{**fields, **overrides})
 
 

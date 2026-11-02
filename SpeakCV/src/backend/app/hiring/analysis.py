@@ -89,15 +89,20 @@ def compute_band(must_have_statuses, claim_statuses, must_have_pct, claims_pct) 
 
 
 def _data(text: str) -> str:
-    """A tag written in a transcript cannot close its section or open another."""
+    """A tag written in any text that enters the prompt cannot close its section or open another."""
     return _CLOSING_TAG.sub("[tag]", text)
 
 
+def _line(text: str) -> str:
+    """One line of data for a prompt section: whitespace collapsed, and no tag of ours can be written in it."""
+    return _data(" ".join((text or "").split()))
+
+
 def _prompt(requirements, claims, values, turns) -> str:
-    listed = "\n".join(f"- id={r.id}: {' '.join(r.text.split())}" for r in requirements)
-    claimed = "\n".join(f"- id={c.id}: {' '.join(c.text.split())}" for c in claims)
-    valued = "\n".join(f"- id={v.id}: {' '.join(v.title.split())}" for v in values)
-    asked = "\n".join(f"- position={t.position}: {' '.join((t.question_text or '').split())}" for t in turns)
+    listed = "\n".join(f"- id={r.id}: {_line(r.text)}" for r in requirements)
+    claimed = "\n".join(f"- id={c.id}: {_line(c.text)}" for c in claims)
+    valued = "\n".join(f"- id={v.id}: {_line(v.title)}" for v in values)
+    asked = "\n".join(f"- position={t.position}: {_line(t.question_text)}" for t in turns)
     answers = "\n".join(f'<transcript position="{t.position}">\n{_data(t.transcript)}\n</transcript>' for t in turns)
     return (
         f"<requirements>\n{listed}\n</requirements>\n\n<claims>\n{claimed}\n</claims>\n\n"

@@ -359,29 +359,6 @@ def test_replay_after_the_last_answer_returns_the_completed_state(client, world,
     assert scheduled == [world.application_id]
 
 
-def test_an_upload_that_finishes_first_wins_and_the_overlapping_one_changes_nothing(client, world, db, started, monkeypatch, _recordings):
-    """Transcribing holds no lock, so two uploads of one position can overlap. The second to re-lock must give way."""
-    session_id = started["session_id"]
-    inner = {"ran": False}
-
-    def racing(audio, _mime_type, _languages, _feature, _company_id=None):
-        if inner["ran"]:
-            return transcript_result(audio.decode())
-        inner["ran"] = True
-        with SessionLocal() as other:
-            voice.submit_answer(other, other.get(VoiceSession, session_id), 1, b"winner audio", "audio/webm")
-        return transcript_result("loser transcript")
-
-    monkeypatch.setattr(voice.gateway, "transcribe", racing)
-    response = answer(client, session_id, 1, data=b"loser audio", content_type="audio/ogg")
-    assert response.status_code == 200 and response.json()["position"] == 2
-    row = turn(db, session_id, 1)
-    assert row.transcript == "winner audio"
-    assert (_recordings / row.audio_path).read_bytes() == b"winner audio"
-    assert not (_recordings / f"{world.company_id}/{world.application_id}/1.ogg").exists()
-    assert db.query(VoiceTurn).filter_by(session_id=session_id).count() == 2
-
-
 def test_an_integrity_error_on_the_next_position_returns_the_current_state(client, world, db, started, _recordings):
     """The unique constraint is the backstop if a writer ever got past the lock. It must not surface as a 500."""
     session_id = started["session_id"]

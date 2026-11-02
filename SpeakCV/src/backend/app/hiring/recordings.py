@@ -18,7 +18,15 @@ def _resolve(path: str) -> Path:
 
 def save_turn_audio(company_id: int, owner_key, position: int, data: bytes, suffix: str) -> str:
     """Write the file whole or not at all, so a reader never sees half an answer."""
-    relative = f"{company_id}/{owner_key}/{position}{suffix}"
+    return _save(f"{company_id}/{owner_key}/{position}{suffix}", data)
+
+
+def save_question_audio(company_id: int, owner_key, position: int, data: bytes, suffix: str) -> str:
+    """The spoken question of a turn, beside the answers. It is never an answer's file, whatever the type."""
+    return _save(f"{company_id}/{owner_key}/{position}-question{suffix}", data)
+
+
+def _save(relative: str, data: bytes) -> str:
     full = _resolve(relative)
     full.parent.mkdir(parents=True, exist_ok=True)
     temporary = full.with_name(f".{uuid.uuid4().hex}.tmp")

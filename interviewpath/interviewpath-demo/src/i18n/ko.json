@@ -1,7 +1,21 @@
 {
   "review": {
-    "reasons": {
-      "document_withdrawn": "다시 검토가 필요합니다. 이 항목의 출처 문서 중 하나가 철회되었습니다. 내용에 해당 문서의 내용이 남아 있지 않은지 확인하세요."
+    "guard": {
+      "uncheckedTitle": "자동 차별 검사가 실행되지 않았습니다",
+      "flaggedTitle": "차단됨: 보호 대상 특성({{category}})을 요구합니다",
+      "uncheckedHint": "이 항목을 직접 읽어 보세요. 문제가 없다면 수락하고 검토했음을 확인하세요.",
+      "flaggedHint": "이 항목은 그대로 수락할 수 없습니다. 거절하거나, 보호 대상 특성을 요구하지 않도록 제목이나 본문을 다시 쓰세요.",
+      "confirmMessage": "이 항목을 읽었으며 보호 대상 특성을 요구하지 않음을 확인합니다.",
+      "confirm": "검토했습니다, 수락",
+      "categories": {
+        "age": "나이",
+        "gender": "성별",
+        "marital_status": "결혼 여부",
+        "appearance": "외모",
+        "region": "출신 지역",
+        "religion": "종교",
+        "ethnicity": "민족"
+      }
     }
   },
   "common": {
@@ -12,7 +26,8 @@
     "remove": "삭제",
     "rename": "이름 변경",
     "none": "없음",
-    "genericError": "문제가 발생했습니다. 다시 시도해 주세요."
+    "genericError": "문제가 발생했습니다. 다시 시도해 주세요.",
+    "aiBudgetExceeded": "이 회사는 오늘의 AI 사용 한도에 도달했습니다. 내일 다시 시도해 주세요."
   },
   "login": {
     "title": "InterviewPath 로그인",
@@ -329,26 +344,8 @@
       "copyFailed": "복사하지 못했습니다. 텍스트를 선택해 직접 복사하세요."
     },
     "isRequirementLine": "{{number}}번 문장은 요건입니다",
-    "isMustHaveLine": "{{number}}번 문장은 필수 요건입니다"
-  },
-  "review": {
-    "guard": {
-      "uncheckedTitle": "자동 차별 검사가 실행되지 않았습니다",
-      "flaggedTitle": "차단됨: 보호 대상 특성({{category}})을 요구합니다",
-      "uncheckedHint": "이 항목을 직접 읽어 보세요. 문제가 없다면 수락하고 검토했음을 확인하세요.",
-      "flaggedHint": "이 항목은 그대로 수락할 수 없습니다. 거절하거나, 보호 대상 특성을 요구하지 않도록 제목이나 본문을 다시 쓰세요.",
-      "confirmMessage": "이 항목을 읽었으며 보호 대상 특성을 요구하지 않음을 확인합니다.",
-      "confirm": "검토했습니다, 수락",
-      "categories": {
-        "age": "나이",
-        "gender": "성별",
-        "marital_status": "결혼 여부",
-        "appearance": "외모",
-        "region": "출신 지역",
-        "religion": "종교",
-        "ethnicity": "민족"
-      }
-    }
+    "isMustHaveLine": "{{number}}번 문장은 필수 요건입니다",
+    "sourceNode": "출처 #{{id}}"
   },
   "board": {
     "lanes": {
@@ -357,10 +354,16 @@
     },
     "actions": {
       "retryTranscription": "음성 변환 다시 시도",
-      "inviteAnyway": "그래도 면접에 초대"
+      "inviteAnyway": "그래도 면접에 초대",
+      "rejectConfirm": "이 지원자를 거절하시겠습니까? 지원자에게 채용팀이 진행하지 않기로 결정했다고 안내됩니다. 되돌릴 수 없습니다.",
+      "rejectConfirmButton": "예, 거절합니다"
     },
     "transcriptionFailed": "지원자가 답변했지만 음성 변환에 실패했습니다. 음성 파일은 있습니다. 면접을 보지 않은 것이 아니라 기술 문제입니다. 음성 변환을 다시 시도할 수 있습니다.",
-    "cvFailed": "이 지원자의 이력서를 처리하지 못해 AI가 이력서를 읽지 않았습니다. 그래도 면접에 초대할 수 있습니다."
+    "cvFailed": "이 지원자의 이력서를 처리하지 못해 AI가 이력서를 읽지 않았습니다. 그래도 면접에 초대할 수 있습니다.",
+    "longPause": "인터뷰 중 긴 휴지 구간이 있었습니다",
+    "claims": {
+      "cvSays": "CV에 적힌 내용"
+    }
   },
   "jobs": {
     "noPublicRequirement": "이 채용 공고에는 공개 요건이 없습니다. 면접에서 측정할 항목이 없어 모든 지원자의 근거 수준이 낮게 표시됩니다."

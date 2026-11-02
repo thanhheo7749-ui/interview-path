@@ -3,20 +3,37 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
-import { Strings, useLang } from "@/lib/i18n";
+import { Strings, format, useLang } from "@/lib/i18n";
 import { Application, HiringError, listMyApplications, reuploadCv, withdrawApplication } from "@/services/hiring";
 import { ConfirmDialog, LangToggle } from "@/components/Hiring/SampleNotice";
 
 const POLL_MS = 3000;
 
+// One fixed message per kind of failure, from the code the server sends. An unknown code falls back to the general one.
+function failureText(a: Application, t: Strings): string {
+  switch (a.failure_reason) {
+    case "no_text": return t.failNoText;
+    case "unreadable": return t.failUnreadable;
+    case "too_large": return t.failTooLarge;
+    case "try_again": return t.failTryAgain;
+    case "interrupted": return t.failInterrupted;
+    default: return t.statusUnreadable;
+  }
+}
+
+// Email is only mentioned when this deployment can send it.
+function approvedText(a: Application, t: Strings): string {
+  return a.email_enabled && a.contact_email ? format(t.statusApproved, { email: a.contact_email }) : t.statusApprovedNoEmail;
+}
+
 function statusText(a: Application, t: Strings): string {
   switch (a.status) {
     case "reading_cv": return t.statusReading;
-    case "cv_unreadable": return t.statusUnreadable;
+    case "cv_unreadable": return failureText(a, t);
     case "invited": return t.statusInvited;
     case "interview_in_progress": return t.statusInterview;
     case "with_hr": return t.statusWithHr;
-    case "decided": return a.decision === "approved" ? t.statusApproved : t.statusRejected;
+    case "decided": return a.decision === "approved" ? approvedText(a, t) : t.statusRejected;
     case "withdrawn": return t.statusWithdrawn;
     default: return "";
   }

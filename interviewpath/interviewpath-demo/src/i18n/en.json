@@ -7,7 +7,8 @@
     "remove": "Remove",
     "rename": "Rename",
     "none": "None",
-    "genericError": "Something went wrong. Please try again."
+    "genericError": "Something went wrong. Please try again.",
+    "aiBudgetExceeded": "This company has reached its daily AI limit. Please try again tomorrow."
   },
   "login": {
     "title": "Sign in to InterviewPath",
@@ -433,7 +434,7 @@
     "roleHint": "Choosing a role fills in the title, description and requirements from the company knowledge. You can edit everything.",
     "jobTitle": "Job title",
     "description": "Description",
-    "descriptionHint": "Write or edit the description here. To draft one from the company knowledge, open a hiring request and use JD Studio.",
+    "descriptionHint": "JD Studio, which will help write job descriptions, arrives later. For now, write or edit the description here.",
     "languages": "Interview languages",
     "language": {
       "vi": "Vietnamese",
@@ -587,7 +588,8 @@
         "explained": "Explained",
         "partly": "Partly explained",
         "not_explained": "Not explained"
-      }
+      },
+      "cvSays": "What the CV says"
     },
     "culture": {
       "title": "Culture notes",
@@ -613,7 +615,9 @@
       "retry": "Retry analysis",
       "reveal": "Reveal identity",
       "retryTranscription": "Retry transcription",
-      "inviteAnyway": "Invite to interview anyway"
+      "inviteAnyway": "Invite to interview anyway",
+      "rejectConfirm": "Reject this candidate? The candidate will be told that the hiring team decided not to move forward. This cannot be undone.",
+      "rejectConfirmButton": "Yes, reject"
     },
     "reveal": {
       "title": "Reveal identity",
@@ -631,7 +635,8 @@
       "reasonShown": "Correction reason: {{reason}}"
     },
     "transcriptionFailed": "This candidate answered, but speech-to-text failed. The audio is available. This is a technical problem, not a missing interview. You can retry the transcription.",
-    "cvFailed": "This candidate's CV could not be processed, so AI has not looked at it. You can invite them to the interview anyway."
+    "cvFailed": "This candidate's CV could not be processed, so AI has not looked at it. You can invite them to the interview anyway.",
+    "longPause": "Long pause during the interview"
   },
   "bridges": {
     "nav": {
@@ -898,6 +903,7 @@
       "copyFailed": "Could not copy. Select the text and copy it by hand."
     },
     "isRequirementLine": "Line {{number}} is a requirement",
-    "isMustHaveLine": "Line {{number}} is a must-have"
+    "isMustHaveLine": "Line {{number}} is a must-have",
+    "sourceNode": "Source #{{id}}"
   }
 }

@@ -7,7 +7,8 @@
     "remove": "Xóa",
     "rename": "Đổi tên",
     "none": "Không có",
-    "genericError": "Đã xảy ra lỗi. Vui lòng thử lại."
+    "genericError": "Đã xảy ra lỗi. Vui lòng thử lại.",
+    "aiBudgetExceeded": "Công ty này đã đạt giới hạn AI trong ngày. Vui lòng thử lại vào ngày mai."
   },
   "login": {
     "title": "Đăng nhập InterviewPath",
@@ -432,7 +433,7 @@
     "roleHint": "Chọn vai trò sẽ điền sẵn tiêu đề, mô tả và yêu cầu từ tri thức công ty. Bạn có thể sửa mọi thứ.",
     "jobTitle": "Tiêu đề việc làm",
     "description": "Mô tả",
-    "descriptionHint": "Hãy viết hoặc sửa mô tả tại đây. Để soạn bản nháp từ kiến thức của công ty, hãy mở một yêu cầu tuyển dụng và dùng JD Studio.",
+    "descriptionHint": "JD Studio, công cụ hỗ trợ viết mô tả công việc, sẽ có sau. Hiện tại hãy tự viết hoặc sửa mô tả tại đây.",
     "languages": "Ngôn ngữ phỏng vấn",
     "language": {
       "vi": "Tiếng Việt",
@@ -586,7 +587,8 @@
         "explained": "Đã giải thích",
         "partly": "Giải thích một phần",
         "not_explained": "Chưa được giải thích"
-      }
+      },
+      "cvSays": "Điều CV nêu"
     },
     "culture": {
       "title": "Ghi chú văn hóa",
@@ -612,7 +614,9 @@
       "retry": "Phân tích lại",
       "reveal": "Tiết lộ danh tính",
       "retryTranscription": "Thử lại chuyển giọng nói",
-      "inviteAnyway": "Vẫn mời phỏng vấn"
+      "inviteAnyway": "Vẫn mời phỏng vấn",
+      "rejectConfirm": "Từ chối ứng viên này? Ứng viên sẽ được báo rằng đội ngũ tuyển dụng quyết định không tiếp tục. Không thể hoàn tác.",
+      "rejectConfirmButton": "Có, từ chối"
     },
     "reveal": {
       "title": "Tiết lộ danh tính",
@@ -630,7 +634,8 @@
       "reasonShown": "Lý do chỉnh sửa: {{reason}}"
     },
     "transcriptionFailed": "Ứng viên này đã trả lời, nhưng chuyển giọng nói thành văn bản bị lỗi. Bản ghi âm vẫn còn. Đây là lỗi kỹ thuật, không phải ứng viên bỏ phỏng vấn. Bạn có thể thử lại.",
-    "cvFailed": "Không xử lý được CV của ứng viên này, nên AI chưa đọc CV. Bạn vẫn có thể mời họ phỏng vấn."
+    "cvFailed": "Không xử lý được CV của ứng viên này, nên AI chưa đọc CV. Bạn vẫn có thể mời họ phỏng vấn.",
+    "longPause": "Có khoảng dừng dài trong buổi phỏng vấn"
   },
   "bridges": {
     "nav": {
@@ -897,6 +902,7 @@
       "copyFailed": "Không sao chép được. Hãy chọn văn bản và sao chép thủ công."
     },
     "isRequirementLine": "Dòng {{number}} là một yêu cầu",
-    "isMustHaveLine": "Dòng {{number}} là yêu cầu bắt buộc"
+    "isMustHaveLine": "Dòng {{number}} là yêu cầu bắt buộc",
+    "sourceNode": "Nguồn #{{id}}"
   }
 }

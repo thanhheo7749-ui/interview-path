@@ -15,6 +15,10 @@ class AIProviderError(AIError):
     """A vendor call failed in a way that may succeed later. HTTP 503."""
 
 
+class BudgetExceeded(AIError):
+    """The company has spent its daily AI budget. Raised by the gateway before any vendor call. HTTP 429."""
+
+
 class AIOutputError(AIError):
     """The vendor returned unusable output, or refused. HTTP 502. `usage` is what the call still cost, when known."""
 

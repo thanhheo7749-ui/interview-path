@@ -14,17 +14,29 @@ CV_STATUSES = ("meets", "not_met")
 # One plain message per decision and language. It names no reason, label or band.
 NOTIFICATIONS = {
     "en": {
-        "approved": ("An update on {title}", "There is an update on your application for {title}. Open the app to see it."),
+        "approved": ("An update on {title}",
+                     "The hiring team would like to move forward with your application for {title}. HR will contact "
+                     "you at this email address with the next step."),
         "rejected": ("An update on {title}",
                      "Thank you for your time and interest in {title}. The hiring team has decided not to move forward "
                      "with your application."),
     },
     "vi": {
-        "approved": ("Cập nhật về vị trí {title}", "Có cập nhật mới về hồ sơ của bạn cho vị trí {title}. Hãy mở ứng dụng để xem."),
+        "approved": ("Cập nhật về vị trí {title}",
+                     "Đội ngũ tuyển dụng muốn tiếp tục với hồ sơ của bạn cho vị trí {title}. Bộ phận nhân sự sẽ liên hệ "
+                     "với bạn qua địa chỉ email này về bước tiếp theo."),
         "rejected": ("Cập nhật về vị trí {title}",
                      "Cảm ơn bạn đã dành thời gian và quan tâm đến vị trí {title}. Rất tiếc, đội ngũ tuyển dụng quyết định "
                      "không tiếp tục với hồ sơ của bạn."),
     },
+}
+
+# Sent when HR grants a restart. It names no reason, label or band.
+RESTART_NOTIFICATIONS = {
+    "en": ("Your interview for {title} is open again",
+           "You can take the recorded interview for {title} again. Open the app and choose Continue interview."),
+    "vi": ("Buổi phỏng vấn cho vị trí {title} đã được mở lại",
+           "Bạn có thể thực hiện lại buổi phỏng vấn có ghi âm cho vị trí {title}. Hãy mở ứng dụng và chọn Tiếp tục phỏng vấn."),
 }
 
 
@@ -60,6 +72,17 @@ def _notify(db, application, decision: str) -> None:
     title = db.get(Job, application.job_id).title
     subject, body = NOTIFICATIONS[language][decision]
     notify.enqueue(db, application.company_id, application.candidate_user_id, "decision", language,
+                   subject.format(title=title), body.format(title=title), application_id=application.id)
+
+
+def _notify_restart(db, application) -> None:
+    if application.candidate_user_id is None:
+        return
+    company = db.get(Company, application.company_id)
+    language = company.default_locale if company.default_locale in RESTART_NOTIFICATIONS else "en"
+    title = db.get(Job, application.job_id).title
+    subject, body = RESTART_NOTIFICATIONS[language]
+    notify.enqueue(db, application.company_id, application.candidate_user_id, "restart", language,
                    subject.format(title=title), body.format(title=title), application_id=application.id)
 
 
@@ -132,17 +155,31 @@ def _clear_interview_evidence(db, application_id: int) -> None:
         {CvClaim.status: None, CvClaim.evidence_quote: None, CvClaim.voice_turn_id: None}, synchronize_session=False)
 
 
-def grant_restart(db, application, actor_user_id) -> None:
-    """One restart per application. The old session and its audio stay as they are."""
-    _check_not_anonymized(application)
-    if application.stage != "ready_for_hr" or application.hr_decision != "pending":
-        raise DecisionError(409, "A restart can only be granted while the application awaits review")
-    sessions = (
+def _screening_sessions(db, application) -> list:
+    return (
         db.query(VoiceSession)
         .filter(VoiceSession.application_id == application.id, VoiceSession.company_id == application.company_id,
                 VoiceSession.purpose == "screening")
         .order_by(VoiceSession.id.desc()).all()
     )
+
+
+def restart_available(db, application) -> bool:
+    """Whether `grant_restart` would be accepted: HR's button is shown only then."""
+    if application.anonymized_at is not None or application.fast_tracked:
+        return False
+    if application.stage != "ready_for_hr" or application.hr_decision != "pending":
+        return False
+    sessions = _screening_sessions(db, application)
+    return bool(sessions) and not any((session.restart_count or 0) > 0 for session in sessions)
+
+
+def grant_restart(db, application, actor_user_id) -> None:
+    """One restart per application. The old session and its audio stay as they are. The candidate is told."""
+    _check_not_anonymized(application)
+    if application.stage != "ready_for_hr" or application.hr_decision != "pending":
+        raise DecisionError(409, "A restart can only be granted while the application awaits review")
+    sessions = _screening_sessions(db, application)
     if not sessions:
         raise DecisionError(409, "There is no session to restart")
     if any((session.restart_count or 0) > 0 for session in sessions):
@@ -155,6 +192,7 @@ def grant_restart(db, application, actor_user_id) -> None:
     _clear_interview_evidence(db, application.id)
     audit.record(db, application.company_id, actor_user_id, "restart_granted", "application", application.id,
                  payload={"session_id": sessions[0].id})
+    _notify_restart(db, application)
     db.flush()
 
 

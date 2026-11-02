@@ -24,6 +24,24 @@ class _NoLongerProcessing(Exception):
     """The application left cv_processing while this job ran, so this job gives way."""
 
 
+# What the candidate may be told about a failed CV: a fixed code per kind of failure, never the text of the failure.
+# The app turns the code into its own words. A message not listed here is "unknown".
+_FAILURE_KINDS = (
+    ("no_text", ("no extractable text",)),
+    ("unreadable", ("could not read this file", "cannot be read", "not utf-8 text")),
+    ("too_large", ("pages. please upload a shorter", "when unpacked")),
+    ("try_again", (TRY_AGAIN.lower(),)),
+    ("interrupted", (INTERRUPTED.lower(),)),
+)
+
+
+def failure_reason(message: str | None) -> str | None:
+    if not message:
+        return None
+    lowered = message.lower()
+    return next((kind for kind, needles in _FAILURE_KINDS if any(needle in lowered for needle in needles)), "unknown")
+
+
 def _locked(db, application_id: int) -> Application | None:
     # A locking read returns the latest committed row, not this transaction's snapshot.
     return (
@@ -142,6 +160,7 @@ def _run(application_id: int, process, keep_text: bool = False) -> None:
             return
         try:
             process(db, application_id)
+            notify.deliver_pending()  # the invitation leaves now, not at the next daily run; never raises
         except (_NoLongerProcessing, screening.ApplicationDeleted):
             db.rollback()
         except (NoExtractableText, CvTooLarge) as exc:

@@ -1,10 +1,13 @@
+import i18n from '../i18n/index.js';
+
 export const API_URL = (import.meta.env.VITE_API_URL || 'http://localhost:8001').replace(/\/$/, '');
 const TOKEN_KEY = 'portal_token';
 
 export class ApiError extends Error {
-  constructor(status, message) {
+  constructor(status, message, code) {
     super(message);
     this.status = status;
+    this.code = code;
   }
 }
 
@@ -31,6 +34,8 @@ export async function api(path, { method = 'GET', body, formData, skipAuthRedire
   }
   if (!response.ok) {
     const detail = await response.json().catch(() => ({}));
+    // The company has used up its daily AI allowance: say so in the user's language, wherever the error is shown.
+    if (detail.code === 'ai_budget_exceeded') throw new ApiError(response.status, i18n.t('common.aiBudgetExceeded'), detail.code);
     // A detail is text, or an object whose `message` says what happened (a draft blocked by lint, for one).
     const text = typeof detail.detail === 'string' ? detail.detail : detail.detail?.message;
     throw new ApiError(response.status, typeof text === 'string' && text ? text : `Request failed (${response.status})`);

@@ -1,8 +1,10 @@
 """Read models for the HR board. Nothing here returns identity or the raw CV: HR reads blind text first."""
+from datetime import timezone
+
 from app.database.sql_models import (
     Application, AuditLog, CandidateBrief, CultureNote, CvClaim, Job, KbNode, RequirementResult, VoiceSession, VoiceTurn,
 )
-from app.hiring import jobs
+from app.hiring import decisions, jobs
 from app.hiring.state import NOT_TAKEN, TRANSCRIPTION_FAILED
 
 CELLS = {
@@ -122,6 +124,22 @@ def _brief_status(db, application) -> str | None:
     return row[0] if row else None
 
 
+LONG_PAUSE_SECONDS = 10 * 60
+
+
+def long_pause(turns) -> bool:
+    """A neutral note for HR: some question waited over ten minutes for its answer. Offline time is not counted by the
+    interview clock, so this is how HR can see it. It touches no label, band or cell and implies nothing."""
+    def naive(value):
+        return value.replace(tzinfo=None) if value.tzinfo is None else value.astimezone(timezone.utc).replace(tzinfo=None)
+
+    return any(
+        turn.answered_at is not None and turn.created_at is not None
+        and (naive(turn.answered_at) - naive(turn.created_at)).total_seconds() > LONG_PAUSE_SECONDS
+        for turn in turns
+    )
+
+
 def detail(db, application) -> dict:
     job = db.get(Job, application.job_id)
     turns = latest_turns(db, application)
@@ -177,6 +195,8 @@ def detail(db, application) -> dict:
         "brief_status": _brief_status(db, application),
         "hr_decided_at": application.hr_decided_at.isoformat() if application.hr_decided_at else None,
         "fast_tracked": bool(application.fast_tracked),
+        "restart_available": decisions.restart_available(db, application),
+        "long_pause": long_pause(turns),
         "hidden_text_detected": bool(application.hidden_text_detected),
         "cv_text_blind": application.cv_text_blind,
         "requirements": requirements,

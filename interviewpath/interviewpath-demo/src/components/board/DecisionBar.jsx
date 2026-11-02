@@ -8,7 +8,7 @@ import { ErrorAlert, inputClass, primaryButton, secondaryButton } from '../KbFee
 // Every action here is a human choice. AI output never reaches these buttons.
 function DecisionBar({ companyId, detail, onChanged }) {
   const { t } = useTranslation();
-  const [mode, setMode] = useState(null); // 'reveal' | 'cv' | null
+  const [mode, setMode] = useState(null); // 'reveal' | 'cv' | 'reject' | null
   const [reason, setReason] = useState('');
   const [reasonError, setReasonError] = useState(false);
   const [identity, setIdentity] = useState(null);
@@ -71,7 +71,7 @@ function DecisionBar({ companyId, detail, onChanged }) {
             <button type="button" disabled={busy} onClick={() => run(() => decide(companyId, appId, 'approved'))} className={primaryButton}>
               {t('board.actions.approve')}
             </button>
-            <button type="button" disabled={busy} onClick={() => run(() => decide(companyId, appId, 'rejected'))} className={secondaryButton}>
+            <button type="button" disabled={busy} onClick={() => openMode('reject')} className={secondaryButton}>
               {t('board.actions.reject')}
             </button>
             {detail.cv_status && (
@@ -79,9 +79,11 @@ function DecisionBar({ companyId, detail, onChanged }) {
                 {t('board.actions.correctCv')}
               </button>
             )}
-            <button type="button" disabled={busy} onClick={() => run(() => grantRestart(companyId, appId))} className={secondaryButton}>
-              {t('board.actions.restart')}
-            </button>
+            {detail.restart_available && (
+              <button type="button" disabled={busy} onClick={() => run(() => grantRestart(companyId, appId))} className={secondaryButton}>
+                {t('board.actions.restart')}
+              </button>
+            )}
           </>
         )}
         {invited && (
@@ -110,6 +112,18 @@ function DecisionBar({ companyId, detail, onChanged }) {
           </button>
         )}
       </div>
+
+      {mode === 'reject' && (
+        <div role="alertdialog" aria-label={t('board.actions.reject')} className="space-y-2 rounded-xl border border-amber-200 bg-amber-50 p-3">
+          <p className="text-sm font-semibold text-amber-900">{t('board.actions.rejectConfirm')}</p>
+          <div className="flex gap-2">
+            <button type="button" disabled={busy} onClick={() => run(() => decide(companyId, appId, 'rejected'), () => setMode(null))} className={primaryButton}>
+              {t('board.actions.rejectConfirmButton')}
+            </button>
+            <button type="button" onClick={() => setMode(null)} className={secondaryButton}>{t('common.cancel')}</button>
+          </div>
+        </div>
+      )}
 
       {mode === 'reveal' && (
         <div role="alertdialog" aria-label={t('board.reveal.title')} className="space-y-2 rounded-xl border border-amber-200 bg-amber-50 p-3">
