@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { fetchTurnAudio } from '../../lib/board.js';
 
 // Audio is fetched only when HR asks for it. Each play is logged by the server.
-export function PlayFromMoment({ companyId, appId, position }) {
+export function PlayFromMoment({ companyId, appId, position, label }) {
   const { t } = useTranslation();
   const [url, setUrl] = useState(null);
   const [error, setError] = useState(false);
@@ -34,7 +34,7 @@ export function PlayFromMoment({ companyId, appId, position }) {
           className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-bold text-slate-800 hover:bg-slate-50 disabled:opacity-60"
         >
           <Play size={13} aria-hidden="true" />
-          {t('board.audio.play')}
+          {label ?? t('board.audio.play')}
         </button>
       )}
       {url && <audio controls autoPlay src={url} aria-label={t('board.audio.player', { position })} className="h-9" />}

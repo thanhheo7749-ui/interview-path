@@ -599,7 +599,8 @@
   },
   "bridges": {
     "nav": {
-      "hiringRequests": "Yêu cầu tuyển dụng"
+      "hiringRequests": "Yêu cầu tuyển dụng",
+      "myInterviews": "Phỏng vấn của tôi"
     },
     "requests": {
       "title": "Yêu cầu tuyển dụng",
@@ -661,6 +662,86 @@
       "retry": "Vui lòng trả lời thêm một lần nữa.",
       "expired": "Buổi này đã hết hạn.",
       "ended": "Buổi này đã kết thúc."
+    },
+    "brief": {
+      "title": "Bản tóm tắt phỏng vấn",
+      "hint": "AI soạn nháp từ bằng chứng. Bạn xem lại và gửi đi; AI không quyết định điều gì.",
+      "language": "Ngôn ngữ bản tóm tắt",
+      "languages": {
+        "ko": "Tiếng Hàn",
+        "vi": "Tiếng Việt",
+        "en": "Tiếng Anh"
+      },
+      "generate": "Tạo bản tóm tắt",
+      "regenerate": "Tạo lại",
+      "replacesNote": "Tạo lại sẽ thay bản nháp trước và xóa trạng thái đã xem lại.",
+      "regenerateConfirm": "Thay bản nháp hiện tại và xóa trạng thái đã xem lại?",
+      "strengths": "Điểm mạnh",
+      "toClarify": "Cần làm rõ",
+      "questions": "Câu hỏi nên hỏi",
+      "sectionEmpty": "Chưa có nội dung.",
+      "noEvidence": "Ứng viên này chưa có bằng chứng từ buổi phỏng vấn.",
+      "wording": "Nội dung cho: {{label}}",
+      "noQuote": "Ý này không có trích dẫn.",
+      "source": {
+        "interview": "Nói trong buổi phỏng vấn (nguyên văn)",
+        "cv": "Viết trong CV (nguyên văn)"
+      },
+      "recordingTime": "Trích dẫn ở phút {{time}} của bản ghi âm (câu trả lời {{position}})",
+      "playAnswer": "Nghe câu trả lời {{position}} từ đầu",
+      "markReviewed": "Lưu nội dung và đánh dấu đã xem lại",
+      "send": "Gửi cho quản lý tuyển dụng",
+      "reviewFirst": "Hãy đánh dấu bản tóm tắt đã xem lại trước khi gửi.",
+      "status": {
+        "draft": "Bản nháp, chưa xem lại",
+        "reviewed": "HR đã xem lại",
+        "sent": "Đã gửi"
+      },
+      "sentNote": "Đã gửi cho quản lý tuyển dụng. Không thể sửa nữa."
+    },
+    "interviews": {
+      "title": "Phỏng vấn của tôi",
+      "empty": "Chưa có bản tóm tắt phỏng vấn nào được gửi cho bạn.",
+      "open": "Mở bản tóm tắt",
+      "back": "Quay lại phỏng vấn của tôi",
+      "sentOn": "gửi {{date}}",
+      "scored": "Đã nộp phiếu đánh giá",
+      "notScored": "Chưa nộp phiếu đánh giá",
+      "identityLogged": "HR đã duyệt ứng viên này. Việc mở trang này được ghi vào nhật ký kiểm toán.",
+      "briefHint": "Trích dẫn được giữ nguyên ngôn ngữ mà ứng viên đã nói hoặc viết.",
+      "recordingHeld": "Bản ghi âm do HR giữ. Hãy nhờ HR phát lại đoạn cần nghe."
+    },
+    "scorecard": {
+      "title": "Phiếu đánh giá",
+      "hint": "Chấm từng yêu cầu từ 1 đến 5 và đưa ra đề xuất. HR đưa ra quyết định cuối cùng.",
+      "submitted": "Bạn đã nộp phiếu đánh giá. Bạn có thể sửa và nộp lại.",
+      "scoreFor": "Điểm cho: {{requirement}}",
+      "choose": "Chọn điểm",
+      "scale": {
+        "1": "1 - Chưa thể hiện",
+        "2": "2 - Yếu",
+        "3": "3 - Đạt",
+        "4": "4 - Tốt",
+        "5": "5 - Xuất sắc"
+      },
+      "recommendation": "Đề xuất của bạn",
+      "hire": "Đề xuất tuyển",
+      "no_hire": "Không đề xuất tuyển",
+      "notes": "Ghi chú (không bắt buộc)",
+      "submit": "Nộp phiếu đánh giá",
+      "resubmit": "Nộp lại"
+    },
+    "outcome": {
+      "title": "Kết quả tuyển dụng",
+      "hint": "Ghi lại kết quả. HR ghi nhận, không phải AI.",
+      "options": {
+        "hired": "Đã tuyển",
+        "not_hired": "Không tuyển",
+        "offer_declined": "Từ chối offer"
+      },
+      "confirm": "Ghi nhận kết quả là \"{{outcome}}\"?",
+      "confirmButton": "Có, ghi nhận",
+      "recorded": "Đã ghi nhận: {{outcome}}"
     }
   }
 }

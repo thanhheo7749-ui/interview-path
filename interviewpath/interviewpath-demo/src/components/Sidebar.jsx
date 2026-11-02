@@ -1,4 +1,4 @@
-import { AlertTriangle, BrainCircuit, Briefcase, ClipboardCheck, ClipboardList, FileText, HelpCircle, KeyRound, LogOut, MessageSquare, Network, Settings, ShieldCheck } from "lucide-react";
+import { AlertTriangle, BrainCircuit, Briefcase, ClipboardCheck, ClipboardList, FileText, Users, HelpCircle, KeyRound, LogOut, MessageSquare, Network, Settings, ShieldCheck } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { NavLink } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext.jsx";
@@ -20,6 +20,7 @@ const navItems = [
   { labelKey: "nav.graph", to: "/graph", icon: Network, hrOnly: true },
   { labelKey: "nav.jobs", to: "/jobs", icon: Briefcase, hrOnly: true },
   { labelKey: "bridges.nav.hiringRequests", to: "/hiring-requests", icon: ClipboardList, roles: ["hr", "manager"] },
+  { labelKey: "bridges.nav.myInterviews", to: "/my-interviews", icon: Users, roles: ["manager"] },
   { labelKey: "nav.copilot", to: "/copilot", icon: MessageSquare },
   { labelKey: "nav.password", to: "/account/password", icon: KeyRound },
 ];

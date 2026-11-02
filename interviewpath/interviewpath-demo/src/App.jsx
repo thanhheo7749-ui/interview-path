@@ -20,6 +20,8 @@ import JobsPage from './routes/JobsPage.jsx';
 import BoardPage from './routes/BoardPage.jsx';
 import HiringRequestsPage from './routes/HiringRequestsPage.jsx';
 import IntakePage from './routes/IntakePage.jsx';
+import InterviewBriefPage from './routes/InterviewBriefPage.jsx';
+import MyInterviewsPage from './routes/MyInterviewsPage.jsx';
 import DemoAiNotice from './components/DemoAiNotice.jsx';
 import { useCompany } from './company/CompanyContext.jsx';
 
@@ -98,6 +100,8 @@ function App() {
         </Route>
         <Route element={<ManagerOnly />}>
           <Route path="/intake/:requestId" element={<IntakePage />} />
+          <Route path="/my-interviews" element={<MyInterviewsPage />} />
+          <Route path="/my-interviews/:appId" element={<InterviewBriefPage />} />
         </Route>
         <Route path="/copilot" element={<CopilotPage />} />
         <Route path="*" element={<Navigate to="/settings" replace />} />

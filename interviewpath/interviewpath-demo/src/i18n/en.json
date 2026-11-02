@@ -600,7 +600,8 @@
   },
   "bridges": {
     "nav": {
-      "hiringRequests": "Hiring requests"
+      "hiringRequests": "Hiring requests",
+      "myInterviews": "My interviews"
     },
     "requests": {
       "title": "Hiring requests",
@@ -662,6 +663,86 @@
       "retry": "Please answer once more.",
       "expired": "This session has expired.",
       "ended": "This session has ended."
+    },
+    "brief": {
+      "title": "Interview brief",
+      "hint": "Drafted by AI from the evidence. You review it and send it; the AI decides nothing.",
+      "language": "Brief language",
+      "languages": {
+        "ko": "Korean",
+        "vi": "Vietnamese",
+        "en": "English"
+      },
+      "generate": "Generate brief",
+      "regenerate": "Generate again",
+      "replacesNote": "Generating replaces any earlier draft and clears its review.",
+      "regenerateConfirm": "Replace the current draft and clear its review?",
+      "strengths": "Strengths",
+      "toClarify": "To clarify",
+      "questions": "Questions to ask",
+      "sectionEmpty": "Nothing here.",
+      "noEvidence": "There is no interview evidence for this candidate yet.",
+      "wording": "Wording for: {{label}}",
+      "noQuote": "No quote for this point.",
+      "source": {
+        "interview": "Said in the interview (original words)",
+        "cv": "Written in the CV (original words)"
+      },
+      "recordingTime": "Quote at {{time}} in the recording (answer {{position}})",
+      "playAnswer": "Play answer {{position}} from its start",
+      "markReviewed": "Save wording and mark reviewed",
+      "send": "Send to the hiring manager",
+      "reviewFirst": "Mark the brief as reviewed before sending it.",
+      "status": {
+        "draft": "Draft, not reviewed",
+        "reviewed": "Reviewed by HR",
+        "sent": "Sent"
+      },
+      "sentNote": "Sent to the hiring manager. It can no longer be edited."
+    },
+    "interviews": {
+      "title": "My interviews",
+      "empty": "No interview briefs have been sent to you yet.",
+      "open": "Open brief",
+      "back": "Back to my interviews",
+      "sentOn": "sent {{date}}",
+      "scored": "Scorecard submitted",
+      "notScored": "Scorecard not submitted yet",
+      "identityLogged": "HR approved this candidate. Opening this page is recorded in the audit log.",
+      "briefHint": "Quotes are shown in the language they were said or written in.",
+      "recordingHeld": "Recordings are held by HR. Ask HR to play a moment if you need to hear it."
+    },
+    "scorecard": {
+      "title": "Scorecard",
+      "hint": "Score each requirement from 1 to 5 and give your recommendation. HR makes the final decision.",
+      "submitted": "Your scorecard is submitted. You can change it and submit again.",
+      "scoreFor": "Score for: {{requirement}}",
+      "choose": "Choose a score",
+      "scale": {
+        "1": "1 - Not shown",
+        "2": "2 - Weak",
+        "3": "3 - Adequate",
+        "4": "4 - Strong",
+        "5": "5 - Excellent"
+      },
+      "recommendation": "Your recommendation",
+      "hire": "Recommend hiring",
+      "no_hire": "Do not recommend hiring",
+      "notes": "Notes (optional)",
+      "submit": "Submit scorecard",
+      "resubmit": "Submit again"
+    },
+    "outcome": {
+      "title": "Hiring outcome",
+      "hint": "Record what happened. HR records this; the AI does not.",
+      "options": {
+        "hired": "Hired",
+        "not_hired": "Not hired",
+        "offer_declined": "Offer declined"
+      },
+      "confirm": "Record the outcome as \"{{outcome}}\"?",
+      "confirmButton": "Yes, record it",
+      "recorded": "Recorded: {{outcome}}"
     }
   }
 }

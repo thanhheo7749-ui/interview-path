@@ -11,7 +11,7 @@ import wave
 
 from app.database.database import SessionLocal
 from app.database.sql_models import (
-    Application, Company, CultureNote, CvClaim, Job, JobRequirement, KbNode, RequirementResult, User,
+    Application, Company, CultureNote, CvClaim, Department, Job, JobRequirement, KbNode, RequirementResult, User,
     VoiceSession, VoiceTurn,
 )
 from app.hiring import recordings
@@ -19,6 +19,8 @@ from app.hiring import recordings
 SLUG = "board-sample-platform-engineer"
 # A second job that only the full-loop spec reads, so the board spec's corrections and rejections never touch it.
 GEM_SLUG = "board-sample-hidden-gem-engineer"
+# A third job, in a department, that only the brief spec reads: its candidate is approved and briefed there.
+BRIEF_SLUG = "board-sample-brief-engineer"
 
 
 def silent_wav() -> bytes:
@@ -41,9 +43,13 @@ def main(out_path: str) -> None:
         ids = {a.alias: a.id for a in db.query(Application).filter(Application.job_id == job.id)}
         gem = db.query(Job).filter(Job.slug == GEM_SLUG).first() or seed_gem(db, company)
         gem_ids = {a.alias: a.id for a in db.query(Application).filter(Application.job_id == gem.id)}
+        brief = db.query(Job).filter(Job.slug == BRIEF_SLUG).first() or seed_brief(db, company)
+        brief_ids = {a.alias: a.id for a in db.query(Application).filter(Application.job_id == brief.id)}
         with open(out_path, "w", encoding="utf-8") as handle:
             json.dump({"job_id": job.id, "company_id": company.id, "applications": ids,
-                       "gem_job_id": gem.id, "gem_applications": gem_ids}, handle)
+                       "gem_job_id": gem.id, "gem_applications": gem_ids,
+                       "brief_job_id": brief.id, "brief_department_id": brief.department_id,
+                       "brief_applications": brief_ids}, handle)
     finally:
         db.close()
 
@@ -76,6 +82,55 @@ def seed_gem(db, company):
         RequirementResult(application_id=row.id, requirement_id=req.id, source="cv", status="not_found"),
         RequirementResult(application_id=row.id, requirement_id=req.id, source="interview", status="evidence",
                           quote="I taught myself the whole stack in a month.", voice_turn_id=turn.id),
+    ])
+    db.commit()
+    return job
+
+
+def seed_brief(db, company):
+    """One candidate with a two-answer interview. The first answer is 133 seconds long, so a quote from the second
+    sits at 02:13 of the recording. Both answers have audio. HR approves the candidate in the spec."""
+    department = Department(company_id=company.id, name="Brief Sample Department")
+    db.add(department)
+    db.flush()
+    job = Job(company_id=company.id, title="Sample Brief Engineer", slug=BRIEF_SLUG, status="published", version=1,
+              description="Sample job for tests", interview_languages=["en"], department_id=department.id)
+    db.add(job)
+    db.flush()
+    reqs = [
+        JobRequirement(company_id=company.id, job_id=job.id, text="Run services in production", must_have=True, position=0),
+        JobRequirement(company_id=company.id, job_id=job.id, text="Lead incident reviews", must_have=False, position=1),
+    ]
+    user = User(email="sample-brief-1@example.test", full_name="Sample Person B1", hashed_password="!",
+                must_change_password=False)
+    db.add_all(reqs + [user])
+    db.flush()
+    row = Application(company_id=company.id, job_id=job.id, job_version=1, alias="#B1", stage="ready_for_hr",
+                      cv_status="meets", interview_band="many", cv_text_blind="[NAME]\nSample CV text.",
+                      candidate_user_id=user.id)
+    db.add(row)
+    db.flush()
+    session = VoiceSession(company_id=company.id, purpose="screening", application_id=row.id,
+                           owner_user_id=user.id, language="ko", status="completed")
+    db.add(session)
+    db.flush()
+    made = []
+    for position, question, transcript, seconds in [
+        (1, "서비스 운영 경험을 말씀해 주세요.", "저는 결제 서비스를 2년 동안 운영했습니다.", 133.0),
+        (2, "장애 회고는 어떻게 이끌었나요?", "장애 회고를 매달 직접 진행했습니다.", 45.0),
+    ]:
+        path = recordings.save_turn_audio(company.id, f"sample-{row.id}", position, silent_wav(), ".wav")
+        turn = VoiceTurn(session_id=session.id, position=position, question_text=question, question_source="must_have",
+                         transcript=transcript, transcript_status="transcribed", audio_path=path,
+                         audio_seconds=seconds)
+        db.add(turn)
+        made.append(turn)
+    db.flush()
+    db.add_all([
+        RequirementResult(application_id=row.id, requirement_id=reqs[0].id, source="interview", status="evidence",
+                          quote="저는 결제 서비스를 2년 동안 운영했습니다.", voice_turn_id=made[0].id),
+        RequirementResult(application_id=row.id, requirement_id=reqs[1].id, source="interview", status="partial",
+                          quote="장애 회고를 매달 직접 진행했습니다.", voice_turn_id=made[1].id),
     ])
     db.commit()
     return job
