@@ -305,6 +305,8 @@ def _live_match(db: Session, graph: _Graph, item: ExtractedNode) -> KbNode | Non
 def _build_node(graph: _Graph, item: ExtractedNode) -> KbNode:
     document = graph.document
     is_fact = _is_fact(item)
+    # Committed before its check runs, and HR can see it by then: until an answer is stored it needs HR's confirmation.
+    guarded = item.type in discrimination.GUARDED_TYPES
     return KbNode(
         company_id=graph.company_id, department_id=document.department_id, type=item.type,
         title=item.title.strip(), body=item.body, language=document.language,
@@ -312,6 +314,8 @@ def _build_node(graph: _Graph, item: ExtractedNode) -> KbNode:
         status="draft", effective_date=_parse_date(item.effective_date, document.effective_date),
         fact_kind=item.fact_kind if is_fact else None, fact_value=item.fact_value.strip() if is_fact else None,
         fact_unit=item.fact_unit.strip() if is_fact else None, scope_text=item.scope_text.strip() if is_fact else None,
+        guard_category=discrimination.UNCHECKED if guarded else None,
+        guard_reason=discrimination.UNCHECKED_REASON if guarded else None,
     )
 
 
@@ -458,9 +462,10 @@ def _store_checks(graph: _Graph, checks: _NodeChecks) -> None:
     """Flag new requirement, skill and behavior nodes that ask for a protected trait, and store every embedding. A
     flagged node stays a draft that HR can only reject or rewrite."""
     for node in graph.new_nodes:
-        result = checks.guards.get(_guard_text(node)) if node.type in discrimination.GUARDED_TYPES else None
-        if result is not None:
-            node.guard_category, node.guard_reason = result.category, result.reason
+        if node.type in discrimination.GUARDED_TYPES:
+            result = checks.guards[_guard_text(node)]
+            node.guard_category = result.category if result else None
+            node.guard_reason = result.reason if result else None
         node.embedding, node.embedding_model, node.embedding_dim = checks.embeddings[retriever.node_text(node)]
 
 
