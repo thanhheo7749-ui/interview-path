@@ -230,13 +230,28 @@ def get_channels(api, world, query=""):
     return api.get(url, headers=world["people"]["hr"]["headers"])
 
 
+def post_commentary(api, world, **body):
+    url = f"/api/companies/{world['company'].id}/jobs/{world['job'].id}/channels/commentary"
+    return api.post(url, json=body, headers=world["people"]["hr"]["headers"])
+
+
+def test_get_makes_no_ai_call_and_has_no_commentary(db, world, api, monkeypatch):
+    fixture_rows(db, world)
+    calls = []
+    monkeypatch.setattr(gateway, "generate_structured", lambda *a, **k: calls.append(1))
+    body = get_channels(api, world).json()
+    assert calls == [] and "commentary" not in body and len(body["table"]["rows"]) == 3
+
+
 def test_small_sample_statement_is_added_by_code_whatever_the_ai_says(db, world, api):
     fixture_rows(db, world)  # every channel is under 30 applications
     fake.enqueue("channel_commentary", json.dumps({"observations": ["All fine, large sample."]}))
     body = get_channels(api, world).json()
     assert body["small_sample_note"] == "Sample too small, treat as a hint"
     assert all(row["small_sample"] for row in body["table"]["rows"])
-    assert body["commentary"]["observations"] == ["All fine, large sample."]
+    # the AI text does not change the note
+    assert post_commentary(api, world).json() == {"observations": ["All fine, large sample."]}
+    assert get_channels(api, world).json()["small_sample_note"] == body["small_sample_note"]
 
 
 def test_no_small_sample_note_at_30_applications(db, world, api):
@@ -245,6 +260,11 @@ def test_no_small_sample_note_at_30_applications(db, world, api):
     body = get_channels(api, world).json()
     assert body["small_sample_note"] is None
     assert body["table"]["rows"][0]["small_sample"] is False
+
+
+def test_commentary_for_an_unknown_job_is_404(db, world, api):
+    url = f"/api/companies/{world['company'].id}/jobs/{world['other_job'].id}/channels/commentary"
+    assert api.post(url, json={}, headers=world["people"]["hr"]["headers"]).status_code == 404
 
 
 def test_small_sample_note_in_vietnamese(db, world, api):
@@ -257,31 +277,38 @@ def test_ai_failure_returns_the_table_without_commentary(db, world, api):
     fixture_rows(db, world)
     fake.enqueue("channel_commentary", "garbage")
     fake.enqueue("channel_commentary", "garbage")
-    response = get_channels(api, world)
-    assert response.status_code == 200
-    body = response.json()
-    assert body["commentary"] is None and len(body["table"]["rows"]) == 3
+    response = post_commentary(api, world)
+    assert response.status_code == 200 and response.json() == {"observations": None}
+    assert len(get_channels(api, world).json()["table"]["rows"]) == 3
 
 
 def test_invented_numbers_twice_returns_the_table_without_commentary(db, world, api):
     fixture_rows(db, world)
     for _ in range(2):
         fake.enqueue("channel_commentary", json.dumps({"observations": ["LinkedIn approves about 40%."]}))
-    body = get_channels(api, world).json()
-    assert body["commentary"] is None and body["table"]["rows"]
+    assert post_commentary(api, world).json() == {"observations": None}
 
 
 def test_demo_responder_cites_applications_and_approval_rate(db, world, api):
     fixture_rows(db, world)
-    body = get_channels(api, world).json()
-    lines = body["commentary"]["observations"]
+    lines = post_commentary(api, world).json()["observations"]
     assert len(lines) == 3 and all(line.startswith("[Demo AI]") for line in lines)
     assert any("33.3%" in line and "6" in line for line in lines)
 
 
 def test_empty_job_makes_no_ai_call(db, world, api):
     body = get_channels(api, world).json()
-    assert body["table"]["rows"] == [] and body["commentary"] is None and body["small_sample_note"] is None
+    assert body["table"]["rows"] == [] and body["small_sample_note"] is None
+    assert post_commentary(api, world).json() == {"observations": None}
+
+
+def test_commentary_follows_the_data_choice(db, world, api):
+    add(db, world, "linkedin")
+    add(db, world, "tiktok", simulated=True)
+    assert "linkedin" in post_commentary(api, world).json()["observations"][0]
+    assert "tiktok" in post_commentary(api, world, data="simulated").json()["observations"][0]
+    assert post_commentary(api, world, data="both").status_code == 422
+    assert post_commentary(api, world, language="fr").status_code == 422
 
 
 def test_not_entered_cost_shows_as_null_and_unknown_job_is_404(db, world, api):
@@ -381,4 +408,6 @@ def test_non_hr_and_other_company_hr_get_403(db, world, api):
                        headers=headers).status_code == 403
         assert api.post(costs_url(world), json={"job_id": world["job"].id, "items": []},
                         headers=headers).status_code == 403
+        commentary_url = f"/api/companies/{world['company'].id}/jobs/{world['job'].id}/channels/commentary"
+        assert api.post(commentary_url, json={}, headers=headers).status_code == 403
     assert api.get(f"/api/companies/{world['company'].id}/jobs/{world['job'].id}/channels").status_code in (401, 403)

@@ -52,28 +52,45 @@ def _has(db: Session, company_id: int, job_id: int, simulated: bool) -> bool:
         Application.is_simulated.is_(simulated)).first() is not None
 
 
-@router.get(BASE + "/jobs/{job_id}/channels")
-def get_channels(company_id: int, job_id: int, data: Literal["real", "simulated"] | None = None,
-                 language: Literal["en", "vi"] = "en",
-                 member: CompanyMember = Depends(require_member("hr")), db: Session = Depends(get_db)):
+class CommentaryIn(BaseModel):
+    data: Literal["real", "simulated"] | None = None
+    language: Literal["en", "vi"] = "en"
+
+
+def _view(db: Session, company_id: int, job_id: int, data: str | None):
+    """The job, the choice of real or simulated data, and the table, all computed by code."""
     job = _job(db, company_id, job_id)
     has_real = _has(db, company_id, job_id, False)
     has_simulated = _has(db, company_id, job_id, True)
     simulated = (data == "simulated") if data else (not has_real and has_simulated)
     table = channels.channel_table(db, company_id, job_id, simulated)
-    job_summary = {"id": job.id, "title": job.title}
-    db.rollback()  # end the read transaction: the AI call below must not run inside one
-    notes = commentary.explain(table, language, company_id)
-    small = any(row.small_sample for row in table.rows)
+    return {"id": job.id, "title": job.title}, has_real, has_simulated, simulated, table
+
+
+@router.get(BASE + "/jobs/{job_id}/channels")
+def get_channels(company_id: int, job_id: int, data: Literal["real", "simulated"] | None = None,
+                 language: Literal["en", "vi"] = "en",
+                 member: CompanyMember = Depends(require_member("hr")), db: Session = Depends(get_db)):
+    """The table only. No AI call: commentary comes from POST .../channels/commentary on request."""
+    job, has_real, has_simulated, simulated, table = _view(db, company_id, job_id, data)
     return {
-        "job": job_summary,
+        "job": job,
         "simulated": simulated,
         "has_real": has_real,
         "has_simulated": has_simulated,
         "table": table.as_dict(),
-        "commentary": {"observations": notes.observations} if notes else None,
-        "small_sample_note": SMALL_SAMPLE_NOTES[language] if small else None,
+        "small_sample_note": SMALL_SAMPLE_NOTES[language] if any(row.small_sample for row in table.rows) else None,
     }
+
+
+@router.post(BASE + "/jobs/{job_id}/channels/commentary")
+def post_channel_commentary(company_id: int, job_id: int, body: CommentaryIn,
+                            member: CompanyMember = Depends(require_member("hr")), db: Session = Depends(get_db)):
+    """Recomputes the table in code, then asks the AI to explain it. `observations` is null when it cannot."""
+    table = _view(db, company_id, job_id, body.data)[4]
+    db.rollback()  # end the read transaction: the AI call below must not run inside one
+    notes = commentary.explain(table, body.language, company_id)
+    return {"observations": notes.observations if notes else None}
 
 
 def _unprocessable(detail) -> HTTPException:
