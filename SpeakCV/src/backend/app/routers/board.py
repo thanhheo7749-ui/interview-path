@@ -11,6 +11,7 @@ from app.database.database import get_db
 from app.database.sql_models import Application, CompanyMember, Job, VoiceSession, VoiceTurn
 from app.hiring import analysis, audit, board, decisions, notify
 from app.hiring.state import TRANSCRIPTION_FAILED
+from app.posthire import feedback
 
 router = APIRouter()
 
@@ -83,6 +84,8 @@ def post_decision(company_id: int, app_id: int, body: DecisionIn, background: Ba
         raise _translate(error)
     db.commit()
     background.add_task(notify.deliver_pending)  # the candidate hears now, not at the next daily run
+    if body.decision == "rejected":
+        background.add_task(feedback.create_draft_for, application.id)
     return {"id": application.id, "hr_decision": application.hr_decision}
 
 
@@ -206,6 +209,8 @@ def post_bulk_reject(company_id: int, job_id: int, body: BulkIn, background: Bac
         raise _translate(error)
     db.commit()
     background.add_task(notify.deliver_pending)
+    for application_id in ids:
+        background.add_task(feedback.create_draft_for, application_id)
     return {"rejected": len(rows)}
 
 

@@ -30,6 +30,7 @@ from .routers import reality_check as reality_check_router
 from .routers import insights as insights_router
 from .routers import onboarding as onboarding_router
 from .routers import talent_pool as talent_pool_router
+from .routers import feedback as feedback_router
 from .brain import fake_demo, ingestion
 from .bridges import intake
 from .hiring import analysis, cv_processing
@@ -156,6 +157,7 @@ def create_app(legacy_b2c: bool | None = None) -> FastAPI:
     app.include_router(onboarding_router.router)
     app.include_router(talent_pool_router.router)
     app.include_router(talent_pool_router.company_router)
+    app.include_router(feedback_router.router)
     enabled = settings.flag("LEGACY_B2C_ENABLED") if legacy_b2c is None else legacy_b2c
     if enabled:
         _include_legacy_routers(app)

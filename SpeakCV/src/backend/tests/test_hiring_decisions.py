@@ -6,7 +6,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.ai.providers import fake
-from app.database.sql_models import Application, AuditLog, Notification, VoiceSession
+from app.database.sql_models import Application, AuditLog, Notification, RejectionFeedback, VoiceSession
 from app.hiring import decisions
 from app.main import create_app
 from tests.helpers_board import CANDIDATE_EMAIL, CANDIDATE_NAME, make_application, make_session, make_world
@@ -86,11 +86,25 @@ def test_approve_records_who_when_audit_and_notification(db, world, api):
     assert db.query(Notification).filter_by(user_id=row.candidate_user_id, kind="decision").count() == 1
 
 
-def test_reject_sends_a_generic_notification_with_no_reasons_or_labels(db, world, api):
+def test_reject_sends_nothing_and_its_draft_holds_no_reasons_or_labels(db, world, api):
     application = make_application(db, world["job"], cv_status="not_met", band="few")
     response = api.post(url(world, f"/applications/{application.id}/decision"), headers=hr(world),
                         json={"decision": "rejected", "reason": "SECRETREASON lacks Docker"})
     assert response.status_code == 200
+    assert db.query(Notification).count() == 0
+    row = db.query(RejectionFeedback).filter_by(application_id=application.id).one()
+    assert row.status == "draft"
+    text = row.draft.lower()
+    for forbidden in ("secretreason", "docker", "not_met", "few", "band", "score", "cv"):
+        assert forbidden not in text
+    assert "Backend" in row.draft
+
+
+def test_the_notice_for_a_rejection_hr_never_answers_holds_no_reasons_or_labels(db, world):
+    application = make_application(db, world["job"], cv_status="not_met", band="few")
+    decisions.decide(db, application, "rejected", world["people"]["hr"]["id"], "SECRETREASON lacks Docker")
+    decisions.notify_rejected(db, application)
+    db.commit()
     note = db.query(Notification).filter_by(kind="decision").one()
     text = f"{note.subject} {note.body}".lower()
     for forbidden in ("secretreason", "docker", "not_met", "few", "band", "score", "cv"):
@@ -153,7 +167,8 @@ def test_bulk_reject_is_one_transaction(db, world, api):
     response = api.post(path, headers=hr(world), json={"application_ids": [first.id, second.id], "reason": "pool"})
     assert response.status_code == 200 and response.json()["rejected"] == 2
     assert _reload(db, first.id).hr_decision == "rejected" and _reload(db, second.id).hr_decision == "rejected"
-    assert db.query(Notification).filter_by(kind="decision").count() == 2
+    assert db.query(Notification).count() == 0
+    assert db.query(RejectionFeedback).filter_by(status="draft").count() == 2
     # an already decided one rolls the whole batch back
     third = make_application(db, world["job"], alias="#A3")
     again = api.post(path, headers=hr(world), json={"application_ids": [third.id, first.id]})

@@ -104,8 +104,14 @@ def decide(db, application, decision, actor_user_id, reason=None) -> None:
     application.hr_decided_at = datetime.now(timezone.utc)
     audit.record(db, application.company_id, actor_user_id, "hr_decision", "application", application.id,
                  payload={"decision": decision, "reason": reason})
-    _notify(db, application, decision)
+    if decision != "rejected":  # a rejection reaches the candidate as feedback HR approves: see app.posthire.feedback
+        _notify(db, application, decision)
     db.flush()
+
+
+def notify_rejected(db, application) -> None:
+    """The fixed notice for a rejection HR has sent nothing about. It names no reason, label or band."""
+    _notify(db, application, "rejected")
 
 
 def record_simulated(application, decision: str, decided_at: datetime) -> None:

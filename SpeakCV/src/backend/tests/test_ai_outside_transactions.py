@@ -17,15 +17,17 @@ from app.ai.types import AIProviderError
 from app.brain import fake_demo, ingestion, seed
 from app.database.database import Base, SessionLocal, engine
 from app.database.sql_models import (
-    AIUsageLog, Application, AuditLog, ChannelContent, Company, CompanyMember, Job, JobChannelLink, JobDraft, JobDraftMessage,
-    JobRequirement, KbChunk, KbDocument, KbNode, User,
+    AIUsageLog, Application, AuditLog, ChannelContent, Company, CompanyMember, Job, JobChannelLink, JobDraft,
+    JobDraftMessage, JobRequirement, KbChunk, KbDocument, KbNode, RejectionFeedback, RequirementResult, User,
 )
 from app.hiring import consents, cv_processing
 from app.hiring import fake_demo as hiring_fake_demo
 from app.main import create_app
-from app.posthire import talent_pool
+from app.posthire import feedback, talent_pool
 from tests import helpers_board
 from tests.helpers import auth_header
+from tests.helpers_board import make_application, make_session
+from tests.helpers_board import make_world as make_board_world
 from tests.helpers_jd import ai_line, assistant_json, line, make_draft, make_world
 from tests.test_brain_ingestion import TEXT, TWO_CHUNKS, extraction, fact, real_extract
 from tests.test_brain_review import World as ReviewWorld
@@ -471,6 +473,57 @@ def test_channel_generate_saves_nothing_when_the_ai_fails(api, db, world, monkey
     db.expire_all()
     assert db.query(ChannelContent).count() == 0
     assert db.query(JobChannelLink).filter_by(job_id=job_id).count() == 0
+
+
+# --- rejection feedback ----------------------------------------------------------------------------------------------
+
+def _interviewed_application(db):
+    board = make_board_world(db)
+    application = make_application(db, board["job"], cv_status="not_met")
+    make_session(db, application, [(1, "Q", "I built a FastAPI service used by three teams", None)])
+    db.add(RequirementResult(application_id=application.id, requirement_id=board["requirements"][0].id,
+                             source="interview", status="evidence", quote="I built a FastAPI service"))
+    db.commit()
+    return board, application.id
+
+
+def test_rejecting_drafts_feedback_in_the_background(api, db, probe):
+    board, application_id = _interviewed_application(db)
+    path = f"/api/companies/{board['company'].id}/applications/{application_id}/decision"
+    headers = board["people"]["hr"]["headers"]
+    probe.start()
+    response = api.post(path, headers=headers, json={"decision": "rejected"})
+    assert response.status_code == 200, response.text
+    probe.assert_clean("rejection_feedback")
+    db.rollback()
+    assert db.query(RejectionFeedback).filter_by(application_id=application_id).one().status == "draft"
+
+
+def test_hr_drafting_feedback_holds_no_write(api, db, probe):
+    board, application_id = _interviewed_application(db)
+    application = db.get(Application, application_id)
+    application.hr_decision = "rejected"
+    db.commit()
+    path = f"/api/companies/{board['company'].id}/applications/{application_id}/feedback/draft"
+    headers = board["people"]["hr"]["headers"]
+    probe.start()
+    response = api.post(path, headers=headers)
+    assert response.status_code == 200, response.text
+    assert response.json()["source"] == "ai"
+    probe.assert_clean("rejection_feedback")
+
+
+def test_a_refused_feedback_draft_retries_holding_no_write(db, probe):
+    _, application_id = _interviewed_application(db)
+    application = db.get(Application, application_id)
+    application.hr_decision = "rejected"
+    db.commit()
+    fake_demo.install()
+    fake.enqueue("rejection_feedback", '{"went_well": [], "to_build": [], "learning_ids": [], "message": "not_met"}')
+    probe.start()
+    feedback.create_draft_for(application_id)
+    assert probe.calls["rejection_feedback"] == 2
+    probe.assert_clean("rejection_feedback")
 
 
 # --- ingestion -------------------------------------------------------------------------------------------------------

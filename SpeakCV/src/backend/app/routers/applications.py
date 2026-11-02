@@ -17,6 +17,7 @@ from app.database.sql_models import Application, Company, Job, RequirementResult
 from app.hiring import applications, audit, consents, cv_processing, decisions, jobs, notify
 from app.hiring import retention
 from app.hiring.state import InvalidTransition, advance
+from app.posthire import feedback as rejection_feedback
 
 router = APIRouter()
 
@@ -57,6 +58,23 @@ class ApplicationOut(BaseModel):
     failure_reason: str | None = None  # a fixed code for why the CV failed; the app words it
     email_enabled: bool = False  # whether this deployment can send email at all
     contact_email: str | None = None  # the candidate's own account email, only once they are approved
+    feedback: "FeedbackOut | None" = None  # only what HR approved and sent
+
+
+class LearningItem(BaseModel):
+    id: int
+    title: str
+    url: str
+    provider: str
+    language: str
+
+
+class FeedbackOut(BaseModel):
+    application_id: int
+    language: str
+    message: str
+    learning: list[LearningItem]
+    sent_at: str | None
 
 
 class FitItem(BaseModel):
@@ -111,6 +129,7 @@ def _out(db: Session, application: Application, **overrides) -> ApplicationOut:
         if decision == "approved" and application.candidate_user_id is not None:
             owner = db.get(User, application.candidate_user_id)
             fields["contact_email"] = owner.email if owner is not None else None
+        fields["feedback"] = rejection_feedback.candidate_view(db, application)
     return ApplicationOut(**{**fields, **overrides})
 
 
@@ -194,6 +213,14 @@ def my_applications(user: User = Depends(get_authenticated_user), db: Session = 
 @router.get("/api/applications/{application_id}", response_model=ApplicationOut)
 def get_application(application_id: int, user: User = Depends(get_authenticated_user), db: Session = Depends(get_db)):
     return _out(db, _owned(db, user, application_id))
+
+
+@router.get("/api/applications/{application_id}/feedback", response_model=FeedbackOut)
+def get_feedback(application_id: int, user: User = Depends(get_authenticated_user), db: Session = Depends(get_db)):
+    view = rejection_feedback.candidate_view(db, _owned(db, user, application_id))
+    if view is None:  # a draft looks exactly like no feedback at all
+        raise HTTPException(status_code=404, detail="Feedback not found")
+    return view
 
 
 def _team_style(db: Session, job: Job) -> list[StyleItem]:
