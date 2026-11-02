@@ -38,6 +38,17 @@ CONSENT_TEXTS = {
         "con người đưa ra. Không có video và không phân tích giọng điệu của bạn. Bản ghi được lưu trong "
         "{retention_days} ngày."
     ),
+    ("onboarding_use", "en"): (
+        "If you are hired, the company may use the gaps found in your interview to plan your first 90 days. "
+        "The plan names skills to build, never your answers. Your interview data is not used for anything else, "
+        "and you can withdraw this at any time from My data. If you decline, the plan uses only the team's knowledge."
+    ),
+    ("onboarding_use", "vi"): (
+        "Nếu bạn được tuyển, công ty có thể dùng các khoảng trống phát hiện trong buổi phỏng vấn để lập kế hoạch "
+        "90 ngày đầu của bạn. Kế hoạch chỉ nêu kỹ năng cần xây dựng, không nêu câu trả lời của bạn. Dữ liệu phỏng "
+        "vấn không được dùng cho mục đích nào khác, và bạn có thể rút lại bất cứ lúc nào trong mục Dữ liệu của tôi. "
+        "Nếu bạn từ chối, kế hoạch chỉ dùng kiến thức của đội ngũ."
+    ),
 }
 PURPOSES = tuple(sorted({purpose for purpose, _ in CONSENT_TEXTS}))
 

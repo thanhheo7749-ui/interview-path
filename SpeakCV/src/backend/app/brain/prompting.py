@@ -1,7 +1,7 @@
 """Helpers for putting untrusted text into a prompt."""
 import re
 
-_DELIMITER = re.compile(r"<(?=\s*/?\s*(?:context|question|document|fact|statement|request|draft|history)\b)", re.IGNORECASE)
+_DELIMITER = re.compile(r"<(?=\s*/?\s*(?:context|question|document|fact|statement|request|draft|history|gaps)\b)", re.IGNORECASE)
 
 
 def as_data(text: str) -> str:

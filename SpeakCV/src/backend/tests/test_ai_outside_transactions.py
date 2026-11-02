@@ -574,3 +574,14 @@ def test_seeding_a_sample_company(db, probe):
     assert db.query(Job).filter_by(status="published").count() == 1
     assert db.query(CompanyMember).count() > 0
     probe.assert_clean("kb_embed", "discrimination_check")
+
+
+def test_onboarding_plan_is_built_outside_a_transaction(api, db, probe):
+    from tests.test_posthire_onboarding import build, create_url
+
+    hire = build(db)
+    probe.start()
+    response = api.post(create_url(hire), headers=HR)
+    assert response.status_code == 200, response.text
+    probe.assert_clean("onboarding_plan")
+    assert db.query(AuditLog).filter_by(action="onboarding.created").count() == 1

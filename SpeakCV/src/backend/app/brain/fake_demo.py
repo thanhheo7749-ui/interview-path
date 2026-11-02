@@ -122,6 +122,19 @@ def _channel_content(_system, messages, _schema) -> str:
     return json.dumps({"body": "[Demo AI] " + " ".join(lines) + "\n\n{link}"}, ensure_ascii=False)
 
 
+_ONBOARDING_NODE = re.compile(r"^\[n(\d+)\] (.*)$", re.MULTILINE)
+
+
+def _onboarding_plan(_system, messages, _schema) -> str:
+    """One item per phase, each citing the first node in the context."""
+    match = _ONBOARDING_NODE.search(messages[-1]["content"])
+    if not match:
+        return json.dumps({"items": []})
+    items = [{"phase": phase, "title": f"[Demo AI] Day {phase}: {match.group(2)[:60]}",
+              "source_node_id": int(match.group(1)), "learning_resource_id": 0} for phase in (30, 60, 90)]
+    return json.dumps({"items": items}, ensure_ascii=False)
+
+
 def _same_topic_no(_system, _messages, _schema) -> str:
     return json.dumps({"same_topic": False})
 
@@ -155,3 +168,4 @@ def install() -> None:
         fake.register("candidate_brief", _candidate_brief)
         fake.register("jd_generate", _jd_generate)
         fake.register("jd_assistant", _jd_assistant)
+        fake.register("onboarding_plan", _onboarding_plan)
