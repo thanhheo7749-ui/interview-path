@@ -294,3 +294,4 @@ class CompanyMember(Base):
 from .models_brain import *  # noqa: F401,F403,E402
 from .models_hiring import *  # noqa: F401,F403,E402
 from .models_bridges import *  # noqa: F401,F403,E402
+from .models_insights import *  # noqa: F401,F403,E402

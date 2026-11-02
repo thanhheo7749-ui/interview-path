@@ -1,4 +1,5 @@
 import re
+from datetime import datetime
 from pathlib import Path
 
 import pytest
@@ -6,6 +7,7 @@ from fastapi.testclient import TestClient
 
 from app.ai.providers import fake
 from app.database.sql_models import Application, AuditLog, Notification, VoiceSession
+from app.hiring import decisions
 from app.main import create_app
 from tests.helpers_board import CANDIDATE_EMAIL, CANDIDATE_NAME, make_application, make_session, make_world
 
@@ -44,6 +46,30 @@ def test_only_decisions_module_writes_hr_decision():
         if re.search(r"\.hr_decision\s*=[^=]|hr_decision\s*=\s*[\"']", path.read_text(encoding="utf-8")):
             offenders.append(str(path))
     assert offenders == []
+
+
+def test_a_simulated_decision_is_refused_on_a_real_application(db, world):
+    application = make_application(db, world["job"], band="many")
+    with pytest.raises(ValueError, match="simulated"):
+        decisions.record_simulated(application, "approved", datetime(2026, 9, 1))
+    assert application.hr_decision == "pending" and application.hr_decided_at is None
+
+
+def test_a_simulated_decision_leaves_no_audit_row_or_notification(db, world):
+    application = make_application(db, world["job"], "#S1", band="many", is_simulated=True)
+    decisions.record_simulated(application, "rejected", datetime(2026, 9, 1))
+    db.commit()
+    row = _reload(db, application.id)
+    assert (row.hr_decision, row.hr_decided_by) == ("rejected", None)
+    assert row.hr_decided_at.replace(tzinfo=None) == datetime(2026, 9, 1)
+    assert db.query(AuditLog).filter_by(action="hr_decision").count() == 0
+    assert db.query(Notification).count() == 0
+
+
+def test_a_simulated_decision_must_be_a_real_decision_value(db, world):
+    application = make_application(db, world["job"], "#S1", band="many", is_simulated=True)
+    with pytest.raises(ValueError, match="approved or rejected"):
+        decisions.record_simulated(application, "maybe", datetime(2026, 9, 1))
 
 
 def test_approve_records_who_when_audit_and_notification(db, world, api):

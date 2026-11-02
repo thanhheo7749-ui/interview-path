@@ -68,9 +68,8 @@ def card(application) -> dict:
 
 def job_board(db, company_id: int, job_id: int) -> dict:
     query = db.query(Application).filter(Application.company_id == company_id, Application.job_id == job_id,
-                                         Application.anonymized_at.is_(None))  # nothing is left to review or decide
-    if hasattr(Application, "is_simulated"):
-        query = query.filter(Application.is_simulated.is_(False))
+                                         Application.anonymized_at.is_(None),  # nothing is left to review or decide
+                                         Application.is_simulated.is_(False))
     cells = {name: [] for name in CELLS.values()}
     lanes = {name: [] for name in LANES}
     refused_ids = {
