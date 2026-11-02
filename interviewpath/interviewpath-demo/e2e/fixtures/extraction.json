@@ -83,6 +83,18 @@
       "fact_unit": "",
       "scope_text": "",
       "effective_date": ""
+    },
+    {
+      "ref": "Manager intake answer",
+      "type": "policy",
+      "title": "Manager intake answer",
+      "body": "What the manager said in the voice intake. The fake speech-to-text always returns the same words.",
+      "quote": "fake transcript",
+      "fact_kind": "none",
+      "fact_value": "",
+      "fact_unit": "",
+      "scope_text": "",
+      "effective_date": ""
     }
   ],
   "edges": []
