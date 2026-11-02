@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { expect, test } from '@playwright/test';
-import { API_URL, HR_EMAIL, LOGIN_USER, NEW_PASSWORD, ensurePasswordChanged, signIn } from './helpers.js';
+import { API_URL, BRAIN_USER, NEW_PASSWORD, ensurePasswordChanged, signIn } from './helpers.js';
 
 // HR opens a hiring request for a manager, the manager answers the voice intake in Korean through a fake microphone,
 // and HR then finds the drafts made from the transcript in Review. The AI is the fake provider.
@@ -23,8 +23,8 @@ async function login(request, email, password) {
 
 // HR adds a manager through the API and the manager picks their own password, as the forced-change screen would.
 async function addManager(request) {
-  await ensurePasswordChanged(request, LOGIN_USER);
-  const hrToken = await login(request, HR_EMAIL, NEW_PASSWORD);
+  await ensurePasswordChanged(request, BRAIN_USER);
+  const hrToken = await login(request, BRAIN_USER.email, NEW_PASSWORD);
   const me = await (await request.get(`${API_URL}/api/me`, { headers: json(hrToken) })).json();
   const companyId = me.memberships.find((m) => m.role === 'hr').company_id;
   const added = await request.post(`${API_URL}/api/companies/${companyId}/members`, {
@@ -45,7 +45,7 @@ test('HR opens a request, the manager records the intake in Korean, and HR revie
   await addManager(page.request);
 
   // HR opens the request in the portal.
-  await signIn(page);
+  await signIn(page, BRAIN_USER);
   await page.getByRole('link', { name: 'Hiring requests' }).click();
   await expect(page.getByRole('heading', { name: 'Hiring requests', exact: true })).toBeVisible();
   await page.getByLabel('Role to hire').fill(TITLE);
