@@ -31,8 +31,7 @@ export default defineConfig({
       command: 'bash e2e/start-backend.sh',
       url: `${apiUrl}/docs`,
       reuseExistingServer: false,
-      // Seeding the samples can wait on SQLite locks while it logs AI usage, which takes about 100 seconds.
-      timeout: 240000,
+      timeout: 60000,
       env: {
         E2E_TMP: process.env.E2E_TMP, E2E_API_PORT: process.env.E2E_API_PORT, E2E_WEB_PORT: process.env.E2E_WEB_PORT,
         E2E_CANDIDATE_PORT: process.env.E2E_CANDIDATE_PORT, E2E_SEED_SAMPLES: '1', E2E_SEED_BOARD: '1',

@@ -102,18 +102,18 @@ def _differs(text: str, node) -> bool:
     return False
 
 
-def _conflicts(db: Session, draft: JobDraft, lines: list[dict]) -> tuple[list[LintIssue], dict[str, str]]:
+def _conflicts(db: Session, company_id: int, lines: list[dict]) -> tuple[list[LintIssue], dict[str, str]]:
     """Conflicts with graph facts, and the lines whose check could not run (line id -> reason)."""
     issues: list[LintIssue] = []
     unchecked: dict[str, str] = {}
-    nodes, _ = retriever.visible_graph(db, aud.Audience(draft.company_id, "hr"))
+    nodes, _ = retriever.visible_graph(db, aud.Audience(company_id, "hr"))
     facts = [n for n in nodes if n.fact_kind in ("number", "date") and n.embedding is not None]
     candidates = [line for line in lines if primary_text(line)]
     if not facts or not candidates:
         return issues, unchecked
     try:
         embedded = gateway.embed([primary_text(line)[:MAX_LINE_CHARS] for line in candidates], "query", "lint_embed",
-                                 draft.company_id)
+                                 company_id)
     except AIError:
         return issues, {line["id"]: "The conflict check could not run." for line in candidates}
     for line, vector in zip(candidates, embedded.vectors):
@@ -131,7 +131,7 @@ def _conflicts(db: Session, draft: JobDraft, lines: list[dict]) -> tuple[list[Li
             try:
                 same = gateway.generate_structured(
                     "bulk", CONFLICT_SYSTEM, [{"role": "user", "content": prompt}], TopicCheck, MAX_CHECK_TOKENS,
-                    "lint_conflict_check", draft.company_id,
+                    "lint_conflict_check", company_id,
                 ).value.same_topic
             except AIError:
                 unchecked.setdefault(line["id"], "The conflict check could not run.")
@@ -145,16 +145,16 @@ def _conflicts(db: Session, draft: JobDraft, lines: list[dict]) -> tuple[list[Li
     return issues, unchecked
 
 
-def run(db: Session, draft: JobDraft) -> LintReport:
-    """Run every check, store the issues on the draft and commit."""
-    lines = copy.deepcopy(draft.lines or [])
+def evaluate(db: Session, company_id: int, lines: list[dict]) -> list[LintIssue]:
+    """Run every check on these lines. Writes nothing and can call the AI, so a caller that changes a draft runs this
+    before its first write: a vendor call must not hold locks."""
     issues: list[LintIssue] = []
     unchecked: dict[str, str] = {}
 
-    visible = {n.id for n in retriever.visible_graph(db, aud.candidate(draft.company_id))[0]}
+    visible = {n.id for n in retriever.visible_graph(db, aud.candidate(company_id))[0]}
     for line in lines:
         text = line_text(line)
-        verdict = discrimination.check(text, draft.company_id) if text else None
+        verdict = discrimination.check(text, company_id) if text else None
         if verdict is not None and verdict.unchecked:
             unchecked.setdefault(line["id"], verdict.reason)
         elif verdict is not None:
@@ -164,7 +164,7 @@ def run(db: Session, draft: JobDraft) -> LintReport:
             issues.append(LintIssue("no_source", BLOCK, line["id"],
                                     "The line has no source in the knowledge graph. Add a source or confirm it."))
 
-    conflicts, conflict_unchecked = _conflicts(db, draft, lines)
+    conflicts, conflict_unchecked = _conflicts(db, company_id, lines)
     issues += conflicts
     for line_id, reason in conflict_unchecked.items():
         unchecked.setdefault(line_id, reason)
@@ -182,10 +182,20 @@ def run(db: Session, draft: JobDraft) -> LintReport:
                                 f"{must_haves} must-have requirements. More than {MAX_MUST_HAVE} narrows the pool."))
 
     issues.sort(key=lambda i: (i.severity != BLOCK, i.check))
+    return issues
+
+
+def store(db: Session, draft: JobDraft, issues: list[LintIssue]) -> LintReport:
+    """Store the issues on the draft and commit, along with whatever the caller has pending."""
     draft.lint = [asdict(issue) for issue in issues]
     db.add(draft)
     db.commit()
     return LintReport(issues, any(issue.severity == BLOCK for issue in issues))
+
+
+def run(db: Session, draft: JobDraft) -> LintReport:
+    """Run every check, store the issues on the draft and commit. Call it with nothing pending in the session."""
+    return store(db, draft, evaluate(db, draft.company_id, draft.lines or []))
 
 
 def acknowledge_unchecked(db: Session, draft: JobDraft, user_id: int, line_id: str | None = None) -> JobDraft:
