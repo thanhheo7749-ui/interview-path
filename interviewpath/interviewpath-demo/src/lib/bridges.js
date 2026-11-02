@@ -7,6 +7,10 @@ export const listHiringRequests = (companyId) => api(`${company(companyId)}/hiri
 export const getHiringRequest = (companyId, requestId) => api(`${company(companyId)}/hiring-requests/${requestId}`);
 export const createHiringRequest = (companyId, body) =>
   api(`${company(companyId)}/hiring-requests`, { method: 'POST', body });
+export const updateHiringRequest = (companyId, requestId, body) =>
+  api(`${company(companyId)}/hiring-requests/${requestId}`, { method: 'PATCH', body });
+export const cancelHiringRequest = (companyId, requestId) =>
+  api(`${company(companyId)}/hiring-requests/${requestId}/cancel`, { method: 'POST' });
 export const startIntake = (companyId, requestId, language) =>
   api(`${company(companyId)}/hiring-requests/${requestId}/intake/start`, { method: 'POST', body: { language } });
 export const listMembers = (companyId) => api(`${company(companyId)}/members`);
@@ -97,8 +101,13 @@ export const rerunLint = (companyId, draftId) => api(`${drafts(companyId)}/${dra
 export const acknowledgeUnchecked = (companyId, draftId, lineId) =>
   api(`${drafts(companyId)}/${draftId}/lint/acknowledge`, { method: 'POST', body: lineId ? { line_id: lineId } : {} });
 export const submitDraft = (companyId, draftId) => api(`${drafts(companyId)}/${draftId}/submit`, { method: 'POST' });
-export const approveDraft = (companyId, draftId) => api(`${drafts(companyId)}/${draftId}/approve`, { method: 'POST' });
-export const publishDraft = (companyId, draftId) => api(`${drafts(companyId)}/${draftId}/publish`, { method: 'POST' });
+// Both name the version on the page, so they cover what the person read. A draft that has moved answers 409.
+export const approveDraft = (companyId, draftId, version) =>
+  api(`${drafts(companyId)}/${draftId}/approve`, { method: 'POST', body: { version } });
+export const publishDraft = (companyId, draftId, version) =>
+  api(`${drafts(companyId)}/${draftId}/publish`, { method: 'POST', body: { version } });
+export const requestDraftChanges = (companyId, draftId, comment) =>
+  api(`${drafts(companyId)}/${draftId}/request-changes`, { method: 'POST', body: { comment } });
 export const getChannelContent = (companyId, draftId) => api(`${drafts(companyId)}/${draftId}/channels`);
 export const generateChannelContent = (companyId, draftId) =>
   api(`${drafts(companyId)}/${draftId}/channels/generate`, { method: 'POST' });

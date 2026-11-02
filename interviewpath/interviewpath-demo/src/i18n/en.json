@@ -667,7 +667,12 @@
       "anyRole": "No specific role",
       "generateDraft": "Generate draft",
       "openDraft": "Open draft",
-      "awaitingApproval": "Awaiting your approval"
+      "awaitingApproval": "Awaiting your approval",
+      "edit": "Edit",
+      "editOne": "Edit request: {{title}}",
+      "cancelRequest": "Cancel request",
+      "cancelOne": "Cancel request: {{title}}",
+      "cancelConfirm": "Cancel this hiring request? Its intake, drafts and approval stop, and it cannot be reopened."
     },
     "intake": {
       "title": "Manager intake",
@@ -828,6 +833,11 @@
     "submit": "Submit to manager",
     "publish": "Publish",
     "approve": "Approve",
+    "feedback": {
+      "title": "Manager's comments",
+      "comment": "What should change?",
+      "send": "Request changes"
+    },
     "lines": "Description lines",
     "languageTabs": "Language of the description",
     "incomplete": "These languages are not complete: {{languages}}.",
@@ -837,6 +847,7 @@
     "emptyInLanguage": "(nothing written in this language)",
     "restrictedSource": "Restricted source",
     "unsourced": "No source",
+    "unsupported": "Its source does not say this",
     "confirmedByHr": "Confirmed by HR",
     "mustHave": "Must-have",
     "requirement": "Requirement",
@@ -868,6 +879,7 @@
       "warning": "Warning",
       "line": "line {{number}}",
       "differentScope": "This is a different scope",
+      "fact": "Company fact: {{title}}",
       "acknowledge": "Acknowledge: the check could not run",
       "checks": {
         "discrimination": "Discrimination",

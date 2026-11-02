@@ -38,7 +38,7 @@ export async function api(path, { method = 'GET', body, formData, skipAuthRedire
     if (detail.code === 'ai_budget_exceeded') throw new ApiError(response.status, i18n.t('common.aiBudgetExceeded'), detail.code);
     // A detail is text, or an object whose `message` says what happened (a draft blocked by lint, for one).
     const text = typeof detail.detail === 'string' ? detail.detail : detail.detail?.message;
-    throw new ApiError(response.status, typeof text === 'string' && text ? text : `Request failed (${response.status})`);
+    throw new ApiError(response.status, typeof text === 'string' && text ? text : `Request failed (${response.status})`, detail.detail?.code);
   }
   return response.status === 204 ? null : response.json();
 }

@@ -71,10 +71,15 @@ test('a flagged item can only be rejected or rewritten, and an unchecked one nee
   await unchecked.getByRole('button', { name: 'Cancel' }).click();
   await expect(unchecked.getByRole('alertdialog')).toHaveCount(0);
   expect(decisions.length).toBe(sent);
+  // Rewritten text the check still cannot read asks too: the server says so, and it goes out only on the confirmation.
+  await unchecked.getByLabel('Body').fill(`Engineers review pull requests UNCHECKEDCANARY-${RUN}`);
   await unchecked.getByRole('button', { name: 'Accept', exact: true }).click();
+  await expect(unchecked.getByRole('alertdialog')).toBeVisible();
+  expect(decisions.length).toBe(sent + 1);
+  expect(decisions.at(-1).confirm_unchecked).toBeUndefined();
   await unchecked.getByRole('button', { name: 'I reviewed it, accept' }).click();
   await expect(item('Guardcheck9')).toHaveCount(0);
-  expect(decisions.length).toBe(sent + 1);
+  expect(decisions.length).toBe(sent + 2);
   expect(decisions.at(-1)).toMatchObject({ action: 'accept', confirm_unchecked: true });
 });
 

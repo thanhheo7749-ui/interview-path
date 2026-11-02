@@ -102,9 +102,11 @@ test('HR drafts, the manager approves in Korean, HR publishes and copies channel
   await page.getByLabel('Text of line 2', { exact: true }).fill('Under 30 years old');
   await page.getByRole('button', { name: 'Save' }).click();
   const lint = page.getByTestId('lint-panel');
-  await expect(lint.getByTestId('lint-block')).toHaveCount(1);
-  await expect(lint.getByTestId('lint-block')).toContainText('Discrimination');
-  await expect(lint.getByTestId('lint-block')).toContainText('line 2');
+  // The 30 is also not in its source, so it blocks twice: as discrimination and as a claim the source does not make.
+  const discrimination = lint.getByTestId('lint-block').filter({ hasText: 'Discrimination' });
+  await expect(discrimination).toHaveCount(1);
+  await expect(discrimination).toContainText('line 2');
+  await expect(lines.nth(1).getByTestId('unsupported-mark')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Publish', exact: true })).toBeDisabled();
   await expect(page.getByRole('button', { name: 'Submit to manager' })).toBeDisabled();
   await page.getByRole('button', { name: 'Edit line 2', exact: true }).click();
