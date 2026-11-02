@@ -119,6 +119,7 @@ def upgrade() -> None:
     sa.Column('channel', sa.String(length=50), nullable=False),
     sa.Column('language', sa.String(length=10), nullable=False),
     sa.Column('body', sa.Text(), nullable=False),
+    sa.Column('used_template', sa.Boolean(), server_default=sa.false(), nullable=False),
     sa.Column('link_id', sa.Integer(), nullable=True),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('(CURRENT_TIMESTAMP)'), nullable=False),
     sa.ForeignKeyConstraint(['company_id'], ['companies.id'], ondelete='CASCADE'),

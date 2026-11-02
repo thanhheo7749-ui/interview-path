@@ -14,7 +14,7 @@ from app.ai import gateway
 from app.brain import audience as aud
 from app.brain import retriever
 from app.brain.prompting import as_data
-from app.bridges import jd_studio, publishing
+from app.bridges import discrimination, jd_studio, publishing
 from app.database.sql_models import ChannelContent, Company, Job, JobChannelLink, JobDraft
 from app.hiring import audit, jobs
 
@@ -138,17 +138,20 @@ def template(channel: Channel, title: str, lines: list[dict], lang: str, types: 
     return "\n".join([title, *texts, f"{titles[4]}: {LINK}"])
 
 
-def _body(channel: Channel, title: str, lines: list[dict], lang: str, types: dict[int, str], company_id: int) -> str:
+def _body(channel: Channel, title: str, lines: list[dict], lang: str, types: dict[int, str],
+          company_id: int) -> tuple[str, bool]:
+    """The text, and whether it is the template. The AI text must keep to the lines' numbers and pass the discrimination
+    guard: a flag, or a check that could not run, is not a pass."""
     output = gateway.generate_structured(
         "bulk", SYSTEM, [{"role": "user", "content": _prompt(channel, title, lines, lang, types)}], ChannelOutput,
         MAX_OUTPUT_TOKENS, "channel_content", company_id,
     ).value
     body = output.body.strip()
-    if not body or not facts_within(body, lines):
-        return template(channel, title, lines, lang, types)
+    if not body or not facts_within(body, lines) or discrimination.check(body.replace(LINK, ""), company_id) is not None:
+        return template(channel, title, lines, lang, types), True
     if LINK not in body:
         body += f"\n\n{LINK}"
-    return body
+    return body, False
 
 
 # --- routes' entry points ------------------------------------------------------------------------------------------
@@ -174,15 +177,15 @@ def generate(db: Session, draft: JobDraft, user_id: int) -> list[dict]:
     written = []
     for channel in CHANNELS:
         lang = channel.language or default
-        written.append((channel, lang, _body(channel, title, lines, lang, types, draft.company_id)))
+        written.append((channel, lang, *_body(channel, title, lines, lang, types, draft.company_id)))
 
     # Only now: the AI calls above must not hold the new links' uncommitted rows.
     links = {link.channel: link for link in jobs.ensure_channels(db, job, [c.token for c in CHANNELS])}
     pieces = []
-    for channel, lang, body in written:
+    for channel, lang, body, used_template in written:
         link = links[channel.token]
         pieces.append(ChannelContent(company_id=draft.company_id, job_draft_id=draft.id, channel=channel.token,
-                                     language=lang, body=body.replace(LINK, tracked_url(job, link)), link_id=link.id))
+                                     language=lang, body=body.replace(LINK, tracked_url(job, link)), link_id=link.id, used_template=used_template))
     db.query(ChannelContent).filter(ChannelContent.job_draft_id == draft.id,
                                     ChannelContent.company_id == draft.company_id).delete()
     db.add_all(pieces)
@@ -199,7 +202,7 @@ def read(db: Session, draft: JobDraft) -> list[dict]:
             .order_by(ChannelContent.id).all())
     links = {link.id: link for link in db.query(JobChannelLink).filter(JobChannelLink.job_id == job.id,
                                                                       JobChannelLink.company_id == draft.company_id)}
-    return [{"id": row.id, "channel": row.channel, "language": row.language, "body": row.body,
+    return [{"id": row.id, "channel": row.channel, "language": row.language, "body": row.body, "used_template": bool(row.used_template),
              "link": {"token": links[row.link_id].token, "url": tracked_url(job, links[row.link_id]),
                       "click_count": links[row.link_id].click_count} if row.link_id in links else None}
             for row in rows]

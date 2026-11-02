@@ -1,5 +1,5 @@
-from sqlalchemy import JSON, Column, DateTime, ForeignKey, Integer, String, Text
-from sqlalchemy.sql import func
+from sqlalchemy import JSON, Boolean, Column, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy.sql import false as sa_false, func
 
 from .database import Base
 
@@ -72,6 +72,7 @@ class ChannelContent(Base):
     channel = Column(String(50), nullable=False)
     language = Column(String(10), nullable=False)
     body = Column(Text, nullable=False)
+    used_template = Column(Boolean, nullable=False, default=False, server_default=sa_false())  # the AI text was not usable
     link_id = Column(Integer, ForeignKey("job_channel_links.id", ondelete="SET NULL"), nullable=True)
     created_at = _created_at()
 
