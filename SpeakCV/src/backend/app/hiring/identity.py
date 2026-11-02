@@ -107,6 +107,15 @@ def _name_pattern(term: str) -> str:
     return f"(?-i:{_term_pattern(term)}|{_term_pattern(term.upper())})"
 
 
+_HANGUL_END = re.compile(r"[\u1100-\u11FF\u3130-\u318F\uA960-\uA97F\uAC00-\uD7AF\uD7B0-\uD7FF]$")
+
+
+def _right_boundary(term: str) -> str:
+    """Korean attaches particles and honorifics to a name (김철수님은, 김철수는), and Hangul counts as a word character,
+    so a term that ends in Hangul has no right boundary. Its left boundary stays."""
+    return "" if _HANGUL_END.search(term) else r"(?!\w)"
+
+
 def apply_terms(text: str, terms: dict[str, list[str]]) -> str:
     """Replace each term with its token: longest first, whole words, in one pass so tokens stay intact.
 
@@ -124,10 +133,11 @@ def apply_terms(text: str, terms: dict[str, list[str]]) -> str:
     # At equal length a name goes first, so a word that is both takes [NAME] when its case fits a name.
     ordered = sorted(entries.values(), key=lambda item: (len(item[0]), item[1] == _NAME), reverse=True)
     alternatives = "|".join(
-        f"({_name_pattern(term) if token == _NAME else _term_pattern(term)})" for term, token in ordered
+        f"({_name_pattern(term) if token == _NAME else _term_pattern(term)}){_right_boundary(term)}"
+        for term, token in ordered
     )
     # Trailing punctuation such as "Mr." has no \b after it, so the boundaries are written as lookarounds.
-    pattern = re.compile(rf"{_EXISTING_TOKEN}|(?<!\w)(?:{alternatives})(?!\w)", re.IGNORECASE)
+    pattern = re.compile(rf"{_EXISTING_TOKEN}|(?<!\w)(?:{alternatives})", re.IGNORECASE)
     return pattern.sub(lambda m: ordered[m.lastindex - 1][1] if m.lastindex else m[0], normalised)
 
 
