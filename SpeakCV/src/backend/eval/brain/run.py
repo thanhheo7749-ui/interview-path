@@ -58,6 +58,15 @@ PROBE_EMBED_TOKENS_PER_COMPANY = 400
 PROBE_DOCUMENT_TITLE = "Backend Developer job advert (eval probe)"
 PROBE_SENTENCE = "The relocation allowance band for the Backend Developer role is 30 to 40 million. {canary}"
 PROBE_QUESTION = "What is the relocation allowance band for the Backend Developer role?"
+STRADDLING_DOCUMENT_TITLE = "Backend Developer relocation memo (eval probe)"
+STRADDLING_QUOTE = (
+    "The relocation allowance band for the Backend Developer role, as agreed by the compensation committee and "
+    "reviewed by the board of directors last quarter, is 30 to 40 million. {canary} per month."
+)
+STRADDLING_FILLER = "This paragraph is neutral filler for the evaluation and says nothing about the topic asked. "
+# Long enough that the chunker cuts hard windows, and the second window starts inside the quote, before the canary.
+STRADDLING_HEAD_CHARS = 1080
+STRADDLING_TAIL_CHARS = 1400
 
 FIXTURE_NOTE = (
     "This run used the fake AI provider for at least one slot. Its numbers come from fixtures and the deterministic "
@@ -342,6 +351,7 @@ def _probe_canaries(slug: str) -> dict[str, str]:
     return {
         "confidential": f"CANARY-PUBLIC-DOC-{marker}-CONFIDENTIAL-2208",
         "rejected": f"CANARY-PUBLIC-DOC-{marker}-REJECTED-2208",
+        "straddling": f"CANARY-PUBLIC-DOC-{marker}-STRADDLING-2208",
     }
 
 
@@ -375,6 +385,41 @@ def plant_public_document_probe(db, company_id: int, slug: str) -> None:
         db.flush()
         db.add(KbNodeSource(node_id=node.id, chunk_id=chunk.id, quote=text))
     db.commit()
+    plant_straddling_probe(db, company_id, planted["straddling"])
+
+
+def plant_straddling_probe(db, company_id: int, canary: str) -> None:
+    """A confidential quote that crosses a chunk boundary, linked the way ingestion links it. The canary is in the tail,
+    so the chunk that starts inside the quote says it without holding the whole quote."""
+    from app.ai import gateway
+    from app.brain import vectors
+    from app.brain.chunking import chunk_pages
+    from app.brain.ingestion import chunks_sharing_quote
+    from app.database.sql_models import KbChunk, KbDocument, KbNode, KbNodeSource
+
+    quote = STRADDLING_QUOTE.format(canary=canary)
+    head = (STRADDLING_FILLER * 20)[:STRADDLING_HEAD_CHARS]
+    tail = (STRADDLING_FILLER * 20)[:STRADDLING_TAIL_CHARS]
+    pieces = [chunk.text for chunk in chunk_pages([(None, f"{head} {quote} {tail}")])]
+    if not any(quote in text for text in pieces) or not any(canary in text and quote not in text for text in pieces):
+        raise EvalError("The straddling probe no longer crosses a chunk boundary.")
+    document = KbDocument(company_id=company_id, title=STRADDLING_DOCUMENT_TITLE, language="en", visibility="public",
+                          status="published")
+    node = KbNode(company_id=company_id, type="private_note", title="Relocation note straddling", body="", language="en",
+                  visibility="confidential", status="published")
+    db.add_all([document, node])
+    db.flush()
+    embedded = gateway.embed(pieces, "document", "kb_embed", company_id)
+    rows = [
+        KbChunk(company_id=company_id, document_id=document.id, position=position, text=text,
+                embedding=vectors.encode(vector), embedding_model=embedded.model, embedding_dim=embedded.dimension)
+        for position, (text, vector) in enumerate(zip(pieces, embedded.vectors))
+    ]
+    db.add_all(rows)
+    db.flush()
+    db.add_all([KbNodeSource(node_id=node.id, chunk_id=rows[index].id, quote=quote)
+                for index in chunks_sharing_quote(quote, pieces)])
+    db.commit()
 
 
 def public_document_probes(db, company_ids: dict[str, int], all_canaries: list[str]) -> tuple[bool, list[dict]]:
@@ -390,7 +435,9 @@ def public_document_probes(db, company_ids: dict[str, int], all_canaries: list[s
     probes = []
     for slug, company_id in company_ids.items():
         hr_items = retriever.search(db, Audience(company_id, "hr"), PROBE_QUESTION).items
-        reachable = reachable and bool(contains_any("\n".join(i.text for i in hr_items), [_probe_canaries(slug)["confidential"]]))
+        hr_text = "\n".join(i.text for i in hr_items)
+        planted = _probe_canaries(slug)
+        reachable = reachable and all(contains_any(hr_text, [planted[name]]) for name in ("confidential", "straddling"))
         for kind in AUDIENCES_UNDER_LEAK_CHECK:
             result = _ask(db, {"audience": kind, "question": PROBE_QUESTION}, company_id)
             retrieved = "\n".join(i.text for i in retriever.search(db, Audience(company_id, kind), PROBE_QUESTION).items)

@@ -11,7 +11,7 @@ from app.ai.types import AIError
 from app.brain import contradiction, org_sync, retriever, review, vectors
 from app.brain.chunking import chunk_pages
 from app.brain.extraction import ExtractedEdge, ExtractedNode, ExtractionResult, extract_chunk
-from app.brain.text import guess_language, normalise_title, quote_in, verified_quote
+from app.brain.text import guess_language, normalise_title, quote_in, shares_span, verified_quote
 from app.bridges import discrimination
 from app.core import storage
 from app.core.text_extract import NoExtractableText, extract_pages
@@ -296,12 +296,32 @@ def _new_node(db: Session, graph: _Graph, item: ExtractedNode) -> KbNode:
     return node
 
 
+def chunks_sharing_quote(quote: str, chunks: list[str]) -> list[int]:
+    """Positions of the chunks that say any of the quote: each chunk holding all of it, and the neighbours on either
+    side for as long as they share a span. Chunks overlap, so the next one can start in the middle of the quote.
+
+    Walking out from a holder means a chance match at the edge of a chunk elsewhere in the document does not count."""
+    linked: set[int] = set()
+    for index, text in enumerate(chunks):
+        if not quote_in(quote, text):
+            continue
+        linked.add(index)
+        for step in (-1, 1):
+            neighbour = index + step
+            while 0 <= neighbour < len(chunks) and shares_span(quote, chunks[neighbour]):
+                linked.add(neighbour)
+                neighbour += step
+    return sorted(linked)
+
+
 def _add_sources(db: Session, graph: _Graph, node: KbNode, quote: str) -> None:
-    """Link the node to every chunk of this document that holds the quote. Chunks overlap, so a sentence can be in two
-    of them, and retrieval decides whether a chunk may be read from the nodes linked to it."""
-    for chunk_id, text in graph.document_chunks:
+    """Link the node to every chunk of this document that says any of the quote. Retrieval decides whether a chunk may
+    be read from the nodes linked to it, so a chunk left out here would serve the part of the quote it holds."""
+    texts = [text for _, text in graph.document_chunks]
+    for index in chunks_sharing_quote(quote, texts):
+        chunk_id = graph.document_chunks[index][0]
         key = (node.id, chunk_id, quote)
-        if key not in graph.sources and quote_in(quote, text):
+        if key not in graph.sources:
             graph.sources.add(key)
             db.add(KbNodeSource(node_id=node.id, chunk_id=chunk_id, quote=quote))
 

@@ -200,6 +200,19 @@ def test_the_leak_check_catches_a_chunk_filter_that_only_looks_at_the_document(t
     assert any("REJECTED" in canary for canary in leaked)
 
 
+def test_the_leak_check_catches_a_straddling_quote_linked_only_where_it_is_whole(tmp_path, monkeypatch):
+    from app.brain import ingestion
+    from app.brain.text import quote_in
+
+    monkeypatch.setattr(ingestion, "chunks_sharing_quote",
+                        lambda quote, chunks: [i for i, text in enumerate(chunks) if quote_in(quote, text)])
+    report = _evaluate(tmp_path)
+
+    leaked = [canary for probe in report["public_document_probes"] for canary in probe["leaked"]]
+    assert any("STRADDLING" in canary for canary in leaked)
+    assert report["permission_leak"] > 0
+
+
 def test_isolation_check_flags_text_that_only_the_other_company_holds():
     truth = run.load_truth()
     markers = run.isolation_markers(truth, "daehan-precision")

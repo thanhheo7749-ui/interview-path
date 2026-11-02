@@ -8,8 +8,11 @@ import pytest
 from app.ai import gateway
 from app.ai.providers import fake
 from app.brain import audience as aud
-from app.brain import contradiction, copilot, retriever
-from app.database.sql_models import KbChunk, KbNodeSource
+from app.brain import contradiction, copilot, ingestion, retriever, review
+from app.brain.chunking import chunk_pages
+from app.brain.ingestion import chunks_sharing_quote
+from app.brain.text import shares_span
+from app.database.sql_models import Company, KbChunk, KbDocument, KbNode, KbNodeSource
 from tests.helpers import auth_header
 from tests.test_brain_copilot import World, answer_json, prompt_text
 
@@ -273,3 +276,95 @@ def test_a_conflict_no_longer_open_does_not_hold_back_the_chunks(db, world, leav
     db.commit()
     fake.enqueue("copilot_answer", answer_json(leave.chunk_a, answer="12 days."))
     assert copilot.ask(db, world.employee_audience, LEAVE_QUESTION, world.employee_id).state == "answered"
+
+
+# A quote that straddles two chunks: the next chunk starts inside it, so it says the tail of what HR classed as hidden.
+
+STRADDLING_CANARY = "CANARYTAIL77"
+STRADDLING_QUOTE = (
+    "The salary band for this backend engineering role, as agreed by the compensation committee last quarter for "
+    f"the coming year and reviewed by the board of directors, is 30 to 40 million VND {STRADDLING_CANARY} per month."
+)
+STRADDLING_QUESTION = "What is the salary band for the backend role?"
+
+
+def straddling_document(db, company):
+    """Hard-window chunks, cut so that one holds the whole quote and the next one starts inside it, before the canary."""
+    before = ("Our backend team builds services for customers and partners across the region every day. " * 14)[:1120]
+    after = "Applicants should send a short letter about their distributed systems work and salary band questions. " * 12
+    data = f"{before} {STRADDLING_QUOTE} {after}"
+    pieces = chunk_pages([(None, data)])
+    holders = [piece for piece in pieces if STRADDLING_QUOTE in piece.text]
+    tails = [piece for piece in pieces if STRADDLING_CANARY in piece.text and STRADDLING_QUOTE not in piece.text]
+    assert len(holders) == 1 and len(tails) == 1  # otherwise this document no longer tests a straddling quote
+    note = {"ref": "Backend salary band", "type": "private_note", "title": "Backend salary band",
+            "body": "Pay is discussed at the offer.", "quote": STRADDLING_QUOTE, "fact_kind": "none", "fact_value": "",
+            "fact_unit": "", "scope_text": "", "effective_date": ""}
+    for piece in pieces:
+        fake.enqueue("kb_extract", json.dumps({"nodes": [note] if piece is holders[0] else [], "edges": []}))
+    document = ingestion.create_document(
+        db, company.id, None, title="Job advert", data=data.encode(), suffix=".md", visibility="public",
+        department_id=None, language="en", effective_date=None,
+    )
+    job = ingestion.start_job(db, document.id)
+    ingestion.run_job(job.id)
+    db.expire_all()
+    return db.query(KbNode).filter_by(title="Backend salary band").one(), db.get(KbDocument, document.id)
+
+
+@pytest.fixture
+def acme(db, tmp_path, monkeypatch):
+    monkeypatch.setenv("STORAGE_DIR", str(tmp_path))
+    fake.reset()
+    row = Company(slug="acme", name="Acme")
+    db.add(row)
+    db.commit()
+    return row
+
+
+def candidate_sees(db, company_id, question):
+    """Everything a candidate's question can reach: the prompt, the response and the retrieved context."""
+    fake.register("copilot_answer", lambda *_: json.dumps({"can_answer": False, "answer": "", "citation_ids": []}))
+    response = copilot.ask(db, aud.candidate(company_id), question, None)
+    retrieved = retriever.search(db, aud.candidate(company_id), question, top_k=100, char_budget=10 ** 6)
+    return " ".join([prompt_text(), json.dumps(asdict(response), default=str), *[i.text for i in retrieved.items]])
+
+
+@pytest.mark.parametrize("decision", ["accept", "reject"])
+def test_the_tail_of_a_straddling_quote_reaches_no_candidate(db, acme, decision):
+    node, document = straddling_document(db, acme)
+    assert node.visibility == "confidential"
+    if decision == "accept":
+        review.publish_node(db, node, None)
+    else:
+        node.status = "rejected"
+    document.status = "published"
+    db.commit()
+    assert STRADDLING_CANARY not in candidate_sees(db, acme.id, STRADDLING_QUESTION)
+    assert any(STRADDLING_CANARY in text for (text,) in db.query(KbChunk.text))
+
+
+def test_a_straddling_quote_links_both_chunks(db, acme):
+    node, _ = straddling_document(db, acme)
+    assert db.query(KbNodeSource).filter_by(node_id=node.id).count() == 2
+
+
+@pytest.mark.parametrize("quote,source,shared", [
+    ("the whole quote is here", "before the whole quote is here after", True),
+    ("the salary band is 30 million", "30 million and more after it", True),  # the tail starts the chunk
+    ("the salary band is 30 million", "text before it the salary band", True),  # the head ends the chunk
+    ("a b the salary band is 30 million c d", "the salary band is 30 million", True),  # the chunk lies inside the quote
+    ("the salary  band\nis 30 million", "band is 30 million and after", True),  # compared after normalising whitespace
+    ("the salary band is 30 million", "nothing about it in here at all", False),
+    ("the salary band is 30 million.", ". nothing here", False),  # one character is chance, not a span
+    ("", "anything", False),
+])
+def test_shares_span(quote, source, shared):
+    assert shares_span(quote, source) is shared
+
+
+def test_a_chunk_far_from_the_quote_is_not_linked_by_a_chance_match_at_its_edge():
+    quote = "Annual leave is 12 days per year."
+    chunks = ["Annual leave is 12 days per year. Then more.", "year. A different section starts here.",
+              "Filler that says nothing.", "year. This chunk is far from the quote."]
+    assert chunks_sharing_quote(quote, chunks) == [0, 1]
