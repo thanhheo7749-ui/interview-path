@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-  correctCvStatus, decide, fastTrack, grantRestart, retryAnalysis, revealIdentity,
+  CONSENT_WITHDRAWN, correctCvStatus, decide, fastTrack, grantRestart, retryAnalysis, revealIdentity,
 } from '../../lib/board.js';
 import { ErrorAlert, inputClass, primaryButton, secondaryButton } from '../KbFeedback.jsx';
 
@@ -19,6 +19,7 @@ function DecisionBar({ companyId, detail, onChanged }) {
   const awaiting = detail.stage === 'ready_for_hr' && detail.hr_decision === 'pending';
   const failed = detail.stage === 'ready_for_hr' && detail.analysis_status === 'failed';
   const invited = detail.stage === 'invited';
+  const canRestart = detail.analysis_status !== CONSENT_WITHDRAWN;
   const otherLabel = detail.cv_status === 'meets' ? 'not_met' : 'meets';
 
   const run = async (action, after) => {
@@ -77,9 +78,11 @@ function DecisionBar({ companyId, detail, onChanged }) {
                 {t('board.actions.correctCv')}
               </button>
             )}
-            <button type="button" disabled={busy} onClick={() => run(() => grantRestart(companyId, appId))} className={secondaryButton}>
-              {t('board.actions.restart')}
-            </button>
+            {canRestart && (
+              <button type="button" disabled={busy} onClick={() => run(() => grantRestart(companyId, appId))} className={secondaryButton}>
+                {t('board.actions.restart')}
+              </button>
+            )}
           </>
         )}
         {invited && (

@@ -520,6 +520,7 @@
     "fastTracked": "Fast-tracked",
     "fastTrackedNote": "This candidate was fast-tracked without an interview, so there is no interview evidence.",
     "notTaken": "Did not take the interview",
+    "consentWithdrawn": "Withdrew consent to recording",
     "anonymizedNotice": "This candidate's data has been deleted. There is nothing left to review and no action is available.",
     "analysisFailed": "The analysis of this interview failed. You can retry it.",
     "hiddenText": "Note: the CV file contained hidden text, which was ignored.",
@@ -558,7 +559,8 @@
       "empty": "There is no interview transcript for this candidate.",
       "question": "Question",
       "followup": "Follow-up",
-      "unavailable": "No transcript is available for this answer."
+      "unavailable": "No transcript is available for this answer.",
+      "maskedNote": "Names, emails, phone numbers and similar details are hidden until you reveal the candidate. Anything else they said about themselves may remain."
     },
     "evidence": {
       "title": "Requirements: CV and interview side by side",

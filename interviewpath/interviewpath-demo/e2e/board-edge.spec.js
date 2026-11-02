@@ -58,3 +58,42 @@ test('an anonymized candidate shows a plain notice and no actions', async ({ pag
   await expect(panel.getByTestId('decision-bar')).toHaveCount(0);
   await expect(panel.getByRole('alert')).toHaveCount(0);
 });
+
+test('a card whose application was deleted meanwhile shows the plain notice instead of an error', async ({ page }) => {
+  await signIn(page, BOARD_USER);
+  await page.route('**/api/companies/*/applications/*', async (route) => {
+    if (!/applications\/\d+$/.test(route.request().url()) || route.request().method() !== 'GET') return route.fallback();
+    return route.fulfill({ status: 404, headers: CORS, json: { detail: 'Application not found' } });
+  });
+  await page.goto(`/jobs/${seed.job_id}/board`);
+  await page.getByTestId('cell-priority').getByRole('button', { name: /#P1/ }).click();
+  const panel = page.getByTestId('detail-panel');
+  await expect(panel.getByTestId('anonymized-notice')).toBeVisible();
+  await expect(panel.getByRole('alert')).toHaveCount(0);
+});
+
+test('before a reveal the panel says what is hidden and that spoken details may remain; a logged reveal shows the raw text', async ({ page }) => {
+  await signIn(page, BOARD_USER);
+  let real = '';
+  const spoken = 'Call me on 0901234567. I ran a billing service.';
+  await page.route('**/api/companies/*/applications/*', async (route) => {
+    if (!/applications\/\d+$/.test(route.request().url()) || route.request().method() !== 'GET') return route.fallback();
+    const response = await route.fetch();
+    const body = await response.json();
+    real = body.identity_masked;
+    body.transcript[0].transcript = body.identity_masked ? 'Call me on [ID]. I ran a billing service.' : spoken;
+    return route.fulfill({ response, json: body, headers: { ...response.headers(), ...CORS } });
+  });
+  await page.goto(`/jobs/${seed.job_id}/board`);
+  await page.getByTestId('cell-priority').getByRole('button', { name: /#P1/ }).click();
+  const panel = page.getByTestId('detail-panel');
+  await expect(panel.getByTestId('transcript-masked-note')).toContainText('may remain');
+  await expect(panel.getByTestId('transcript')).toContainText('[ID]');
+  expect(real).toBe(true);
+  await panel.getByRole('button', { name: 'Reveal identity' }).click();
+  await panel.getByRole('button', { name: 'Reveal', exact: true }).click();
+  await expect(panel.getByTestId('revealed-identity')).toBeVisible();
+  await expect(panel.getByTestId('transcript-masked-note')).toHaveCount(0);
+  await expect(panel.getByTestId('transcript')).toContainText('0901234567');
+  expect(real).toBe(false);
+});

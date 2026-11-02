@@ -1,7 +1,7 @@
 import { X } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { getApplication } from '../lib/board.js';
+import { CONSENT_WITHDRAWN, getApplication } from '../lib/board.js';
 import { BriefWorkflow } from './board/BriefEditor.jsx';
 import DecisionBar from './board/DecisionBar.jsx';
 import EvidenceTable from './board/EvidenceTable.jsx';
@@ -15,12 +15,18 @@ function CandidateDetailPanel({ companyId, appId, onClose, onChanged }) {
   const { t } = useTranslation();
   const [detail, setDetail] = useState(null);
   const [error, setError] = useState('');
+  const [deleted, setDeleted] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
     getApplication(companyId, appId)
       .then((data) => { if (!cancelled) setDetail(data); })
-      .catch((err) => { if (!cancelled) setError(err.message); });
+      .catch((err) => {
+        if (cancelled) return;
+        // The board no longer lists a deleted application, so a stale card is the one way to reach this.
+        if (err.status === 404) setDeleted(true);
+        else setError(err.message);
+      });
     return () => { cancelled = true; };
   }, [companyId, appId]);
 
@@ -46,8 +52,8 @@ function CandidateDetailPanel({ companyId, appId, onClose, onChanged }) {
         </button>
       </div>
       <ErrorAlert message={error} />
-      {!detail && !error && <p className="mt-4 text-sm text-slate-500">{t('common.loading')}</p>}
-      {detail?.anonymized && (
+      {!detail && !error && !deleted && <p className="mt-4 text-sm text-slate-500">{t('common.loading')}</p>}
+      {(deleted || detail?.anonymized) && (
         <p role="status" data-testid="anonymized-notice" className="mt-4 rounded-xl bg-slate-100 p-4 text-sm font-semibold text-slate-700">
           {t('board.anonymizedNotice')}
         </p>
@@ -63,12 +69,13 @@ function CandidateDetailPanel({ companyId, appId, onClose, onChanged }) {
           {detail.hidden_text_detected && <p className="text-xs text-slate-500">{t('board.hiddenText')}</p>}
           {detail.fast_tracked && <p className="text-sm font-semibold text-slate-700">{t('board.fastTrackedNote')}</p>}
           {detail.analysis_status === 'not_taken' && <p data-testid="interview-note" className="text-sm font-semibold text-amber-800">{t('board.notTaken')}</p>}
+          {detail.analysis_status === CONSENT_WITHDRAWN && <p data-testid="interview-note" className="text-sm font-semibold text-amber-800">{t('board.consentWithdrawn')}</p>}
           {detail.analysis_status === 'failed' && <p className="text-sm font-semibold text-red-700">{t('board.analysisFailed')}</p>}
           {detail.cv_status_correction_reason && (
             <p className="text-xs text-slate-600">{t('board.cvCorrection.reasonShown', { reason: detail.cv_status_correction_reason })}</p>
           )}
 
-          <TranscriptPanel companyId={companyId} appId={appId} turns={detail.transcript} />
+          <TranscriptPanel companyId={companyId} appId={appId} turns={detail.transcript} masked={detail.identity_masked} />
           <EvidenceTable
             companyId={companyId}
             appId={appId}

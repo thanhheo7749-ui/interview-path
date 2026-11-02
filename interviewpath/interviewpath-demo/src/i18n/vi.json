@@ -519,6 +519,7 @@
     "fastTracked": "Đi tắt",
     "fastTrackedNote": "Ứng viên này được đi tắt, không qua phỏng vấn, nên không có bằng chứng phỏng vấn.",
     "notTaken": "Không tham gia phỏng vấn",
+    "consentWithdrawn": "Đã rút đồng ý ghi âm",
     "anonymizedNotice": "Dữ liệu của ứng viên này đã bị xóa. Không còn gì để xem xét và không có hành động nào khả dụng.",
     "analysisFailed": "Phân tích buổi phỏng vấn này không thành công. Bạn có thể thử lại.",
     "hiddenText": "Lưu ý: tệp CV có chứa văn bản ẩn và phần này đã bị bỏ qua.",
@@ -557,7 +558,8 @@
       "empty": "Ứng viên này chưa có bản ghi phỏng vấn.",
       "question": "Câu hỏi",
       "followup": "Câu hỏi thêm",
-      "unavailable": "Chưa có bản ghi cho câu trả lời này."
+      "unavailable": "Chưa có bản ghi cho câu trả lời này.",
+      "maskedNote": "Tên, email, số điện thoại và các chi tiết tương tự được ẩn cho đến khi bạn mở danh tính ứng viên. Những điều khác ứng viên tự nói về bản thân vẫn có thể còn lại."
     },
     "evidence": {
       "title": "Yêu cầu: CV và phỏng vấn cạnh nhau",

@@ -30,3 +30,6 @@ export async function fetchTurnAudio(companyId, appId, position) {
 }
 
 export const isUndecided = (card) => card.hr_decision === 'pending';
+export const CONSENT_WITHDRAWN = 'consent_withdrawn';
+// A candidate who withdrew consent to recording is never rejected along with others: HR decides on them alone.
+export const isBulkSelectable = (card) => isUndecided(card) && card.analysis_status !== CONSENT_WITHDRAWN;
