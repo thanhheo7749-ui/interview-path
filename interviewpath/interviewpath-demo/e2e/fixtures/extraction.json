@@ -95,6 +95,42 @@
       "fact_unit": "",
       "scope_text": "",
       "effective_date": ""
+    },
+    {
+      "ref": "Guardflag9 candidates must be under 30 years old",
+      "type": "requirement",
+      "title": "Guardflag9 candidates must be under 30 years old",
+      "body": "Candidates must be under 30 years old to join the Guardflag9 team.",
+      "quote": "Guardflag9 candidates must be under 30 years old.",
+      "fact_kind": "none",
+      "fact_value": "",
+      "fact_unit": "",
+      "scope_text": "",
+      "effective_date": ""
+    },
+    {
+      "ref": "Guardrewrite9 candidates must be under 25 years old",
+      "type": "requirement",
+      "title": "Guardrewrite9 candidates must be under 25 years old",
+      "body": "Candidates must be under 25 years old to join the Guardrewrite9 team.",
+      "quote": "Guardrewrite9 candidates must be under 25 years old.",
+      "fact_kind": "none",
+      "fact_value": "",
+      "fact_unit": "",
+      "scope_text": "",
+      "effective_date": ""
+    },
+    {
+      "ref": "Guardcheck9 engineers review every pull request",
+      "type": "requirement",
+      "title": "Guardcheck9 engineers review every pull request",
+      "body": "Guardcheck9 engineers review every pull request before it merges. UNCHECKEDCANARY",
+      "quote": "Guardcheck9 engineers review every pull request before it merges.",
+      "fact_kind": "none",
+      "fact_value": "",
+      "fact_unit": "",
+      "scope_text": "",
+      "effective_date": ""
     }
   ],
   "edges": []

@@ -179,7 +179,24 @@
     "factValue": "Giá trị dữ kiện",
     "factUnit": "Đơn vị dữ kiện",
     "factScope": "Áp dụng cho",
-    "effective": "hiệu lực {{date}}"
+    "effective": "hiệu lực {{date}}",
+    "guard": {
+      "uncheckedTitle": "Kiểm tra phân biệt đối xử tự động chưa chạy được",
+      "flaggedTitle": "Bị chặn: yêu cầu một đặc điểm được bảo vệ ({{category}})",
+      "uncheckedHint": "Hãy tự đọc mục này. Nếu ổn, hãy chấp nhận và xác nhận rằng bạn đã xem xét.",
+      "flaggedHint": "Không thể chấp nhận mục này như hiện tại. Hãy từ chối, hoặc viết lại tiêu đề hay nội dung để không còn yêu cầu đặc điểm được bảo vệ.",
+      "confirmMessage": "Xác nhận rằng bạn đã đọc mục này và nó không yêu cầu đặc điểm được bảo vệ.",
+      "confirm": "Tôi đã xem xét, chấp nhận",
+      "categories": {
+        "age": "độ tuổi",
+        "gender": "giới tính",
+        "marital_status": "tình trạng hôn nhân",
+        "appearance": "ngoại hình",
+        "region": "vùng miền",
+        "religion": "tôn giáo",
+        "ethnicity": "dân tộc"
+      }
+    }
   },
   "conflicts": {
     "title": "Mâu thuẫn",
@@ -620,7 +637,11 @@
         "drafting": "Đang soạn mô tả công việc",
         "published": "Đã đăng",
         "cancelled": "Đã hủy"
-      }
+      },
+      "roleLabel": "Vị trí để viết mô tả",
+      "anyRole": "Không chọn vị trí cụ thể",
+      "generateDraft": "Tạo bản nháp",
+      "openDraft": "Mở bản nháp"
     },
     "intake": {
       "title": "Phỏng vấn đầu vào với quản lý",
@@ -661,6 +682,105 @@
       "retry": "Vui lòng trả lời thêm một lần nữa.",
       "expired": "Buổi này đã hết hạn.",
       "ended": "Buổi này đã kết thúc."
+    }
+  },
+  "jd": {
+    "title": "JD Studio",
+    "back": "Quay lại yêu cầu tuyển dụng",
+    "version": "Phiên bản {{version}}",
+    "status": {
+      "draft": "Bản nháp",
+      "manager_review": "Chờ quản lý",
+      "approved": "Đã duyệt",
+      "published": "Đã đăng"
+    },
+    "hint": {
+      "draft": "Chỉnh sửa các dòng hoặc nhờ trợ lý, sau đó gửi bản nháp cho quản lý.",
+      "draftManager": "HR vẫn đang chỉnh sửa bản nháp này. Bạn sẽ duyệt được khi HR gửi.",
+      "manager_review": "Đã gửi. Đang chờ quản lý đọc và duyệt.",
+      "manager_reviewManager": "Đọc mô tả bằng ngôn ngữ của bạn. Duyệt nếu đúng.",
+      "approved": "Quản lý đã duyệt phiên bản này. HR có thể đăng.",
+      "approvedManager": "Bạn đã duyệt phiên bản này. HR có thể đăng.",
+      "published": "Mô tả này đã được đăng. Sửa lại sẽ cần được duyệt lần nữa.",
+      "publishedManager": "Mô tả này đã được đăng.",
+      "blocked": "Hãy sửa những điểm đang chặn bản nháp, hoặc bổ sung các ngôn ngữ còn thiếu, trước khi gửi."
+    },
+    "submit": "Gửi cho quản lý",
+    "publish": "Đăng",
+    "approve": "Duyệt",
+    "lines": "Các dòng của mô tả",
+    "languageTabs": "Ngôn ngữ của mô tả",
+    "incomplete": "Các ngôn ngữ chưa đầy đủ: {{languages}}.",
+    "rejected": "{{count}} dòng được tạo đã bị loại vì đồ thị tri thức không có căn cứ.",
+    "noLines": "Bản nháp này chưa có dòng nào.",
+    "lineText": "Nội dung dòng {{number}}",
+    "emptyInLanguage": "(chưa viết gì bằng ngôn ngữ này)",
+    "sourceNode": "Nguồn #{{id}}",
+    "unsourced": "Không có nguồn",
+    "confirmedByHr": "HR đã xác nhận",
+    "mustHave": "Bắt buộc",
+    "requirement": "Yêu cầu",
+    "edit": "Sửa",
+    "editLine": "Sửa dòng {{number}}",
+    "confirmLine": "Xác nhận dòng {{number}} dù không có nguồn",
+    "confirmLineShort": "Xác nhận",
+    "removeLine": "Xóa dòng {{number}}",
+    "assistant": {
+      "title": "Trợ lý",
+      "hint": "Nhờ đổi cách viết, độ dài hoặc giọng văn. Trợ lý không bao giờ tự thêm lương, phúc lợi hay yêu cầu mà đồ thị tri thức không có; trợ lý chỉ đề xuất và bạn quyết định.",
+      "empty": "Chưa có tin nhắn.",
+      "role": {
+        "user": "Bạn",
+        "assistant": "Trợ lý"
+      },
+      "proposed": "Dòng đề xuất, chưa có trong bản nháp",
+      "confirm": "Xác nhận",
+      "dismiss": "Bỏ qua",
+      "input": "Tin nhắn cho trợ lý",
+      "placeholder": "Ví dụ: viết ngắn hơn",
+      "send": "Gửi"
+    },
+    "lint": {
+      "title": "Kiểm tra",
+      "rerun": "Chạy kiểm tra lại",
+      "clear": "Không có vấn đề.",
+      "blocking": "Chặn việc đăng",
+      "warning": "Cảnh báo",
+      "line": "dòng {{number}}",
+      "differentScope": "Đây là phạm vi khác",
+      "acknowledge": "Ghi nhận: không chạy được kiểm tra",
+      "checks": {
+        "discrimination": "Phân biệt đối xử",
+        "no_source": "Không có nguồn",
+        "conflict": "Mâu thuẫn với dữ kiện công ty",
+        "unchecked": "Không chạy được kiểm tra",
+        "must_have_count": "Quá nhiều yêu cầu bắt buộc"
+      }
+    },
+    "channels": {
+      "title": "Nội dung theo kênh",
+      "manualNotice": "Hãy sao chép và đăng thủ công. Hệ thống này không đăng lên trang tuyển dụng.",
+      "generate": "Tạo nội dung theo kênh",
+      "names": {
+        "linkedin": "LinkedIn",
+        "facebook": "Facebook",
+        "itviec": "ITviec",
+        "topcv": "TopCV",
+        "university_email": "Email gửi trường đại học",
+        "university_post": "Bài đăng cho sinh viên"
+      },
+      "languages": {
+        "en": "tiếng Anh",
+        "vi": "tiếng Việt",
+        "ko": "tiếng Hàn"
+      },
+      "language": "Viết bằng {{language}}",
+      "copyLink": "Sao chép liên kết {{channel}}",
+      "copyLinkShort": "Sao chép liên kết",
+      "copyText": "Sao chép nội dung {{channel}}",
+      "copyTextShort": "Sao chép nội dung",
+      "copied": "Đã sao chép",
+      "copyFailed": "Không sao chép được. Hãy chọn văn bản và sao chép thủ công."
     }
   }
 }

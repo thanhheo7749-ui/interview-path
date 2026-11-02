@@ -134,8 +134,8 @@ test('HR opens a request, the manager records the intake in Korean, and HR revie
   }).toPass({ timeout: 60000, intervals: [1000, 2000, 3000] });
 });
 
-// The sections used by the manager's pages: sign-in, sidebar, settings, the notices, hiring requests and the intake.
-const MANAGER_SECTIONS = ['common', 'login', 'nav', 'auth', 'password', 'settings', 'banner', 'demoAi', 'bridges'];
+// The sections used by the manager's pages: sign-in, sidebar, settings, the notices, hiring requests, the intake and JD Studio (draft, approval).
+const MANAGER_SECTIONS = ['common', 'login', 'nav', 'auth', 'password', 'settings', 'banner', 'demoAi', 'bridges', 'jd'];
 const readLocale = (name) => JSON.parse(readFileSync(join(import.meta.dirname, '..', 'src', 'i18n', `${name}.json`), 'utf8'));
 
 function flatten(value, prefix = '') {

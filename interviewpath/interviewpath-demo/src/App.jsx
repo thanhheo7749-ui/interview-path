@@ -20,6 +20,7 @@ import JobsPage from './routes/JobsPage.jsx';
 import BoardPage from './routes/BoardPage.jsx';
 import HiringRequestsPage from './routes/HiringRequestsPage.jsx';
 import IntakePage from './routes/IntakePage.jsx';
+import JdStudioPage from './routes/JdStudioPage.jsx';
 import DemoAiNotice from './components/DemoAiNotice.jsx';
 import { useCompany } from './company/CompanyContext.jsx';
 
@@ -95,6 +96,7 @@ function App() {
         </Route>
         <Route element={<HrOrManager />}>
           <Route path="/hiring-requests" element={<HiringRequestsPage />} />
+          <Route path="/jd-studio/:draftId" element={<JdStudioPage />} />
         </Route>
         <Route element={<ManagerOnly />}>
           <Route path="/intake/:requestId" element={<IntakePage />} />

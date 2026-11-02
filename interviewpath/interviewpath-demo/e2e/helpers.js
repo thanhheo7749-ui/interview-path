@@ -47,3 +47,35 @@ export async function signIn(page, user = LOGIN_USER) {
   await fillLogin(page, NEW_PASSWORD, user);
   await expect(page.getByRole('heading', { name: 'Company settings' })).toBeVisible();
 }
+
+const bearer = (token) => ({ Authorization: `Bearer ${token}` });
+
+export async function apiLogin(request, email, password) {
+  const response = await request.post(`${API_URL}/api/login`, { data: { email, password } });
+  expect(response.ok()).toBe(true);
+  return (await response.json()).access_token;
+}
+
+// HR's token and company for a user who can already sign in with this password.
+export async function hrSession(request, email, password) {
+  const token = await apiLogin(request, email, password);
+  const me = await (await request.get(`${API_URL}/api/me`, { headers: bearer(token) })).json();
+  return { token, headers: bearer(token), companyId: me.memberships.find((m) => m.role === 'hr').company_id };
+}
+
+// HR adds a manager through the API and the manager picks their own password, as the forced-change screen would.
+export async function addManager(request, hr, { email, fullName, password, departmentId = null }) {
+  const added = await request.post(`${API_URL}/api/companies/${hr.companyId}/members`, {
+    headers: hr.headers,
+    data: { email, full_name: fullName, role: 'manager', department_id: departmentId },
+  });
+  expect(added.ok()).toBe(true);
+  const { user_id: userId, temporary_password: temporary } = await added.json();
+  const token = await apiLogin(request, email, temporary);
+  const changed = await request.post(`${API_URL}/api/me/password`, {
+    headers: bearer(token),
+    data: { current_password: temporary, new_password: password },
+  });
+  expect(changed.ok()).toBe(true);
+  return userId;
+}
