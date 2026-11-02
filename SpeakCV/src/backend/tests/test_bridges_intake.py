@@ -771,3 +771,32 @@ def test_recovery_erases_what_a_crash_left_and_a_second_run_is_a_no_op(client, w
     assert recording_files(tmp_path) == [] and db.query(KbDocument).filter_by(source_type="intake").count() == 1
     scheduled.clear()
     assert intake.recover_interrupted() == [] and scheduled == []
+
+
+def test_a_manager_who_was_removed_cannot_keep_answering_their_intake(client, world, db):
+    state = start(client, world).json()
+    member = db.query(CompanyMember).filter_by(company_id=world.company.id, user_id=world.manager.id).one()
+    db.delete(member)
+    db.commit()
+    assert answer(client, state["session_id"], state["position"]).status_code == 404
+    assert client.get(f"/api/voice/{state['session_id']}/state", headers=auth_header(MANAGER)).status_code == 404
+
+
+def test_the_intake_rules_run_on_every_node_type(client, world, db):
+    queue_extraction(requirement_item("Team makeup", "30세 이하 선호", node_type="value"))
+    session = finished_session(client, db, world, text="우리 팀은 30세 이하 선호합니다. 팀은 빠르게 일합니다.", language="ko")
+    intake.run_completion(session.id)
+    db.expire_all()
+    node = db.query(KbNode).filter_by(title="Team makeup").one()
+    assert node.type == "value" and node.guard_category == "age" and node.status == "draft"
+    path = f"/api/companies/{world.company.id}/kb/review/decide"
+    blocked = client.post(path, json={"items": [{"action": "accept", "node_id": node.id}]}, headers=auth_header(HR))
+    assert blocked.status_code == 409 and "age" in blocked.text
+    reworded = client.post(path, headers=auth_header(HR), json={"items": [
+        {"action": "accept", "node_id": node.id, "title": "Team makeup", "body": "Under 30 years old only"}]})
+    assert reworded.status_code == 409  # an edit is checked again by the rules
+    clean = client.post(path, headers=auth_header(HR), json={"items": [
+        {"action": "accept", "node_id": node.id, "title": "Team style", "body": "We value fast, careful work"}]})
+    assert clean.status_code == 200, clean.text
+    db.expire_all()
+    assert db.get(KbNode, node.id).status == "published" and db.get(KbNode, node.id).guard_category is None

@@ -190,7 +190,7 @@ def generate(db, application, reviewer_id, language: str = DEFAULT_LANGUAGE) -> 
     if application.hr_decision != "approved" or application.anonymized_at is not None:
         raise BriefError(409, "A brief needs an approved application")
     row = _get(db, application)
-    if row is not None and row.status == "sent":
+    if row is not None and row.status == "sent" and not row.stale:
         raise BriefError(409, "This brief was already sent")
     evidence = collect_evidence(db, application)
     provider = model = None
@@ -214,6 +214,7 @@ def generate(db, application, reviewer_id, language: str = DEFAULT_LANGUAGE) -> 
         row = CandidateBrief(company_id=application.company_id, application_id=application.id)
         db.add(row)
     row.language, row.content, row.status, row.reviewed_by, row.sent_at = language, content, "draft", None, None
+    row.stale = False
     audit.record(db, application.company_id, reviewer_id, "brief_generated", "application", application.id,
                  payload={"language": language, "evidence": len(evidence)},
                  ai_provider=provider, ai_model=model, prompt_version=PROMPT_VERSION if evidence else None)
@@ -251,6 +252,8 @@ def _managers_of(db, company_id: int, department_id: int | None) -> list[int]:
 
 
 def send(db, application, row, actor_user_id) -> CandidateBrief:
+    if application.anonymized_at is not None:
+        raise BriefError(409, "This application was anonymized")
     if row.status == "sent":
         raise BriefError(409, "This brief was already sent")
     if row.reviewed_by is None:
@@ -263,7 +266,7 @@ def send(db, application, row, actor_user_id) -> CandidateBrief:
     for user_id in _managers_of(db, application.company_id, job.department_id):
         notify.enqueue(db, application.company_id, user_id, "brief", row.language,
                        subject.format(title=job.title, alias=application.alias),
-                       body.format(title=job.title, alias=application.alias))
+                       body.format(title=job.title, alias=application.alias), application_id=application.id)
     db.flush()
     return row
 
@@ -298,6 +301,8 @@ def submit_scorecard(db, application, manager_user_id, scores, recommendation, n
 def record_outcome(db, application, actor_user_id, outcome: str) -> None:
     if outcome not in OUTCOMES:
         raise BriefError(422, "Outcome must be hired, not_hired or offer_declined")
+    if application.anonymized_at is not None:
+        raise BriefError(409, "This application was anonymized")
     if application.hr_decision != "approved":
         raise BriefError(409, "An outcome can only be recorded for an approved application")
     previous = application.final_outcome
@@ -307,7 +312,14 @@ def record_outcome(db, application, actor_user_id, outcome: str) -> None:
     db.flush()
 
 
+def utc_iso(value: datetime | None) -> str | None:
+    """A stored time as ISO text with its zone. MySQL returns it without one, and a browser would read that as local."""
+    if value is None:
+        return None
+    return (value if value.tzinfo else value.replace(tzinfo=timezone.utc)).isoformat()
+
+
 def serialize(row: CandidateBrief) -> dict:
     return {"id": row.id, "application_id": row.application_id, "language": row.language, "status": row.status,
-            "content": row.content, "reviewed_by": row.reviewed_by,
-            "sent_at": row.sent_at.isoformat() if row.sent_at else None}
+            "content": row.content, "reviewed_by": row.reviewed_by, "stale": bool(row.stale),
+            "sent_at": utc_iso(row.sent_at)}

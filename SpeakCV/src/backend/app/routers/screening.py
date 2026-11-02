@@ -15,7 +15,7 @@ from app.auth.dependencies import get_authenticated_user
 from app.core.rate_limit import VOICE_ANSWER_LIMIT, VOICE_QUESTION_AUDIO_LIMIT, VOICE_START_LIMIT, limiter, user_key
 from app.core.uploads import CHUNK_SIZE
 from app.database.database import get_db
-from app.database.sql_models import Application, Company, Job, User, VoiceSession, VoiceTurn
+from app.database.sql_models import Application, Company, CompanyMember, Job, User, VoiceSession, VoiceTurn
 from app.hiring import audit, consents, planner, voice
 from app.hiring.state import advance
 
@@ -73,6 +73,11 @@ def _owned_session(db: Session, user_id: int, session_id: int, purpose: str | No
     session = query.first()
     if session is None:
         raise _not_found()
+    if session.purpose == "intake" and db.query(CompanyMember.id).filter(
+        CompanyMember.company_id == session.company_id, CompanyMember.user_id == user_id,
+        CompanyMember.role == "manager",
+    ).first() is None:
+        raise _not_found()  # a manager who was removed, or changed role, no longer answers for the company
     return session
 
 

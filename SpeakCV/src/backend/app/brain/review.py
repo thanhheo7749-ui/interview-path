@@ -428,11 +428,26 @@ def _apply_fields(item, node: KbNode, reembed: dict[int, KbNode], edited_facts: 
     return False
 
 
+def _guard_by_rules(node: KbNode, before: tuple[str, str], publishing: bool) -> None:
+    """The types the classifier does not cover are held to the rules, which need no AI: a node flagged at intake stays
+    blocked until HR rewrites it, and an edit is checked again."""
+    if (node.title, node.body) == before:
+        if node.guard_category and publishing and node.status != "published":
+            raise ReviewError(409, f"Blocked ({node.guard_category}): {node.guard_reason}")
+        return
+    result = discrimination.check_rules(f"{node.title}\n{node.body}")
+    node.guard_category = result.category if result else None
+    node.guard_reason = result.reason if result else None
+    if result is not None and publishing:
+        raise ReviewError(409, f"Blocked ({result.category}): {result.reason}")
+
+
 def _guard(node: KbNode, item, before: tuple[str, str], publishing: bool, check) -> None:
     """The discrimination guard for a node that is edited or published. Raises ReviewError(409) when the node would
     become, or stay, a published requirement that asks for a protected trait. Edits are re-checked; unchanged text keeps
     its flag, so asking again cannot draw a different answer from the classifier."""
     if node.type not in discrimination.GUARDED_TYPES:
+        _guard_by_rules(node, before, publishing)
         return
     held = node.guard_category
     if (node.title, node.body) == before:
