@@ -28,6 +28,7 @@ def upgrade() -> None:
     sa.Column('language', sa.String(length=10), nullable=False),
     sa.Column('content', sa.JSON(), nullable=False),
     sa.Column('status', sa.String(length=20), nullable=False),
+    sa.Column('stale', sa.Boolean(), server_default=sa.false(), nullable=False),
     sa.Column('reviewed_by', sa.Integer(), nullable=True),
     sa.Column('sent_at', sa.DateTime(timezone=True), nullable=True),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('(CURRENT_TIMESTAMP)'), nullable=False),
@@ -99,6 +100,8 @@ def upgrade() -> None:
     sa.Column('requirement_lines', sa.JSON(), nullable=False),
     sa.Column('lint', sa.JSON(), nullable=False),
     sa.Column('failed_languages', sa.JSON(), nullable=False),
+    sa.Column('rejected', sa.JSON(), nullable=False),
+    sa.Column('title', sa.String(length=255), nullable=True),
     sa.Column('status', sa.String(length=20), nullable=False),
     sa.Column('approved_by', sa.Integer(), nullable=True),
     sa.Column('submitted_at', sa.DateTime(timezone=True), nullable=True),
@@ -122,6 +125,7 @@ def upgrade() -> None:
     sa.Column('channel', sa.String(length=50), nullable=False),
     sa.Column('language', sa.String(length=10), nullable=False),
     sa.Column('body', sa.Text(), nullable=False),
+    sa.Column('used_template', sa.Boolean(), server_default=sa.false(), nullable=False),
     sa.Column('link_id', sa.Integer(), nullable=True),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('(CURRENT_TIMESTAMP)'), nullable=False),
     sa.ForeignKeyConstraint(['company_id'], ['companies.id'], ondelete='CASCADE'),
@@ -153,6 +157,9 @@ def upgrade() -> None:
         batch_op.create_index(batch_op.f('ix_job_draft_messages_id'), ['id'], unique=False)
         batch_op.create_index(batch_op.f('ix_job_draft_messages_job_draft_id'), ['job_draft_id'], unique=False)
 
+    with op.batch_alter_table('kb_documents', schema=None) as batch_op:
+        batch_op.add_column(sa.Column('masking_note', sa.String(length=50), nullable=True))
+
     with op.batch_alter_table('kb_nodes', schema=None) as batch_op:
         batch_op.add_column(sa.Column('guard_category', sa.String(length=30), nullable=True))
         batch_op.add_column(sa.Column('guard_reason', sa.Text(), nullable=True))
@@ -166,6 +173,9 @@ def downgrade() -> None:
     with op.batch_alter_table('kb_nodes', schema=None) as batch_op:
         batch_op.drop_column('guard_reason')
         batch_op.drop_column('guard_category')
+
+    with op.batch_alter_table('kb_documents', schema=None) as batch_op:
+        batch_op.drop_column('masking_note')
 
     with op.batch_alter_table('job_draft_messages', schema=None) as batch_op:
         batch_op.drop_index(batch_op.f('ix_job_draft_messages_job_draft_id'))

@@ -23,6 +23,7 @@ from app.database.sql_models import (
     RequirementResult, VoiceSession, VoiceTurn,
 )
 from app.hiring import audit, decisions, jobs, notify
+from app.hiring.state import CONSENT_WITHDRAWN
 from app.hiring.screening import _DIRECTIVE
 from app.posthire import learning
 
@@ -507,6 +508,7 @@ def draft(db, application, user_id) -> RejectionFeedback:
     if existing is not None and existing.status != "draft":
         raise FeedbackError(409, "This feedback has already been sent")
     before = existing.draft if existing is not None else None
+    had_withdrawn = application.analysis_status == CONSENT_WITHDRAWN  # then the results hold nothing from the interview
     application_id, company_id = application.id, application.company_id
     session = _latest_session(db, application)
     language = _language(db, application, session)
@@ -525,6 +527,9 @@ def draft(db, application, user_id) -> RejectionFeedback:
     if locked is None or locked.anonymized_at is not None or locked.hr_decision != "rejected":
         db.rollback()
         raise FeedbackError(409, "This application can no longer receive feedback")
+    if locked.analysis_status == CONSENT_WITHDRAWN and not had_withdrawn:
+        db.rollback()
+        raise FeedbackError(409, "This application changed while the feedback was being written. Please try again.")
     row = _locked_feedback(db, application_id)
     if row is not None and (row.status != "draft" or row.draft != before or source != SOURCE_AI):
         db.rollback()

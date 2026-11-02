@@ -56,11 +56,22 @@ def terms_in(text: str) -> set[str]:
     return {name for name, pattern in _TERM_PATTERNS.items() if pattern.search(folded)}
 
 
+def _source_of(line: dict, node_texts: dict[int, str]) -> str:
+    return "\n".join(node_texts.get(node_id, "") for node_id in line.get("source_node_ids") or [])
+
+
+def unsupported_line_numbers(line: dict, node_texts: dict[int, str]) -> list[str]:
+    """The numbers in this line, in any language, that the nodes it cites do not state with that unit."""
+    source = _source_of(line, node_texts)
+    texts = [text for text in (line.get("text") or {}).values() if text]
+    return list(dict.fromkeys(number for text in texts for number in contradiction.unsupported_numbers(text, source)))
+
+
 def unsupported_claims(line: dict, node_texts: dict[int, str]) -> str | None:
     """Why the nodes this line cites do not support it, or None when they do."""
-    source = "\n".join(node_texts.get(node_id, "") for node_id in line.get("source_node_ids") or [])
+    source = _source_of(line, node_texts)
     texts = [text for text in (line.get("text") or {}).values() if text]
-    numbers = list(dict.fromkeys(number for text in texts for number in contradiction.unsupported_numbers(text, source)))
+    numbers = unsupported_line_numbers(line, node_texts)
     terms = sorted(set().union(*(terms_in(text) for text in texts)) - terms_in(source)) if texts else []
     reasons = []
     if numbers:

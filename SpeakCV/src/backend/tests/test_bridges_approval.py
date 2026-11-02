@@ -1,5 +1,6 @@
 """Who may read and approve a draft, what a line may claim, and what an approval covers (the Block 4 final review)."""
 import json
+from datetime import datetime, timezone
 
 import numpy as np
 import pytest
@@ -9,13 +10,14 @@ from sqlalchemy import inspect
 from app.ai import gateway
 from app.ai.providers import fake
 from app.brain import audience as aud
-from app.brain import fake_demo, vectors
-from app.bridges import brief, jd_studio, lint, publishing
+from app.brain import fake_demo, retriever, vectors
+from app.bridges import brief, intake, jd_studio, lint, publishing
 from app.database.database import SessionLocal
 from app.database.sql_models import (
     Application, AuditLog, CandidateBrief, CompanyMember, HiringRequest, InterviewScorecard, Job, JobDraft,
     JobRequirement, Notification, RequirementResult, VoiceSession, VoiceTurn,
 )
+from app.hiring.state import CONSENT_WITHDRAWN
 from app.main import create_app
 from tests.helpers import auth_header, make_user
 from tests.helpers_jd import ai_line, assistant_json, generate_json, line, make_draft, make_world
@@ -210,7 +212,7 @@ def test_generate_applies_the_term_and_unit_checks(db, world):
     ]))
     draft = jd_studio.generate(db, world.request, world.hr.id)
     assert [item["id"] for item in draft.lines] == ["l1"]
-    assert {item["line_id"] for item in draft.rejected_lines} == {"l2", "l3"}
+    assert {item["line_id"] for item in draft.rejected} == {"l2", "l3"}
 
 
 def test_the_demo_assistant_returns_the_bad_line_and_code_stops_it(db, world):
@@ -812,7 +814,6 @@ def test_a_brief_sent_during_a_regenerate_stays_as_it_was_sent(api, db, world):
 
 
 def test_an_application_anonymized_during_a_regenerate_gets_no_brief(api, db, world):
-    from datetime import datetime, timezone
 
     request = db.get(HiringRequest, world.request.id)
     job, open_req, secret = _job_for_request(db, world, request)
@@ -917,3 +918,83 @@ def test_manages_follows_the_request_then_the_department(db, world):
     assert publishing.manages(db, with_request, member) is False
     assert publishing.manages(db, without, member) is True
     assert aud.for_member(db, member).department_ids  # a department manager, whose subtree holds the role
+
+
+# --- where this work meets the Block 3 and group Y fixes -------------------------------------------------------------
+
+def _reviewed_brief(api, db, world):
+    request = db.get(HiringRequest, world.request.id)
+    job, open_req, secret = _job_for_request(db, world, request)
+    application = _application(db, world, job, open_req, secret)
+    path = _url(world, f"/applications/{application.id}/brief")
+    assert api.post(path, headers=HR, json={"language": "en"}).status_code == 200
+    assert api.patch(path, headers=HR, json={}).status_code == 200
+    return application, f"{path}/send"
+
+
+@pytest.mark.parametrize("change", ["withdrawn", "anonymized", "stale"])
+def test_send_refuses_a_brief_that_may_no_longer_go_out(api, db, world, change):
+    application, send_path = _reviewed_brief(api, db, world)
+    application_id = application.id
+
+    def apply(session):
+        if change == "stale":
+            session.query(CandidateBrief).filter_by(application_id=application_id).one().stale = True
+        elif change == "withdrawn":
+            session.get(Application, application_id).analysis_status = CONSENT_WITHDRAWN
+        else:
+            session.get(Application, application_id).anonymized_at = datetime.now(timezone.utc)
+
+    _in_other_session(apply)  # after this request's session last read them
+    assert api.post(send_path, headers=HR).status_code == 409
+    db.rollback()
+    db.expire_all()
+    assert db.query(CandidateBrief).filter_by(application_id=application_id).one().status == "draft"
+    assert db.query(Notification).filter_by(company_id=world.company.id).count() == 0
+
+
+def test_send_refuses_a_brief_a_withdrawal_deleted_after_it_was_read(api, db, world):
+    application, _send_path = _reviewed_brief(api, db, world)
+    row = db.query(CandidateBrief).filter_by(application_id=application.id).one()
+    row_id = row.id
+
+    def delete(session):
+        session.delete(session.get(CandidateBrief, row_id))
+
+    _in_other_session(delete)
+    with pytest.raises(brief.BriefError) as refused:
+        brief.send(db, application, row, world.hr.id)
+    assert refused.value.status_code == 409
+
+
+def test_a_line_rejected_for_a_term_is_stored_with_its_code_and_stays_with_hr(api, db, world):
+    hours = world.builder.node("We work 40 hours per week", "", type="fact")
+    fake.enqueue("jd_generate", generate_json([
+        ai_line("l1", [world.role.id], en="We build the APIs of our hiring platform", vi="API", ko="API"),
+        ai_line("l2", [world.role.id], en="CANARY free housing", vi="Nha o", ko="주택"),
+        ai_line("l3", [hours.id], en="We work 9 hours", vi="9", ko="9"),
+    ]))
+    response = api.post(_url(world, f"/hiring-requests/{world.request.id}/drafts"), headers=HR, json={})
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert {item["line_id"]: (item["code"], item["detail"]) for item in body["rejected"]} == {
+        "l2": ("unsupported_terms", []), "l3": ("unsupported_numbers", ["9"]),
+    }
+    draft_id = body["id"]
+    assert _act(api, world, draft_id, "submit").status_code == 200
+    as_hr = api.get(_url(world, f"/job-drafts/{draft_id}"), headers=HR)
+    assert len(as_hr.json()["rejected"]) == 2  # stored, not only on the response that generated it
+    as_manager = api.get(_url(world, f"/job-drafts/{draft_id}"), headers=MANAGER)
+    assert "rejected" not in as_manager.json() and "CANARY" not in as_manager.text
+
+
+def test_known_falls_back_to_templates_with_the_hr_read_still_deciding_what_to_ask(db, world, monkeypatch):
+    world.builder.node("A confidential value of Sales", type="value", visibility="confidential",
+                       department_id=world.sales.id)
+
+    def no_embeddings(*_args, **_kwargs):
+        raise retriever.NoEmbeddingsError("no embeddings")
+
+    monkeypatch.setattr(retriever, "search", no_embeddings)
+    known = intake._known(db, world.request)
+    assert known.requirements == () and known.has_values is True

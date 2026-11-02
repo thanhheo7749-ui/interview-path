@@ -9,16 +9,20 @@ from sqlalchemy import or_
 from app.core import storage
 from app.database.database import SessionLocal
 from app.database.sql_models import (
-    Application, AuditLog, CandidateBrief, Company, CompanyMember, Consent, CultureNote, CvClaim, InterviewScorecard,
-    Job, Notification, RejectionFeedback, RequirementResult, ScreeningCache, VoiceSession, VoiceTurn,
+    Application, AssistantQuestion, AuditLog, CandidateBrief, Company, CompanyMember, Consent, CultureNote, CvClaim,
+    InterviewScorecard, Job, Notification, ReapplyGuard, RejectionFeedback, RequirementResult, ScreeningCache, VoiceSession,
+    VoiceTurn,
 )
-from app.hiring import audit, notify, voice
+from app.bridges import intake
+from app.hiring import audit, consents, notify, reapply_guard, voice
 from app.hiring.state import advance
 from app.posthire import feedback
 
 logger = logging.getLogger(__name__)
 
-UNDECIDED_RETENTION_DAYS = 180
+UNDECIDED_RETENTION_DAYS = consents.UNDECIDED_RETENTION_DAYS
+QUESTION_RETENTION_DAYS = 180
+CANDIDATE_AUDIENCE = "candidate"
 REMINDER_AFTER_DAYS = 3
 SECONDS_BETWEEN_RUNS = 24 * 60 * 60
 TRIGGER_RETENTION = "retention"
@@ -45,6 +49,8 @@ ERASED = {
     "consents": ("user_id",),
     "candidate_briefs": ("content",),  # original quotes and recording times
     "interview_scorecards": ("requirement_scores", "notes"),
+    # Not tied to one application: cleared on the candidate's last deletion at the company, and by age. See _erase_question.
+    "assistant_questions": ("user_id", "question", "embedding"),
     "rejection_feedbacks": ("draft",),  # it quotes the candidate's answers
     # Nothing is cleared on these three. Each one's own rules decide how long it stays: see KEPT.
     "talent_pool_entries": (),
@@ -71,9 +77,11 @@ KEPT = {
     "consents": ("purpose", "text_version", "language"),
     "audit_log": (
         "action", "target_type", "ai_provider", "ai_model", "prompt_version",
-        "payload",  # by rule audit payloads hold no personal content
+        "payload",  # HR's free-text reasons are stripped by _strip_audit_reasons; nothing else there is personal
         "actor_user_id",  # HR staff stay; a candidate's own is cleared by _unlink_audit
     ),
+    "assistant_questions": ("audience", "language", "state", "top_score", "embedding_model"),  # no content once cleared
+    "reapply_guards": ("key_hash",),  # a keyed hash, stated in the consent text; removed after REAPPLY_DAYS
     "rejection_feedbacks": ("language", "status", "approved_by"),
     # A separate talent_pool consent keeps these until the entry ends, whatever happens to the application.
     "talent_pool_entries": ("candidate_user_id", "retained_cv_text", "embedding_model", "status"),
@@ -133,6 +141,18 @@ def _erase(row) -> None:
         setattr(row, name, None if row.__table__.c[name].nullable else "")
 
 
+def _has_another_live(db, application, user_id: int) -> bool:
+    """Whether the user has another application at this company that is not anonymized."""
+    return (
+        db.query(Application.id)
+        .filter(
+            Application.company_id == application.company_id, Application.candidate_user_id == user_id,
+            Application.id != application.id, Application.anonymized_at.is_(None),
+        )
+        .first()
+    ) is not None
+
+
 def _delete_notifications(db, application, user_id: int | None) -> None:
     """Notifications pointing at this application go. An old row with no link goes by the former rule: while the user
     has another live application at this company, only one naming this job goes; the rest go with the last one."""
@@ -143,15 +163,7 @@ def _delete_notifications(db, application, user_id: int | None) -> None:
         Notification.company_id == application.company_id, Notification.user_id == user_id,
         Notification.application_id.is_(None),
     )
-    another_live = (
-        db.query(Application.id)
-        .filter(
-            Application.company_id == application.company_id, Application.candidate_user_id == user_id,
-            Application.id != application.id, Application.anonymized_at.is_(None),
-        )
-        .first()
-    )
-    if another_live is not None:
+    if _has_another_live(db, application, user_id):
         title = db.get(Job, application.job_id).title
         rows = rows.filter(or_(Notification.subject.contains(title, autoescape=True),
                                Notification.body.contains(title, autoescape=True)))
@@ -166,6 +178,43 @@ def _unlink_audit(db, application, user_id: int) -> None:
     if is_member is not None:
         rows = rows.filter(AuditLog.target_type == "application", AuditLog.target_id == application.id)
     rows.update({AuditLog.actor_user_id: None}, synchronize_session=False)
+
+
+def _strip_audit_reasons(db, application_id: int) -> None:
+    """HR's reason is free text and may name the candidate. The fact that one existed stays."""
+    rows = db.query(AuditLog).filter(AuditLog.target_type == "application", AuditLog.target_id == application_id)
+    for row in rows:
+        payload = row.payload or {}
+        if "reason" in payload:
+            row.payload = {
+                **{key: value for key, value in payload.items() if key != "reason"},
+                **({"has_reason": True} if payload["reason"] else {}),
+            }
+
+
+def _erase_question(row) -> None:
+    _erase(row)
+    row.resolved = True  # it was a gap only for as long as HR could read what was asked
+
+
+def _forget_questions(db, application, user_id: int) -> None:
+    """On a candidate's deletion, once nothing of theirs remains at this company. Their staff questions are not touched."""
+    if _has_another_live(db, application, user_id):
+        return
+    for row in db.query(AssistantQuestion).filter(
+        AssistantQuestion.company_id == application.company_id, AssistantQuestion.user_id == user_id,
+        AssistantQuestion.audience == CANDIDATE_AUDIENCE,
+    ):
+        _erase_question(row)
+
+
+def _guard_reapply(db, application, user_id: int, had_session: bool) -> None:
+    """An interview seen or a decision made must not be undone by deleting. Past the limit there is nothing to guard."""
+    if not had_session and application.hr_decision == "pending":
+        return
+    applied_at = _as_naive(application.created_at)
+    if applied_at > _naive_utc(None) - timedelta(days=consents.REAPPLY_DAYS):
+        reapply_guard.remember(db, user_id, application.job_id, applied_at)
 
 
 def _delete_cache(db, application_id: int, blind_hash: str | None) -> None:
@@ -210,12 +259,29 @@ def _expire_talent_pool(db) -> int:
     return talent_pool.expire(db)
 
 
-def anonymize_application(db, application, *, trigger: str = TRIGGER_RETENTION, commit: bool = True) -> None:
-    """Commits, unless the caller owns the transaction and the application has no file to delete. Files go after the rows are flushed and before the commit: if a file cannot be deleted, the caller
-    rolls back and the paths survive for a retry, and a file already deleted is no obstacle to that retry."""
-    if application.anonymized_at is not None:
-        return
+def anonymize_application(db, application, *, trigger: str = TRIGGER_RETENTION, only_if=None, commit: bool = True) -> bool:
+    """Commits, unless the caller owns the transaction and the application has no file to delete. Files go after the rows
+    are flushed and before the commit: if a file cannot be deleted, the caller rolls back and the paths survive for a
+    retry, and a file already deleted is no obstacle to that retry.
+
+    Discards anything pending and ends the session's snapshot before locking, as `voice._lock` does. Under MySQL's
+    REPEATABLE READ the plain reads below would otherwise come from a snapshot older than an answer stored while this
+    waited for the lock, and the audio and transcript would stay for good. Any check of the caller's must be repeated
+    under this lock, so it is passed as `only_if`. With commit=False the caller's own work is in this transaction and it
+    has locked the row, so neither happens. Returns False if `only_if` refused; an application already gone counts as done.
+    """
     application_id = application.id
+    if commit:
+        db.rollback()
+        application = _locked(db, application_id)
+    if application is None or application.anonymized_at is not None:
+        if commit:
+            db.rollback()
+        return only_if is None
+    if only_if is not None and not only_if(application):
+        if commit:
+            db.rollback()
+        return False
     user_id = application.candidate_user_id
     blind_hash = application.cv_blind_hash
     cv_path = application.cv_file_path
@@ -223,6 +289,8 @@ def anonymize_application(db, application, *, trigger: str = TRIGGER_RETENTION, 
     session_ids = [session.id for session in sessions]
     turns = db.query(VoiceTurn).filter(VoiceTurn.session_id.in_(session_ids)).all() if session_ids else []
     audio_paths = [path for turn in turns for path in (turn.audio_path, turn.question_audio_path) if path]
+    if user_id is not None:
+        _guard_reapply(db, application, user_id, bool(session_ids))
 
     for model in (RequirementResult, CvClaim, CultureNote, Consent, CandidateBrief, InterviewScorecard, RejectionFeedback):
         for row in db.query(model).filter_by(application_id=application_id):
@@ -235,7 +303,10 @@ def anonymize_application(db, application, *, trigger: str = TRIGGER_RETENTION, 
     _delete_notifications(db, application, user_id)
     _settle_talent_pool(db, application, user_id, trigger)
     if user_id is not None:
+        if trigger == TRIGGER_CANDIDATE:
+            _forget_questions(db, application, user_id)  # after the pool: an invitation it retracts no longer counts as live
         _unlink_audit(db, application, user_id)
+    _strip_audit_reasons(db, application_id)
     _stop_cv_job(application)
     _erase(application)
     application.anonymized_at = _naive_utc(None)
@@ -245,14 +316,14 @@ def anonymize_application(db, application, *, trigger: str = TRIGGER_RETENTION, 
     _delete_files(cv_path, audio_paths)
     if commit:
         db.commit()
+    return True
 
 
-def try_anonymize(db, application, *, trigger: str) -> bool:
+def try_anonymize(db, application, *, trigger: str, only_if=None) -> bool:
     """False, with everything rolled back, when it could not finish. Only the type is logged: text can hold content."""
     application_id = application.id
     try:
-        anonymize_application(db, application, trigger=trigger)
-        return True
+        return anonymize_application(db, application, trigger=trigger, only_if=only_if)
     except Exception as exc:
         db.rollback()
         logger.warning("Could not anonymize application %s: %s", application_id, type(exc).__name__)
@@ -268,17 +339,39 @@ def _locked(db, application_id: int) -> Application | None:
 
 
 def _anonymize_if_due(db, application_id: int, retention_days: int, now: datetime) -> bool:
+    def due(row) -> bool:
+        return _is_due(row, retention_days, now) and not has_extension(db, row)
+
     application = _locked(db, application_id)
-    if application is None or not _is_due(application, retention_days, now) or has_extension(db, application):
+    if application is None or not due(application):
         db.rollback()
         return False
-    return try_anonymize(db, application, trigger=TRIGGER_RETENTION)
+    return try_anonymize(db, application, trigger=TRIGGER_RETENTION, only_if=due)
 
 
 def _purge_unused_cache(db) -> None:
     """A CV job whose AI call ended after its application was deleted still commits a cache row. Nothing uses it."""
     in_use = db.query(Application.id).filter(Application.cv_blind_hash == ScreeningCache.blind_hash).exists()
     db.query(ScreeningCache).filter(~in_use).delete(synchronize_session=False)
+    db.commit()
+
+
+def _expire_questions(db, now: datetime) -> None:
+    """Candidates' questions go by age, whatever became of any application. Staff questions stay."""
+    rows = db.query(AssistantQuestion).filter(
+        AssistantQuestion.audience == CANDIDATE_AUDIENCE,
+        AssistantQuestion.created_at < now - timedelta(days=QUESTION_RETENTION_DAYS),
+        or_(AssistantQuestion.question != "", AssistantQuestion.user_id.isnot(None)),
+    )
+    for row in rows:
+        _erase_question(row)
+    db.commit()
+
+
+def _expire_guards(db, now: datetime) -> None:
+    db.query(ReapplyGuard).filter(
+        ReapplyGuard.applied_at < now - timedelta(days=consents.REAPPLY_DAYS),
+    ).delete(synchronize_session=False)
     db.commit()
 
 
@@ -294,11 +387,16 @@ def run(db, now=None) -> int:
             except Exception as exc:
                 db.rollback()
                 logger.warning("Could not check application %s: %s", application_id, type(exc).__name__)
-    try:
-        _purge_unused_cache(db)
-    except Exception as exc:
-        db.rollback()
-        logger.warning("Could not clear unused screening results: %s", type(exc).__name__)
+    for name, step in (
+        ("unused screening results", lambda: _purge_unused_cache(db)),
+        ("old candidate questions", lambda: _expire_questions(db, now)),
+        ("old re-apply guards", lambda: _expire_guards(db, now)),
+    ):
+        try:
+            step()
+        except Exception as exc:
+            db.rollback()
+            logger.warning("Could not clear %s: %s", name, type(exc).__name__)
     return count
 
 
@@ -336,6 +434,7 @@ def _queue_reminder(db, application_id: int, cutoff: datetime) -> bool:
         or application.candidate_user_id is None
         or db.query(VoiceSession.id).filter_by(application_id=application_id).first() is not None
         or db.query(AuditLog.id).filter_by(action=REMINDER_QUEUED, target_type="application", target_id=application_id).first() is not None
+        or consents.was_withdrawn(db, application_id, "cv_processing")  # the interview can no longer start
         or _invited_at(db, application) >= cutoff
     ):
         db.rollback()
@@ -375,7 +474,7 @@ def send_reminders(db, now=None) -> int:
 def _daily_pass() -> None:
     db = SessionLocal()
     try:
-        for step in (voice.sweep_abandoned, run, _expire_talent_pool, send_reminders, feedback.send_overdue_notices,
+        for step in (voice.sweep_abandoned, intake.sweep_terminal, run, _expire_talent_pool, send_reminders, feedback.send_overdue_notices,
                      notify.send_pending):
             try:
                 step(db)

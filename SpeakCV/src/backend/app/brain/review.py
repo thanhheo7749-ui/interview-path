@@ -242,11 +242,13 @@ def _is_incomplete(job: KbIngestionJob | None) -> bool:
 
 def publish_hold(db: Session, document: KbDocument, job: KbIngestionJob | None) -> dict | None:
     """Why a document in review waits for HR's say beyond its drafts, or None. job is the document's latest."""
-    if document.status != "review" or not _is_incomplete(job):
+    masking = bool(document.masking_note)
+    if document.status != "review" or not (masking or _is_incomplete(job)):
         return None
     return {
-        "dropped_items": job.dropped_items, "failed_chunks": job.failed_chunks,
-        "contradiction_check_failed": bool(job.contradiction_check_failed),
+        "dropped_items": job.dropped_items if job else 0, "failed_chunks": job.failed_chunks if job else 0,
+        "contradiction_check_failed": bool(job.contradiction_check_failed) if job else False,
+        "masking_failed": masking,
         "pending_drafts": has_drafts(db, document),
     }
 
@@ -267,6 +269,8 @@ def finish_document_if_decided(db: Session, document_id: int, publish_incomplete
     document = lock_document(db, document_id)
     if document is None or document.status != "review" or has_drafts(db, document, fresh=True):
         return False
+    if document.masking_note:
+        return False  # the names were not masked: its text is not published, even on HR's say, until masking is retried
     if not publish_incomplete and _is_incomplete(_latest_job(db, document_id)):
         return False
     document.status = "published"
@@ -433,11 +437,26 @@ def _confirm_unchecked(node: KbNode, item) -> None:
     node.guard_category = node.guard_reason = None
 
 
+def _guard_by_rules(node: KbNode, before: tuple[str, str], publishing: bool) -> None:
+    """The types the classifier does not cover are held to the rules, which need no AI: a node flagged at intake stays
+    blocked until HR rewrites it, and an edit is checked again."""
+    if (node.title, node.body) == before:
+        if node.guard_category and publishing and node.status != "published":
+            raise ReviewError(409, f"Blocked ({node.guard_category}): {node.guard_reason}")
+        return
+    result = discrimination.check_rules(f"{node.title}\n{node.body}")
+    node.guard_category = result.category if result else None
+    node.guard_reason = result.reason if result else None
+    if result is not None and publishing:
+        raise ReviewError(409, f"Blocked ({result.category}): {result.reason}")
+
+
 def _guard(node: KbNode, item, before: tuple[str, str], publishing: bool, check) -> None:
     """The discrimination guard for a node that is edited or published. Raises ReviewError(409) when the node would
     become, or stay, a published requirement that asks for a protected trait. Edits are re-checked; unchanged text keeps
     its flag, so asking again cannot draw a different answer from the classifier."""
     if node.type not in discrimination.GUARDED_TYPES:
+        _guard_by_rules(node, before, publishing)
         return
     held = node.guard_category
     if (node.title, node.body) == before:

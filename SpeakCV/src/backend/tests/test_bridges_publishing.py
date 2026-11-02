@@ -308,6 +308,32 @@ def test_ai_text_with_only_known_numbers_is_kept_and_an_unknown_link_is_not(api,
     assert "evil.test" not in pieces[1]["body"]
 
 
+def test_a_channel_body_with_a_discriminating_phrase_falls_back_to_the_template(api, db, world):
+    draft, _ = _published(api, db, world)
+    fake.enqueue("channel_content", json.dumps({"body": "Chi tuyen nam gioi tre trung nang dong, ngoai hinh dep. {link}"}))
+    fake.enqueue("channel_content", json.dumps({"body": "Join our friendly team. {link}"}))
+    pieces = _post(api, world, draft, "channels/generate").json()["channels"]
+    assert "nam gioi" not in pieces[0]["body"] and "Backend Developer" in pieces[0]["body"]
+    assert pieces[0]["used_template"] is True
+    assert pieces[1]["body"].startswith("Join our friendly team") and pieces[1]["used_template"] is False
+    assert db.query(ChannelContent).filter_by(channel="linkedin").one().used_template is True
+
+
+def test_a_channel_body_the_classifier_flags_or_cannot_check_uses_the_template(api, db, world):
+    draft, _ = _published(api, db, world)
+    fake.enqueue("channel_content", json.dumps({"body": "A perfect fit for fresh graduates. {link}"}))
+    fake.enqueue("discrimination_check", json.dumps({"flagged": True, "category": "age", "reason": "proxy for age"}))
+    pieces = _post(api, world, draft, "channels/generate").json()["channels"]
+    assert pieces[0]["used_template"] is True and "fresh graduates" not in pieces[0]["body"]
+
+    def down(*_):
+        raise RuntimeError("classifier down")
+
+    fake.register("discrimination_check", down)
+    again = _post(api, world, draft, "channels/generate").json()["channels"]
+    assert all(p["used_template"] for p in again)  # unchecked is not a pass
+
+
 def test_itviec_template_has_sections_and_benefits_only_from_benefit_lines(db, world):
     lines = _lines(world)
     types = {world.role.id: "role", world.python.id: "requirement", world.leave.id: "fact"}

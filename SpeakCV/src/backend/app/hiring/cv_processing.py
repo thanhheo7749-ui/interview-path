@@ -6,7 +6,7 @@ from app.core import storage
 from app.core.text_extract import NoExtractableText
 from app.database.database import SessionLocal
 from app.database.sql_models import Application, Company, Job, User
-from app.hiring import identity, notify, screening
+from app.hiring import consents, identity, notify, screening
 from app.hiring.hidden_text import CvTooLarge, extract_cv
 from app.hiring.state import InvalidTransition, advance
 
@@ -27,6 +27,7 @@ class _NoLongerProcessing(Exception):
 # What the candidate may be told about a failed CV: a fixed code per kind of failure, never the text of the failure.
 # The app turns the code into its own words. A message not listed here is "unknown".
 _FAILURE_KINDS = (
+    ("consent_withdrawn", ("withdrew consent",)),
     ("no_text", ("no extractable text",)),
     ("unreadable", ("could not read this file", "cannot be read", "not utf-8 text")),
     ("too_large", ("pages. please upload a shorter", "when unpacked")),
@@ -63,7 +64,8 @@ def _claim(db, application_id: int, keep_text: bool = False) -> bool:
     `keep_text` is for an invitation from the talent pool, whose masked text and flags were set when it was created.
     """
     application = _locked(db, application_id)
-    if application is None or application.anonymized_at is not None:
+    # The lock comes first in this transaction, so the read of the consent sees a withdrawal committed before it.
+    if application is None or application.anonymized_at is not None or consents.was_withdrawn(db, application_id, "cv_processing"):
         db.rollback()
         return False
     try:

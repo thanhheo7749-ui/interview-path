@@ -7,13 +7,13 @@ from sqlalchemy.exc import IntegrityError
 from app.core import storage
 from app.core.text_extract import NoExtractableText
 from app.database.sql_models import Application, Job, JobChannelLink, User
-from app.hiring import consents
+from app.hiring import consents, reapply_guard
 from app.hiring.hidden_text import CvTooLarge, extract_cv
 
 MAX_CV_CHARS = 20_000
 # A Text column on MySQL holds 64 KB. 20,000 characters of up to 3 bytes fit; 4-byte characters might not.
 MAX_CV_BYTES = 65_000
-REAPPLY_DAYS = 90
+REAPPLY_DAYS = consents.REAPPLY_DAYS
 ALIAS_ATTEMPTS = 5
 _ALIAS = re.compile(r"^#A(\d+)$")
 DIRECT = "direct"
@@ -71,6 +71,10 @@ def check_reapply(db, user_id: int, job_id: int) -> None:
     )
     if recent is not None:
         raise AlreadyApplied(recent[0] + timedelta(days=REAPPLY_DAYS))
+    # A deleted application left this instead: its row no longer names the user.
+    until = reapply_guard.blocked_until(db, user_id, job_id)
+    if until is not None and until > now:
+        raise AlreadyApplied(until)
 
 
 def create_application(db, user, job, file_bytes, suffix, src_token, consent_version, consent_language=None) -> Application:

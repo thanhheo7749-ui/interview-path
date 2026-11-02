@@ -207,3 +207,26 @@ def test_mask_prompt_has_contact_details_removed_by_regex_first():
     identity.mask(CV_A, company_id=1)
     prompt = fake.last_messages()[-1]["content"]
     assert "an.nguyen@example.test" not in prompt and "079098001234" not in prompt
+
+
+def test_korean_names_are_masked_with_a_particle_or_honorific_attached():
+    text = "김철수님은 일을 잘합니다. 김철수는 빠릅니다. 김철수 씨도 좋습니다."
+    assert identity.apply_terms(text, {"[NAME]": ["김철수"]}) == "[NAME]님은 일을 잘합니다. [NAME]는 빠릅니다. [NAME] 씨도 좋습니다."
+
+
+def test_a_korean_name_keeps_its_left_boundary_and_other_scripts_keep_both():
+    assert identity.apply_terms("박김철수 와 김철수", {"[NAME]": ["김철수"]}) == "박김철수 와 [NAME]"
+    assert identity.apply_terms("Annam met An", {"[NAME]": ["An"]}) == "Annam met [NAME]"
+    assert identity.apply_terms("An안 An", {"[NAME]": ["An"]}) == "An안 [NAME]"
+
+
+def test_a_longer_korean_name_wins_over_a_shorter_one_inside_it():
+    assert identity.apply_terms("김철수님과 김철", {"[NAME]": ["김철", "김철수"]}) == "[NAME]님과 [NAME]"
+
+
+def test_korean_names_are_masked_in_the_intake_document(db):
+    from app.bridges import intake
+
+    fake.enqueue("intake_mask", '{"names": ["김철수"]}')
+    masked, checked = intake._mask("김철수님은 일을 잘합니다. 김철수는 빠릅니다.", 1)
+    assert checked and "김철수" not in masked and masked.count("[NAME]") == 2

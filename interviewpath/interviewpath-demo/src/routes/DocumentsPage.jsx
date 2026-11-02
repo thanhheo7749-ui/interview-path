@@ -4,7 +4,8 @@ import { useCompany } from '../company/CompanyContext.jsx';
 import { ConfirmBar, EmptyState, ErrorAlert, cardClass, inputClass, primaryButton, secondaryButton } from '../components/KbFeedback.jsx';
 import { api } from '../lib/api.js';
 import {
-  decideReview, getJob, listDocuments, notifyKbChanged, retryFailedSections, retryJob, unpublishDocument, uploadDocument,
+  decideReview, getJob, listDocuments, notifyKbChanged, retryFailedSections, retryJob, retryMasking, unpublishDocument,
+  uploadDocument,
 } from '../lib/kb.js';
 
 const VISIBILITIES = ['public', 'internal', 'confidential'];
@@ -159,6 +160,17 @@ function DocumentsPage() {
       (job) => setDocuments((current) => current.map((d) => (d.id === document.id ? { ...d, job } : d))),
     );
 
+  // Masks the names of an intake transcript again. The server rebuilds the document, so its review starts over.
+  const retryNames = (document) =>
+    runOnce(
+      document,
+      () => retryMasking(companyId, document.id),
+      (result) =>
+        setDocuments((current) =>
+          current.map((d) => (d.id === document.id ? { ...d, ...result.document, job: result.job, publish_hold: null } : d)),
+        ),
+    );
+
   const withdraw = (document) => {
     setWithdrawing(null);
     return runOnce(
@@ -277,7 +289,7 @@ function DocumentsPage() {
                   job && !running && ['review', 'published'].includes(document.status) && (job.failed_chunks > 0 || job.contradiction_check_failed);
                 const hold = document.publish_hold;
                 const partial = !hold && job && job.status !== 'failed' && (job.dropped_items > 0 || job.failed_chunks > 0);
-                const canPublishAnyway = hold && !hold.pending_drafts && !running;
+                const canPublishAnyway = hold && !hold.pending_drafts && !running && !document.masking_note;
                 return (
                   <tr key={document.id} className="border-b border-slate-100 align-top">
                     <td className="py-3 pr-3 font-semibold text-slate-900">{document.title}</td>
@@ -306,6 +318,16 @@ function DocumentsPage() {
                         <p className="rounded-lg border border-amber-200 bg-amber-50 px-2 py-1 text-xs font-semibold text-amber-900">
                           {t('documents.held', { dropped: hold.dropped_items, failed: hold.failed_chunks })}
                         </p>
+                      )}
+                      {document.masking_note && (
+                        <div data-testid="masking-note" className="space-y-1">
+                          <p className="rounded-lg border border-amber-200 bg-amber-50 px-2 py-1 text-xs font-semibold text-amber-900">
+                            {t(`documents.maskingNotes.${document.masking_note}`, { defaultValue: t('documents.maskingNotes.unknown') })}
+                          </p>
+                          <button type="button" disabled={rowBusy || running} onClick={() => retryNames(document)} className={secondaryButton}>
+                            {t('documents.retryMasking')}
+                          </button>
+                        </div>
                       )}
                       {canRetryFailed && (
                         <button type="button" disabled={rowBusy} onClick={() => retryFailed(document)} className={secondaryButton}>

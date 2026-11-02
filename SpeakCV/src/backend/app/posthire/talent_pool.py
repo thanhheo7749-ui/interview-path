@@ -17,7 +17,7 @@ from app.brain import vectors
 from app.database.sql_models import (
     Application, Company, Consent, Job, ScreeningCache, TalentPoolEntry, User, VoiceSession,
 )
-from app.hiring import applications, audit, consents, decisions, identity, jobs, notify, retention, screening
+from app.hiring import applications, audit, consents, decisions, identity, jobs, notify, reapply_guard, retention, screening
 
 logger = logging.getLogger(__name__)
 
@@ -380,6 +380,11 @@ def _job_text(db, job) -> str:
     return "\n".join(line for line in lines if line)[:EMBED_MAX_CHARS]
 
 
+def reapply_guard_open(db, user_id: int, job_id: int, now: datetime) -> bool:
+    until = reapply_guard.blocked_until(db, user_id, job_id)
+    return until is None or _naive(until) <= now
+
+
 def _candidate_rows(db, company_id: int, job_id: int, now: datetime) -> list:
     """Valid, real entries of this company. People already applying to this job come through that application instead."""
     since = now - timedelta(days=applications.REAPPLY_DAYS)
@@ -401,6 +406,7 @@ def _candidate_rows(db, company_id: int, job_id: int, now: datetime) -> list:
     return [
         row for row in rows
         if row[0].candidate_user_id not in recent_people
+        and reapply_guard_open(db, row[0].candidate_user_id, job_id, now)
         # Anonymizing removes the application's link to the person, and the rule still covers the source itself.
         and not (row[2] == job_id and _naive(row[3]) > since)
     ]

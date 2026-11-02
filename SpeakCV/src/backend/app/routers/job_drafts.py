@@ -73,7 +73,7 @@ def _draft_out(db: Session, draft: JobDraft, member: CompanyMember | None = None
         return body
     return {
         **body,
-        "rejected": list(getattr(draft, "rejected_lines", [])),
+        "rejected": list(draft.rejected or []),
         "proposals": jd_studio.pending_proposals(db, draft),
         "messages": [{"role": m.role, "content": m.content, "summary": m.summary,
                       "created_at": m.created_at.isoformat() if m.created_at else None}
@@ -148,6 +148,17 @@ def confirm_line(company_id: int, draft_id: int, line_id: str, member: CompanyMe
     draft = _get_draft(db, member, draft_id)
     try:
         return _draft_out(db, jd_studio.confirm_line(db, draft, line_id, member.user_id))
+    except jd_studio.JdStudioError as error:
+        db.rollback()
+        raise _translate(error) from error
+
+
+@router.post(BASE + "/job-drafts/{draft_id}/proposals/{proposal_id}/dismiss")
+def dismiss_proposal(company_id: int, draft_id: int, proposal_id: str,
+                     member: CompanyMember = Depends(require_member("hr")), db: Session = Depends(get_db)):
+    draft = _get_draft(db, member, draft_id)
+    try:
+        return _draft_out(db, jd_studio.dismiss_proposal(db, draft, proposal_id, member.user_id))
     except jd_studio.JdStudioError as error:
         db.rollback()
         raise _translate(error) from error

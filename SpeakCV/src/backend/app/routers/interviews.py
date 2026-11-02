@@ -182,7 +182,7 @@ def list_my_interviews(company_id: int, member: CompanyMember = Depends(require_
     }
     return [
         {"application_id": application.id, "alias": application.alias, "job_id": job.id, "job_title": job.title,
-         "language": row.language, "sent_at": row.sent_at.isoformat() if row.sent_at else None,
+         "language": row.language, "sent_at": brief.utc_iso(row.sent_at),
          "scored": application.id in scored}
         for application, job, row in rows
     ]

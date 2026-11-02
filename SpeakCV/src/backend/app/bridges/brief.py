@@ -19,6 +19,7 @@ from app.database.sql_models import (
     RequirementResult, VoiceSession, VoiceTurn,
 )
 from app.hiring import audit, jobs, notify
+from app.hiring.state import CONSENT_WITHDRAWN
 
 PROMPT_VERSION = "candidate-brief-1"
 MAX_OUTPUT_TOKENS = 3000
@@ -192,9 +193,13 @@ def _lock_brief(db, application) -> CandidateBrief | None:
     )
 
 
-def _lock_row(db, row: CandidateBrief) -> None:
-    """Read the row as it is now: a regenerate may have cleared its review since this request read it."""
-    db.query(CandidateBrief).filter(CandidateBrief.id == row.id).populate_existing().with_for_update().one()
+def _lock_row(db, application, row: CandidateBrief) -> None:
+    """Read the application and the brief as they are now: a regenerate may have cleared the review since this request
+    read the row, and a withdrawal may have deleted it. The application's lock comes first, as in a withdrawal."""
+    db.query(Application).filter(Application.id == application.id).populate_existing().with_for_update().first()
+    current = db.query(CandidateBrief).filter(CandidateBrief.id == row.id).populate_existing().with_for_update().first()
+    if current is None:
+        raise BriefError(409, "This brief no longer exists")
 
 
 def _check_can_have_brief(application) -> None:
@@ -202,14 +207,20 @@ def _check_can_have_brief(application) -> None:
         raise BriefError(409, "A brief needs an approved application")
 
 
-def _row_to_write(db, application) -> CandidateBrief:
+def _row_to_write(db, application, had_withdrawn: bool) -> CandidateBrief:
     """After the AI call. Takes the application's row and the brief's, reads them as they are now, and refuses if the
-    application is no longer approved or the brief went out during the call. Two first generates meet at the unique key,
-    and the one that loses writes over the winner's draft."""
+    application was deleted, lost its consent or approval, or the brief went out during the call: nothing drawn from this
+    evidence is written then. Two first generates meet at the unique key, and the one that loses writes over the winner's
+    draft."""
     application_id = application.id
     # End the transaction, so the reads after these locks see what was committed before they were granted.
     db.rollback()
-    db.query(Application).filter(Application.id == application_id).populate_existing().with_for_update().one()
+    locked = db.query(Application).filter(Application.id == application_id).populate_existing().with_for_update().first()
+    if (
+        locked is None or locked.anonymized_at is not None
+        or (locked.analysis_status == CONSENT_WITHDRAWN and not had_withdrawn)
+    ):
+        raise BriefError(409, "This application changed while the brief was being written. Please try again.")
     _check_can_have_brief(application)
     row = _lock_brief(db, application)
     if row is None:
@@ -220,7 +231,7 @@ def _row_to_write(db, application) -> CandidateBrief:
                 db.add(row)
         except IntegrityError:
             row = _lock_brief(db, application)
-    if row.status == "sent":
+    if row.status == "sent" and not row.stale:
         raise BriefError(409, "This brief was already sent")
     return row
 
@@ -231,9 +242,10 @@ def generate(db, application, reviewer_id, language: str = DEFAULT_LANGUAGE) -> 
         raise BriefError(422, "Unsupported language")
     _check_can_have_brief(application)
     row = _get(db, application)
-    if row is not None and row.status == "sent":
+    if row is not None and row.status == "sent" and not row.stale:
         raise BriefError(409, "This brief was already sent")
     evidence = collect_evidence(db, application)
+    had_withdrawn = application.analysis_status == CONSENT_WITHDRAWN  # then the evidence holds nothing from the interview
     provider = model = None
     if not evidence:
         content = _empty(language)
@@ -251,8 +263,9 @@ def generate(db, application, reviewer_id, language: str = DEFAULT_LANGUAGE) -> 
             [(q.evidence_id, q.question, "") for q in out.questions],
         )
         provider, model = response.provider, get_config().slot("reasoning").model
-    row = _row_to_write(db, application)
+    row = _row_to_write(db, application, had_withdrawn)
     row.language, row.content, row.status, row.reviewed_by, row.sent_at = language, content, "draft", None, None
+    row.stale = False
     audit.record(db, application.company_id, reviewer_id, "brief_generated", "application", application.id,
                  payload={"language": language, "evidence": len(evidence)},
                  ai_provider=provider, ai_model=model, prompt_version=PROMPT_VERSION if evidence else None)
@@ -262,7 +275,7 @@ def generate(db, application, reviewer_id, language: str = DEFAULT_LANGUAGE) -> 
 
 def edit(db, application, row, reviewer_id, strengths=None, to_clarify=None, questions=None) -> CandidateBrief:
     """HR changes wording only. The result goes through `assemble` again, so quotes and times stay the evidence's."""
-    _lock_row(db, row)
+    _lock_row(db, application, row)
     if row.status == "sent":
         raise BriefError(409, "A sent brief cannot be edited")
     content = dict(row.content or {})
@@ -296,7 +309,13 @@ def _managers_of(db, job: Job) -> list[int]:
 
 
 def send(db, application, row, actor_user_id) -> CandidateBrief:
-    _lock_row(db, row)
+    _lock_row(db, application, row)
+    if application.anonymized_at is not None:
+        raise BriefError(409, "This application was anonymized")
+    if application.analysis_status == CONSENT_WITHDRAWN:
+        raise BriefError(409, "The candidate withdrew consent to the recording")
+    if row.stale:
+        raise BriefError(409, "The analysis changed after this brief was written. Generate it again")
     if row.status == "sent":
         raise BriefError(409, "This brief was already sent")
     if row.reviewed_by is None:
@@ -309,7 +328,7 @@ def send(db, application, row, actor_user_id) -> CandidateBrief:
     for user_id in _managers_of(db, job):
         notify.enqueue(db, application.company_id, user_id, "brief", row.language,
                        subject.format(title=job.title, alias=application.alias),
-                       body.format(title=job.title, alias=application.alias))
+                       body.format(title=job.title, alias=application.alias), application_id=application.id)
     db.flush()
     return row
 
@@ -373,6 +392,8 @@ def submit_scorecard(db, application, manager_user_id, required: set[int], score
 def record_outcome(db, application, actor_user_id, outcome: str) -> None:
     if outcome not in OUTCOMES:
         raise BriefError(422, "Outcome must be hired, not_hired or offer_declined")
+    if application.anonymized_at is not None:
+        raise BriefError(409, "This application was anonymized")
     if application.hr_decision != "approved":
         raise BriefError(409, "An outcome can only be recorded for an approved application")
     previous = application.final_outcome
@@ -382,7 +403,14 @@ def record_outcome(db, application, actor_user_id, outcome: str) -> None:
     db.flush()
 
 
+def utc_iso(value: datetime | None) -> str | None:
+    """A stored time as ISO text with its zone. MySQL returns it without one, and a browser would read that as local."""
+    if value is None:
+        return None
+    return (value if value.tzinfo else value.replace(tzinfo=timezone.utc)).isoformat()
+
+
 def serialize(row: CandidateBrief) -> dict:
     return {"id": row.id, "application_id": row.application_id, "language": row.language, "status": row.status,
-            "content": row.content, "reviewed_by": row.reviewed_by,
-            "sent_at": row.sent_at.isoformat() if row.sent_at else None}
+            "content": row.content, "reviewed_by": row.reviewed_by, "stale": bool(row.stale),
+            "sent_at": utc_iso(row.sent_at)}

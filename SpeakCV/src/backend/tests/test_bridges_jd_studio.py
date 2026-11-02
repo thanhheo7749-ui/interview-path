@@ -79,8 +79,8 @@ def test_invented_node_ids_are_removed_and_listed(db, world):
     draft = jd_studio.generate(db, _context(world), world.hr.id)
 
     assert [item["id"] for item in draft.lines] == ["l1"]
-    assert {r["line_id"] for r in draft.rejected_lines} == {"l2", "l3"}
-    assert all(r["reason"] for r in draft.rejected_lines)
+    assert {r["line_id"] for r in draft.rejected} == {"l2", "l3"}
+    assert all(r["reason"] for r in draft.rejected)
 
 
 def test_confidential_content_cannot_reach_the_prompt(db, world, prompts):

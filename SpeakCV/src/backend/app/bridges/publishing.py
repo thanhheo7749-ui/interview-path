@@ -11,7 +11,9 @@ from app.brain import audience as aud
 from app.brain import retriever
 from app.bridges import jd_studio, lint
 from app.bridges.lint import LANGS
-from app.database.sql_models import Company, CompanyMember, HiringRequest, Job, JobDraft, JobDraftMessage, KbNode
+from app.database.sql_models import (
+    ChannelContent, Company, CompanyMember, HiringRequest, Job, JobDraft, JobDraftMessage, KbNode,
+)
 from app.hiring import audit, jobs
 
 FALLBACK_LANG = "en"
@@ -238,6 +240,9 @@ def publish(db: Session, draft: JobDraft, user_id: int, version: int) -> tuple[J
     except PublishError:
         db.rollback()
         raise
+    # Channel content was written from the lines of the version before: it is not served again, and HR regenerates it.
+    db.query(ChannelContent).filter(ChannelContent.job_draft_id == draft.id,
+                                    ChannelContent.company_id == draft.company_id).delete(synchronize_session=False)
     draft.job_id = job.id
     draft.status = "published"
     if request is not None:

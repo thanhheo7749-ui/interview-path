@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Link } from 'react-router-dom';
 import { useCompany } from '../company/CompanyContext.jsx';
 import {
   ConfirmBar, EmptyState, ErrorAlert, WarningList, cardClass, inputClass, primaryButton, secondaryButton,
@@ -96,6 +97,8 @@ function ReviewPage() {
 
   const nodes = queue?.nodes ?? [];
   const proposals = queue?.merge_proposals ?? [];
+  // A document whose names were not masked is not accepted in bulk until HR retries the masking.
+  const heldTitles = new Set((queue?.held_documents ?? []).map((held) => held.title));
 
   return (
     <div className="space-y-6 p-8">
@@ -103,13 +106,20 @@ function ReviewPage() {
       <ErrorAlert message={error} />
       <WarningList warnings={warnings} onDismiss={() => setWarnings([])} />
 
+      {(queue?.held_documents ?? []).map((held) => (
+        <p key={held.id} role="note" data-testid="masking-held" className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-900">
+          {t('review.maskingHeld', { title: held.title })}{' '}
+          <Link to="/documents" className="underline">{t('review.maskingHeldLink')}</Link>
+        </p>
+      ))}
+
       {queue && nodes.length === 0 && <EmptyState>{t('review.empty')}</EmptyState>}
 
       {groupByDocument(nodes).map((group) => (
         <section key={group.name} className={`${cardClass} space-y-4`}>
           <div className="flex flex-wrap items-center justify-between gap-3">
             <h2 className="text-lg font-extrabold tracking-tight">{group.name || t('review.unknownDocument')}</h2>
-            <button type="button" disabled={busy || group.items.every(isHeld)} onClick={() => decide(group.items.filter((node) => !isHeld(node)).map((node) => accept(node)))} className={primaryButton}>
+            <button type="button" disabled={busy || group.items.every(isHeld) || heldTitles.has(group.name)} onClick={() => decide(group.items.filter((node) => !isHeld(node)).map((node) => accept(node)))} className={primaryButton}>
               {t('review.acceptAll')}
             </button>
           </div>

@@ -8,8 +8,8 @@ import LineEditor from '../components/jd/LineEditor.jsx';
 import LintPanel from '../components/jd/LintPanel.jsx';
 import { ErrorAlert, cardClass, inputClass, primaryButton, secondaryButton } from '../components/KbFeedback.jsx';
 import {
-  acknowledgeUnchecked, approveDraft, askAssistant, confirmDraftLine, generateChannelContent, getChannelContent, getDraft,
-  patchDraftLines, publishDraft, requestDraftChanges, rerunLint, submitDraft,
+  acknowledgeUnchecked, approveDraft, askAssistant, confirmDraftLine, dismissProposal, generateChannelContent,
+  getChannelContent, getDraft, patchDraftLines, publishDraft, requestDraftChanges, rerunLint, submitDraft,
 } from '../lib/bridges.js';
 
 const LANGUAGES = [
@@ -78,7 +78,6 @@ function JdStudio() {
   const lang = chosenLang ?? (LANGUAGES.some((l) => l.code === i18n.language) ? i18n.language : 'en');
   const [channels, setChannels] = useState([]);
   const [channelError, setChannelError] = useState('');
-  const [dismissed, setDismissed] = useState([]);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -165,6 +164,7 @@ function JdStudio() {
   const publish = async () => {
     const published = await act(() => publishDraft(companyId, draft.id, draft.version));
     if (!published) return;
+    setChannels([]); // the lines changed: text written for the version before must not be shown
     setChannelError('');
     try {
       setChannels((await generateChannelContent(companyId, draft.id)).channels);
@@ -252,9 +252,18 @@ function JdStudio() {
             </p>
           )}
           {(draft.rejected ?? []).length > 0 && (
-            <p role="note" className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-900">
-              {t('jd.rejected', { count: draft.rejected.length })}
-            </p>
+            <div role="note" data-testid="rejected-lines" className="space-y-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+              <p className="font-semibold">{t('jd.rejected', { count: draft.rejected.length })}</p>
+              <ul className="space-y-1">
+                {draft.rejected.map((item) => (
+                  <li key={item.line_id} data-testid="rejected-line">
+                    <span className="font-semibold">{item.text?.[lang] || item.text?.en || item.text?.vi || item.text?.ko}</span>
+                    {' · '}
+                    {t(`jd.rejectedReasons.${item.code}`, { defaultValue: t('jd.rejectedReasons.unknown'), numbers: (item.detail ?? []).join(', ') })}
+                  </li>
+                ))}
+              </ul>
+            </div>
           )}
           {draft.lines.length === 0 && <p className={`${cardClass} text-sm font-semibold text-slate-600`}>{t('jd.noLines')}</p>}
           <ol data-testid="jd-lines" className="space-y-2">
@@ -281,11 +290,10 @@ function JdStudio() {
             <AssistantPanel
               messages={draft.messages ?? []}
               proposals={draft.proposals ?? []}
-              dismissed={dismissed}
               busy={busy}
               onSend={sendMessage}
               onConfirm={confirmLine}
-              onDismiss={(id) => setDismissed((current) => [...current, id])}
+              onDismiss={(id) => act(() => dismissProposal(companyId, draft.id, id))}
             />
           )}
           <LintPanel

@@ -102,7 +102,8 @@
         "intake_done": "인테이크 완료, HR 검토 중",
         "drafting": "채용공고 초안 작성 중",
         "published": "게시됨",
-        "cancelled": "취소됨"
+        "cancelled": "취소됨",
+        "intake_empty": "기록된 답변이 없습니다. 인테이크를 다시 시작하세요"
       },
       "roleLabel": "설명을 작성할 직무",
       "anyRole": "특정 직무 없음",
@@ -113,7 +114,8 @@
       "editOne": "요청 수정: {{title}}",
       "cancelRequest": "요청 취소",
       "cancelOne": "요청 취소: {{title}}",
-      "cancelConfirm": "이 채용 요청을 취소할까요? 인테이크, 초안 작성과 승인이 중단되며 다시 열 수 없습니다."
+      "cancelConfirm": "이 채용 요청을 취소할까요? 인테이크, 초안 작성과 승인이 중단되며 다시 열 수 없습니다.",
+      "startAgain": "인테이크 다시 시작"
     },
     "intake": {
       "title": "매니저 인테이크",
@@ -189,7 +191,9 @@
         "reviewed": "HR 검토 완료",
         "sent": "발송됨"
       },
-      "sentNote": "채용 매니저에게 발송되었습니다. 더 이상 수정할 수 없습니다."
+      "sentNote": "채용 매니저에게 발송되었습니다. 더 이상 수정할 수 없습니다.",
+      "stale": "이 브리프를 만든 뒤 인터뷰가 다시 분석되었습니다. 새 근거를 쓰려면 다시 생성하세요.",
+      "staleSent": "이 브리프를 보낸 뒤 인터뷰가 다시 분석되었습니다. 다시 생성하고 검토한 뒤 새 브리프를 보내세요."
     },
     "interviews": {
       "title": "내 면접",
@@ -328,6 +332,14 @@
         "conflict": "회사 정보와 충돌",
         "unchecked": "검사를 실행하지 못함",
         "must_have_count": "필수 요건이 많음"
+      },
+      "messages": {
+        "discrimination": "어떤 줄이 직무가 아닌 사람에 대한 조건을 요구할 수 있습니다. 게시하기 전에 HR이 고쳐야 합니다.",
+        "no_source": "어떤 줄에 회사 지식의 출처가 없습니다. HR이 출처를 추가하거나 확인해야 합니다.",
+        "conflict": "어떤 줄이 회사 사실과 다른 값을 말합니다. 게시하기 전에 HR이 고쳐야 합니다.",
+        "unchecked": "어떤 줄에 대해 자동 검사를 실행하지 못했습니다. HR이 다시 실행하거나 그 줄을 검토해야 합니다.",
+        "must_have_count": "이 초안에는 필수 요건이 많아 지원자 풀이 좁아집니다.",
+        "other": "검사에서 이 초안의 문제가 발견되었습니다."
       }
     },
     "channels": {
@@ -353,11 +365,20 @@
       "copyText": "{{channel}} 내용 복사",
       "copyTextShort": "내용 복사",
       "copied": "복사됨",
-      "copyFailed": "복사하지 못했습니다. 텍스트를 선택해 직접 복사하세요."
+      "copyFailed": "복사하지 못했습니다. 텍스트를 선택해 직접 복사하세요.",
+      "usedTemplate": "이 채널에는 AI 문안을 쓰지 않았습니다. 새로운 사실을 추가했거나, 공정성 검사에서 걸렸거나, 검사를 실행하지 못했기 때문입니다. 이 문안은 채용 공고의 줄만으로 만들었습니다.",
+      "regenerate": "다시 생성"
     },
     "isRequirementLine": "{{number}}번 문장은 요건입니다",
     "isMustHaveLine": "{{number}}번 문장은 필수 요건입니다",
-    "sourceNode": "출처 #{{id}}"
+    "sourceNode": "출처 #{{id}}",
+    "rejectedReasons": {
+      "no_source": "회사 지식에 출처가 없습니다.",
+      "unknown_nodes": "사용할 수 없는 지식을 인용합니다.",
+      "unsupported_numbers": "출처에 없는 숫자를 말합니다: {{numbers}}.",
+      "unsupported_terms": "출처에 없는 급여나 복리후생을 언급합니다.",
+      "unknown": "회사 지식이 이 줄을 뒷받침하지 않습니다."
+    }
   },
   "board": {
     "lanes": {
@@ -373,11 +394,18 @@
     "transcriptionFailed": "지원자가 답변했지만 음성 변환에 실패했습니다. 음성 파일은 있습니다. 면접을 보지 않은 것이 아니라 기술 문제입니다. 음성 변환을 다시 시도할 수 있습니다.",
     "cvFailed": "이 지원자의 이력서를 처리하지 못해 AI가 이력서를 읽지 않았습니다. 그래도 면접에 초대할 수 있습니다.",
     "longPause": "인터뷰 중 긴 휴지 구간이 있었습니다",
+    "consentWithdrawn": "녹음 동의를 철회함",
+    "cvConsentWithdrawn": "이 지원자가 이력서 처리 동의를 철회하여 AI가 더 이상 이력서를 다루지 않으며 면접에 초대할 수 없습니다.",
+    "transcript": {
+      "maskedNote": "지원자의 신원을 공개하기 전까지 이름, 이메일, 전화번호 및 이와 유사한 정보는 가려집니다. 지원자가 자신에 대해 말한 다른 내용은 남아 있을 수 있습니다."
+    },
     "claims": {
       "cvSays": "CV에 적힌 내용"
     }
   },
   "jobs": {
-    "noPublicRequirement": "이 채용 공고에는 공개 요건이 없습니다. 면접에서 측정할 항목이 없어 모든 지원자의 근거 수준이 낮게 표시됩니다."
+    "noPublicRequirement": "이 채용 공고에는 공개 요건이 없습니다. 면접에서 측정할 항목이 없어 모든 지원자의 근거 수준이 낮게 표시됩니다.",
+    "descriptionInJdStudio": "이 공고는 JD Studio에서 만들었습니다. 검사와 매니저 승인이 적용되도록 설명은 그곳에서 수정하세요.",
+    "openJdStudio": "JD Studio에서 열기"
   }
 }

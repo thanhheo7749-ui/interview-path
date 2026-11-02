@@ -37,7 +37,9 @@ function LintPanel({ issues, lineNumbers, canAct, busy, onDifferentScope, onReru
                 <span className="font-semibold">{t(`jd.lint.checks.${issue.check}`, { defaultValue: issue.check })}</span>
                 {issue.line_id && lineNumbers[issue.line_id] ? ` (${t('jd.lint.line', { number: lineNumbers[issue.line_id] })})` : ''}
               </p>
-              <p>{issue.message}</p>
+              <p data-testid="lint-message">
+                {canAct ? issue.message : t(`jd.lint.messages.${issue.check}`, { defaultValue: t('jd.lint.messages.other') })}
+              </p>
               {issue.check === 'conflict' && issue.node_title && (
                 <p data-testid="lint-fact" className="font-semibold">
                   {t('jd.lint.fact', { title: issue.node_title })}

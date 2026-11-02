@@ -982,3 +982,119 @@ def test_the_daily_pass_expires_entries(db, world):
     db.commit()
     retention._daily_pass()
     assert reload(db, entry).status == "expired"
+
+
+# Beside the re-apply guard and consent withdrawal (Block 3 final review fixes)
+
+
+def _in_the_pool_with_a_session(db, world):
+    application = rejected(db, world["job"])
+    db.add(VoiceSession(company_id=application.company_id, purpose="screening", application_id=application.id,
+                        owner_user_id=application.candidate_user_id, language="en", status="completed"))
+    db.commit()
+    user_id = application.candidate_user_id
+    join(db, application)
+    return application.id, user_id
+
+
+def test_retention_keeps_a_valid_entry_and_also_leaves_the_guard(db, world):
+    from app.database.sql_models import ReapplyGuard
+    from app.hiring import reapply_guard
+
+    application_id, user_id = _in_the_pool_with_a_session(db, world)
+    job_id = world["job"].id
+    retention.anonymize_application(db, db.get(Application, application_id))
+    db.rollback()
+    entry = db.query(TalentPoolEntry).filter_by(source_application_id=application_id).one()
+    assert entry.status == "active" and entry.retained_cv_text
+    consent = db.get(Consent, entry.consent_id)
+    assert consent.user_id == user_id and consent.withdrawn_at is None
+    assert db.query(ReapplyGuard).count() == 1
+    assert reapply_guard.blocked_until(db, user_id, job_id) is not None
+
+
+def test_a_guard_stops_an_invitation_to_that_job_and_only_that_job(client, db, world):
+    from app.hiring import applications as hiring_applications
+    from app.hiring import reapply_guard
+
+    application_id, user_id = _in_the_pool_with_a_session(db, world)
+    other = make_application(db, world["job"], alias=f"#A{next(_numbers)}")
+    other_user = other.candidate_user_id
+    assert other_user != user_id
+    reapply_guard.remember(db, user_id, world["new_job"].id, utcnow() - timedelta(days=1))
+    db.commit()
+    with pytest.raises(hiring_applications.AlreadyApplied):
+        hiring_applications.check_reapply(db, user_id, world["new_job"].id)
+    assert talent_pool._candidate_rows(db, world["company"].id, world["new_job"].id, utcnow()) == []
+    other_job = Job(company_id=world["company"].id, title="Third", slug="third", status="published", version=1, interview_languages=["en"])
+    db.add(other_job)
+    db.commit()
+    assert len(talent_pool._candidate_rows(db, world["company"].id, other_job.id, utcnow())) == 1
+
+
+def test_withdrawing_the_pool_consent_after_anonymizing_goes_through_the_route_and_names_nobody(client, db, world):
+    application_id, user_id = _in_the_pool_with_a_session(db, world)
+    email = db.get(User, user_id).email
+    retention.anonymize_application(db, db.get(Application, application_id))
+    db.rollback()
+    consent_id = db.query(TalentPoolEntry).filter_by(source_application_id=application_id).one().consent_id
+    response = client.post(f"/api/me/consents/{consent_id}/withdraw", headers=auth_header(email))
+    assert response.status_code == 200, response.text
+    db.rollback()
+    db.expire_all()
+    assert db.query(TalentPoolEntry).filter_by(source_application_id=application_id).count() == 0
+    consent = db.get(Consent, consent_id)
+    assert consent.withdrawn_at is not None and consent.user_id is None
+    row = db.query(AuditLog).filter_by(action="consent_withdrawn", target_id=consent_id).one()
+    assert row.actor_user_id is None
+
+
+def test_a_withdrawal_that_retracts_an_invitation_commits_both_in_one_transaction(client, db, world):
+    """anonymize_application shares the caller's transaction here: its rollback must not undo the withdrawal."""
+    application = rejected(db, world["job"])
+    email = owner(db, application).email
+    entry = join(db, application)
+    consent_id, entry_id = entry.consent_id, entry.id
+    invited = talent_pool.invite(db, entry, world["new_job"], world["people"]["hr"]["id"])
+    invited_id = invited.id
+    db.query(Application).filter_by(id=invited_id).update({"cv_blind_hash": application.cv_blind_hash})
+    db.commit()
+    response = client.post(f"/api/me/consents/{consent_id}/withdraw", headers=auth_header(email))
+    assert response.status_code == 200, response.text
+    db.rollback()
+    db.expire_all()
+    assert db.get(Consent, consent_id).withdrawn_at is not None
+    assert db.get(TalentPoolEntry, entry_id).status == "left"
+    assert db.get(Application, invited_id).anonymized_at is not None
+
+
+def test_commit_false_keeps_what_the_caller_has_pending(db, world):
+    application = rejected(db, world["job"])
+    application_id = application.id
+    db.add(AuditLog(company_id=application.company_id, action="callers_own_work", target_type="application", target_id=application_id))
+    assert retention.anonymize_application(db, application, commit=False) is True
+    db.rollback()
+    assert db.query(AuditLog).filter_by(action="callers_own_work").count() == 0  # nothing was committed for the caller
+    assert db.get(Application, application_id).anonymized_at is None
+
+
+def test_deleting_the_source_erases_questions_once_the_invitation_it_retracts_is_gone(client, db, world):
+    from app.database.sql_models import AssistantQuestion
+
+    application = rejected(db, world["job"])
+    application_id, user_id = application.id, application.candidate_user_id
+    email = owner(db, application).email
+    entry = join(db, application)
+    invited = talent_pool.invite(db, entry, world["new_job"], world["people"]["hr"]["id"])
+    db.query(Application).filter_by(id=invited.id).update({"cv_blind_hash": application.cv_blind_hash})
+    question = AssistantQuestion(company_id=world["company"].id, user_id=user_id, audience="candidate", question="Is there leave?",
+                                 language="en", answered=False)
+    db.add(question)
+    db.commit()
+    question_id = question.id
+    assert client.delete(f"/api/me/applications/{application_id}", headers=auth_header(email)).status_code == 204
+    db.rollback()
+    db.expire_all()
+    row = db.get(AssistantQuestion, question_id)
+    assert row.user_id is None and row.question == ""
+

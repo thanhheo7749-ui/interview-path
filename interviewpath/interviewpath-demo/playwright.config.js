@@ -22,6 +22,8 @@ export default defineConfig({
   timeout: 240000,
   use: {
     baseURL: webUrl,
+    // A page that does not load fails here, not after the whole test timeout.
+    navigationTimeout: 30000,
     // A fake microphone, allowed without a prompt, so the screening room can record real audio in CI.
     launchOptions: { args: ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream'] },
     permissions: ['microphone'],

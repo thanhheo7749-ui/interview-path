@@ -14,7 +14,7 @@ from app.schemas.bridges import HiringRequestIn, HiringRequestPatch, IntakeStart
 router = APIRouter()
 
 BASE = "/api/companies/{company_id}"
-INTAKE_OPEN_STATUSES = ("open", "intake_in_progress")
+INTAKE_OPEN_STATUSES = ("open", "intake_in_progress", intake.EMPTY_STATUS)
 
 
 def _latest_drafts(db: Session, member: CompanyMember, request_ids: list[int]) -> dict[int, tuple[int, str]]:
@@ -156,7 +156,8 @@ def _resume(db: Session, row: HiringRequest) -> StateOut | None:
 
 
 def _check_can_start(db: Session, row: HiringRequest) -> None:
-    finished = row.intake_session_id is not None and db.query(VoiceSession.id).filter(
+    # A wholly silent intake is also "completed", and leaves no document: that one may be started again.
+    finished = row.status != intake.EMPTY_STATUS and row.intake_session_id is not None and db.query(VoiceSession.id).filter(
         VoiceSession.id == row.intake_session_id, VoiceSession.status == voice.COMPLETED
     ).first()
     if row.status not in INTAKE_OPEN_STATUSES or finished:

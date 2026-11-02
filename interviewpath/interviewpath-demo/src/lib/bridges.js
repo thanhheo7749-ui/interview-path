@@ -97,6 +97,8 @@ export const askAssistant = (companyId, draftId, message) =>
   api(`${drafts(companyId)}/${draftId}/assistant`, { method: 'POST', body: { message } });
 export const confirmDraftLine = (companyId, draftId, lineId) =>
   api(`${drafts(companyId)}/${draftId}/lines/${encodeURIComponent(lineId)}/confirm`, { method: 'POST' });
+export const dismissProposal = (companyId, draftId, proposalId) =>
+  api(`${drafts(companyId)}/${draftId}/proposals/${encodeURIComponent(proposalId)}/dismiss`, { method: 'POST' });
 export const rerunLint = (companyId, draftId) => api(`${drafts(companyId)}/${draftId}/lint`, { method: 'POST' });
 export const acknowledgeUnchecked = (companyId, draftId, lineId) =>
   api(`${drafts(companyId)}/${draftId}/lint/acknowledge`, { method: 'POST', body: lineId ? { line_id: lineId } : {} });

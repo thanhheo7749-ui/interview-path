@@ -1,4 +1,5 @@
 """The Trust Center for HR, and a candidate's consent withdrawal. Every HR lookup filters on company_id."""
+import logging
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -8,12 +9,13 @@ from sqlalchemy.orm import Session
 from app.auth.dependencies import get_authenticated_user, require_member
 from app.database.database import get_db
 from app.database.sql_models import Application, AuditLog, Company, CompanyMember, Consent, Job, User
-from app.hiring import audit, consents, fairness, retention
+from app.hiring import consents, fairness, retention, withdrawal
 
 router = APIRouter(prefix="/api/companies/{company_id}/trust", dependencies=[Depends(require_member("hr"))])
 me_router = APIRouter()
 
 PAGE_SIZE = 50
+logger = logging.getLogger(__name__)
 
 
 class ConsentRow(BaseModel):
@@ -145,6 +147,8 @@ def fairness_check(
     application = db.query(Application).filter(Application.id == body.application_id, Application.company_id == company_id).first()
     if application is None:
         raise HTTPException(status_code=404, detail="Application not found")
+    if consents.was_withdrawn(db, application.id, withdrawal.CV_PROCESSING):
+        raise HTTPException(status_code=409, detail="The candidate withdrew consent to CV processing, so this check cannot run")
     try:
         result = fairness.check(db, application, actor_user_id=user.id)
     except fairness.ApplicationDeleted as exc:
@@ -176,15 +180,13 @@ def my_consents(user: User = Depends(get_authenticated_user), db: Session = Depe
 
 @me_router.post("/api/me/consents/{consent_id}/withdraw", response_model=WithdrawnConsent)
 def withdraw_consent(consent_id: int, user: User = Depends(get_authenticated_user), db: Session = Depends(get_db)):
-    consent = (
-        db.query(Consent).filter(Consent.id == consent_id, Consent.user_id == user.id)
-        .populate_existing().with_for_update().first()
-    )
+    user_id = user.id
+    try:
+        consent = withdrawal.withdraw(db, consent_id, user_id)
+    except Exception as exc:  # a file that could not be deleted; the paths survive, so the candidate can try again
+        db.rollback()
+        logger.warning("Could not withdraw consent %s: %s", consent_id, type(exc).__name__)
+        raise HTTPException(status_code=503, detail="Your consent could not be withdrawn just now. Please try again.") from None
     if consent is None:
         raise HTTPException(status_code=404, detail="Consent not found")
-    if consent.withdrawn_at is None:
-        consents.withdraw(db, consent.id, user.id)
-        # A consent with no user left belongs to an anonymized application, so this row must not name them either.
-        audit.record(db, consent.company_id, user.id if consent.user_id else None, "consent_withdrawn", "consent", consent.id)
-        db.commit()
     return WithdrawnConsent(id=consent.id, purpose=consent.purpose, withdrawn_at=consent.withdrawn_at)
