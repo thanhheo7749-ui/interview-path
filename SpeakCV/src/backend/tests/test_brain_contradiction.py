@@ -561,13 +561,33 @@ def test_a_title_differing_in_case_and_spacing_is_the_same_title(db, company):
     assert contradiction.check_new_facts(db, company.id, [new.id]) == 1
 
 
-def test_same_title_in_another_type_is_held_to_the_gate(db, company):
+def test_same_title_reaches_the_check_across_types_when_one_is_a_fact(db, company):
     other = node(db, company, "12", embedding=vec(1.0))
     other.type = "policy"
     db.commit()
     new = node(db, company, "15", status="draft", embedding=vec(0.0, 1.0))
+    fake.enqueue("kb_conflict_check", conflict_answer())
+    assert contradiction.check_new_facts(db, company.id, [new.id]) == 1
+
+
+def test_same_title_across_two_other_types_is_held_to_the_gate(db, company):
+    other = node(db, company, "12", embedding=vec(1.0))
+    other.type = "policy"
+    new = node(db, company, "15", status="draft", embedding=vec(0.0, 1.0))
+    new.type = "process"
+    db.commit()
     assert contradiction.check_new_facts(db, company.id, [new.id]) == 0
     assert fake.last_messages() == []
+
+
+def test_same_title_in_the_same_other_type_still_reaches_the_check(db, company):
+    other = node(db, company, "12", embedding=vec(1.0))
+    other.type = "policy"
+    new = node(db, company, "15", status="draft", embedding=vec(0.0, 1.0))
+    new.type = "policy"
+    db.commit()
+    fake.enqueue("kb_conflict_check", conflict_answer())
+    assert contradiction.check_new_facts(db, company.id, [new.id]) == 1
 
 
 # The anti-fabrication gate: a word counts as a number only where it is used as one.

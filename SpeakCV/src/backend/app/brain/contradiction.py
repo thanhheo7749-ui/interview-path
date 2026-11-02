@@ -373,13 +373,16 @@ def _already_paired(db: Session, company_id: int, first: int, second: int, reche
 
 
 def _same_title(node: KbNode, other: KbNode) -> bool:
-    return node.type == other.type and _folded(node.title) == _folded(other.title)
+    """One title names one thing when the two share a type, or when one of them is a fact: a policy can state the value
+    that a fact elsewhere gives differently."""
+    same_kind_of_thing = node.type == other.type or "fact" in (node.type, other.type)
+    return same_kind_of_thing and _folded(node.title) == _folded(other.title)
 
 
 def check_new_facts(db: Session, company_id: int, node_ids: list[int], bump_version: bool = True,
                     recheck_dismissed: bool = False) -> int:
-    """Open a conflict for each new fact that disagrees with a similar fact, or one with the same type and title however
-    its body is worded. Returns how many were opened.
+    """Open a conflict for each new fact that disagrees with a similar fact, or one with the same title however its body
+    is worded (see _same_title). Returns how many were opened.
 
     AIError from the check propagates; conflicts opened before it are already committed.
     bump_version=False is for a request that has already moved the version: resetting it afterwards would undo
