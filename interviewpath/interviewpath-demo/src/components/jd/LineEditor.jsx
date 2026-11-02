@@ -4,7 +4,7 @@ import { inputClass, primaryButton, secondaryButton } from '../KbFeedback.jsx';
 
 // One line of the description in the chosen language: its source chips, an inline edit, and a mark when nothing in the
 // knowledge graph supports it. `titles` maps node ids to titles; a manager has none, so a chip then names the node id.
-function LineEditor({ line, number, lang, titles, canEdit, busy, onSave, onRemove, onConfirm }) {
+function LineEditor({ line, number, lang, titles, canEdit, busy, onSave, onRemove, onConfirm, onFlag }) {
   const { t } = useTranslation();
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState('');
@@ -66,12 +66,37 @@ function LineEditor({ line, number, lang, titles, canEdit, busy, onSave, onRemov
             {t('jd.confirmedByHr')}
           </span>
         )}
-        {line.is_requirement && (
+        {!canEdit && line.is_requirement && (
           <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-700">
             {line.must_have ? t('jd.mustHave') : t('jd.requirement')}
           </span>
         )}
       </div>
+
+      {canEdit && (
+        <div className="flex flex-wrap gap-4 text-xs font-semibold text-slate-700">
+          <label className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              aria-label={t('jd.isRequirementLine', { number })}
+              checked={Boolean(line.is_requirement)}
+              disabled={busy}
+              onChange={(e) => onFlag(line.id, { is_requirement: e.target.checked })}
+            />
+            {t('jd.requirement')}
+          </label>
+          <label className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              aria-label={t('jd.isMustHaveLine', { number })}
+              checked={Boolean(line.must_have)}
+              disabled={busy || !line.is_requirement}
+              onChange={(e) => onFlag(line.id, { must_have: e.target.checked })}
+            />
+            {t('jd.mustHave')}
+          </label>
+        </div>
+      )}
 
       {canEdit && !editing && (
         <div className="flex flex-wrap gap-2">

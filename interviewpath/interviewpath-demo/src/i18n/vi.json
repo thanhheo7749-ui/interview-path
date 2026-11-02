@@ -781,6 +781,8 @@
       "copyTextShort": "Sao chép nội dung",
       "copied": "Đã sao chép",
       "copyFailed": "Không sao chép được. Hãy chọn văn bản và sao chép thủ công."
-    }
+    },
+    "isRequirementLine": "Dòng {{number}} là một yêu cầu",
+    "isMustHaveLine": "Dòng {{number}} là yêu cầu bắt buộc"
   }
 }

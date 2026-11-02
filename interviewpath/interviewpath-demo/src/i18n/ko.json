@@ -226,7 +226,9 @@
       "copyTextShort": "내용 복사",
       "copied": "복사됨",
       "copyFailed": "복사하지 못했습니다. 텍스트를 선택해 직접 복사하세요."
-    }
+    },
+    "isRequirementLine": "{{number}}번 문장은 요건입니다",
+    "isMustHaveLine": "{{number}}번 문장은 필수 요건입니다"
   },
   "review": {
     "guard": {

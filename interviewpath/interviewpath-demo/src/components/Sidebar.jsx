@@ -33,7 +33,7 @@ function Sidebar() {
   const items = [...navItems.filter((item) => (!item.hrOnly || isHr) && (!item.roles || item.roles.includes(membership?.role))), ...(isHr ? kbNavItems : [])];
 
   return (
-    <aside className="fixed inset-y-0 left-0 z-30 flex w-64 flex-col border-r border-slate-200 bg-white px-4 py-5 shadow-panel">
+    <aside className="fixed inset-y-0 left-0 z-30 flex w-64 flex-col overflow-y-auto border-r border-slate-200 bg-white px-4 py-5 shadow-panel">
       <div className="flex items-center gap-3 px-2">
         <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-blue-600 text-white shadow-card">
           <BrainCircuit size={23} />

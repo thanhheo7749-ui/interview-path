@@ -29,10 +29,12 @@ test('a flagged item can only be rejected or rewritten, and an unchecked one nee
   await uploadGuardDocument(page);
   await page.getByRole('link', { name: /^Review/ }).click();
   const item = (name) => page.getByRole('article').filter({ hasText: name });
+  // Other specs may leave documents in this company's queue, so look only at this document's group.
+  const acceptAll = page.locator('section').filter({ has: page.getByRole('heading', { name: `Guard document ${RUN}` }) }).getByRole('button', { name: 'Accept all' });
 
   // Nothing here can be accepted in bulk: every item of the document is held by the guard.
   await expect(item('Guardflag9')).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Accept all' })).toBeDisabled();
+  await expect(acceptAll).toBeDisabled();
 
   // Flagged: the category and the reason show, and Accept stays off while the text is unchanged.
   const flagged = item('Guardflag9');
@@ -62,7 +64,7 @@ test('a flagged item can only be rejected or rewritten, and an unchecked one nee
   // Unchecked: Accept asks for a confirmation first, and Cancel sends nothing.
   const unchecked = item('Guardcheck9');
   await expect(unchecked.getByTestId('guard-unchecked')).toContainText('The automatic discrimination check did not run');
-  await expect(page.getByRole('button', { name: 'Accept all' })).toBeDisabled();
+  await expect(acceptAll).toBeDisabled();
   const sent = decisions.length;
   await unchecked.getByRole('button', { name: 'Accept', exact: true }).click();
   await expect(unchecked.getByRole('alertdialog')).toBeVisible();
@@ -71,7 +73,7 @@ test('a flagged item can only be rejected or rewritten, and an unchecked one nee
   expect(decisions.length).toBe(sent);
   await unchecked.getByRole('button', { name: 'Accept', exact: true }).click();
   await unchecked.getByRole('button', { name: 'I reviewed it, accept' }).click();
-  await expect(page.getByText('Nothing to review')).toBeVisible();
+  await expect(item('Guardcheck9')).toHaveCount(0);
   expect(decisions.length).toBe(sent + 1);
   expect(decisions.at(-1)).toMatchObject({ action: 'accept', confirm_unchecked: true });
 });

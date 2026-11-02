@@ -113,6 +113,12 @@ test('HR drafts, the manager approves in Korean, HR publishes and copies channel
   await expect(lint.getByTestId('lint-clear')).toBeVisible();
   await expect(lint.getByTestId('lint-block')).toHaveCount(0);
 
+  // A job needs a requirement to be published: HR marks the first line as a must-have requirement.
+  await page.getByLabel('Line 1 is a requirement', { exact: true }).click();
+  await expect(page.getByLabel('Line 1 is a requirement', { exact: true })).toBeChecked();
+  await page.getByLabel('Line 1 is a must-have', { exact: true }).click();
+  await expect(page.getByLabel('Line 1 is a must-have', { exact: true })).toBeChecked();
+
   // HR submits.
   await page.getByRole('button', { name: 'Submit to manager' }).click();
   await expect(page.getByTestId('draft-status')).toContainText('Waiting for the manager');
@@ -140,7 +146,11 @@ test('HR drafts, the manager approves in Korean, HR publishes and copies channel
   // HR publishes. Channel content shows for every channel, with a link and a copy button and nothing that posts.
   await page.reload();
   await expect(page.getByTestId('draft-status')).toContainText('Approved');
-  await page.getByRole('button', { name: 'Publish', exact: true }).click();
+  const [published] = await Promise.all([
+    page.waitForResponse((r) => r.url().endsWith(`/job-drafts/${draftId}/publish`)),
+    page.getByRole('button', { name: 'Publish', exact: true }).click(),
+  ]);
+  expect(published.status(), await published.text()).toBe(200);
   await expect(page.getByTestId('draft-status')).toContainText('Published');
   const content = page.getByTestId('channel-content');
   await expect(content.getByTestId('manual-post-notice')).toHaveText('Copy and post by hand. This system does not post to job boards.');
@@ -157,6 +167,6 @@ test('HR drafts, the manager approves in Korean, HR publishes and copies channel
   expect(buttons.filter((text) => !/^Copy/.test(text.trim()) && !CHANNELS.includes(text.trim()))).toEqual([]);
   await content.getByRole('tab', { name: 'LinkedIn' }).click();
   await content.getByRole('button', { name: /^Copy link / }).click();
-  await expect(content.getByRole('button', { name: 'Copied' })).toBeVisible();
+  await expect(content.getByText('Copied', { exact: true })).toBeVisible();
   expect(await page.evaluate(() => navigator.clipboard.readText())).toMatch(/\/jobs\/[a-z0-9-]+\?src=/);
 });

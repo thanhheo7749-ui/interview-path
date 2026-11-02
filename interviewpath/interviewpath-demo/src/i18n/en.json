@@ -782,6 +782,8 @@
       "copyTextShort": "Copy text",
       "copied": "Copied",
       "copyFailed": "Could not copy. Select the text and copy it by hand."
-    }
+    },
+    "isRequirementLine": "Line {{number}} is a requirement",
+    "isMustHaveLine": "Line {{number}} is a must-have"
   }
 }

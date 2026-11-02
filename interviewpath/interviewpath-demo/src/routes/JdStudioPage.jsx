@@ -229,6 +229,7 @@ function JdStudio() {
                 onSave={saveLine}
                 onRemove={removeLine}
                 onConfirm={confirmLine}
+                onFlag={(lineId, flags) => act(() => patchDraftLines(companyId, draft.id, [{ id: lineId, ...flags }]))}
               />
             ))}
           </ol>
