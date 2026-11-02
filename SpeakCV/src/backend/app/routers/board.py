@@ -42,7 +42,8 @@ class BulkIn(BaseModel):
 
 
 def _application(db: Session, company_id: int, application_id: int, lock: bool = False) -> Application:
-    query = db.query(Application).filter(Application.id == application_id, Application.company_id == company_id)
+    query = db.query(Application).filter(Application.id == application_id, Application.company_id == company_id,
+                                         Application.is_simulated.is_(False))
     if lock:  # a locking read returns the latest committed row, not this request's earlier snapshot
         query = query.populate_existing().with_for_update()
     application = query.first()
@@ -155,7 +156,8 @@ def post_bulk_reject(company_id: int, job_id: int, body: BulkIn,
     ids = list(dict.fromkeys(body.application_ids))
     rows = (
         db.query(Application)
-        .filter(Application.id.in_(ids), Application.company_id == company_id, Application.job_id == job_id)
+        .filter(Application.id.in_(ids), Application.company_id == company_id, Application.job_id == job_id,
+                Application.is_simulated.is_(False))
         .populate_existing().with_for_update().all()
     )
     if len(rows) != len(ids):

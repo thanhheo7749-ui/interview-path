@@ -1,4 +1,4 @@
-.PHONY: eval-brain eval-discrimination eval-stt seed-samples docker-build docker-up docker-down docker-logs docker-ps docker-build-speakcv docker-up-speakcv docker-restart test test-mysql reembed
+.PHONY: eval-brain eval-discrimination eval-stt seed-samples docker-build docker-up docker-down docker-logs docker-ps docker-build-speakcv docker-up-speakcv docker-restart test test-mysql reembed simulate-hiring
 
 BACKEND_DIR = SpeakCV/src/backend
 BACKEND_PY = $(if $(wildcard $(BACKEND_DIR)/.venv/bin/python),.venv/bin/python,python3)
@@ -68,6 +68,11 @@ reembed:
 # Creates the two fictional sample companies. Pass ARGS=--auto-approve to publish them, ARGS="--only sori-labs" for one.
 seed-samples:
 	cd $(BACKEND_DIR) && $(BACKEND_PY) -m app.cli seed-samples $(ARGS)
+
+# Replaces a sample company's labelled simulated hiring data. No AI calls, and refused for any other company.
+# Pass COMPANY=<slug> (default sori-labs) and SEED=<number> (default 42).
+simulate-hiring:
+	cd $(BACKEND_DIR) && $(BACKEND_PY) -m app.cli simulate-hiring --company $(or $(COMPANY),sori-labs) --seed $(or $(SEED),42)
 
 # Measures the Company Brain against labelled ground truth. Prints an estimated cost first and asks before spending.
 # Pass ARGS=--dry-run, ARGS=--yes or ARGS="--profile fake".

@@ -88,6 +88,15 @@ def test_board_cells_and_lanes(db, world, api):
     assert f'"id": {apps["other_job"].id},' not in everything
 
 
+def test_a_simulated_application_is_not_on_the_board_and_its_detail_is_404(db, world, api):
+    simulated = make_application(db, world["job"], "#S1", band="many", is_simulated=True)
+    real = make_application(db, world["job"], "#A2", band="many")
+    body = board.job_board(db, world["company"].id, world["job"].id)
+    assert _ids(body["cells"]["priority"]) == [real.id]
+    assert api.get(url(world, f"/applications/{simulated.id}"), headers=hr(world)).status_code == 404
+    assert api.get(url(world, f"/applications/{real.id}"), headers=hr(world)).status_code == 200
+
+
 def test_board_cards_hide_identity_and_cv_text(db, world, api):
     apps = _populate(db, world)
     add_claims(db, apps["priority"], ["Improved latency"])

@@ -10,7 +10,7 @@ from app.core import storage
 from app.database.database import SessionLocal
 from app.database.sql_models import (
     Application, AuditLog, CandidateBrief, Company, CompanyMember, Consent, CultureNote, CvClaim, InterviewScorecard,
-    Job, Notification, RequirementResult, ScreeningCache, VoiceSession, VoiceTurn,
+    Job, Notification, RejectionFeedback, RequirementResult, ScreeningCache, VoiceSession, VoiceTurn,
 )
 from app.hiring import audit, notify, voice
 from app.hiring.state import advance
@@ -44,6 +44,11 @@ ERASED = {
     "consents": ("user_id",),
     "candidate_briefs": ("content",),  # original quotes and recording times
     "interview_scorecards": ("requirement_scores", "notes"),
+    "rejection_feedbacks": ("draft",),  # it quotes the candidate's answers
+    # Nothing is cleared on these three. Each one's own rules decide how long it stays: see KEPT.
+    "talent_pool_entries": (),
+    "onboarding_plans": (),
+    "probation_outcomes": (),
 }
 # Whole rows go. A notification's user_id cannot be NULL, and a cache row is nothing but quotes and claims.
 DELETED_ROWS = ("screening_cache", "notifications")
@@ -68,6 +73,11 @@ KEPT = {
         "payload",  # by rule audit payloads hold no personal content
         "actor_user_id",  # HR staff stay; a candidate's own is cleared by _unlink_audit
     ),
+    "rejection_feedbacks": ("language", "status", "approved_by"),
+    # A separate talent_pool consent keeps these until the entry ends, whatever happens to the application.
+    "talent_pool_entries": ("candidate_user_id", "retained_cv_text", "embedding_model", "status"),
+    "onboarding_plans": ("employee_user_id", "status", "approved_by"),  # an employee's plan, not candidate evidence
+    "probation_outcomes": ("result", "recorded_by"),  # feeds Reality Check, and holds no personal content
 }
 
 
@@ -200,7 +210,7 @@ def anonymize_application(db, application, *, trigger: str = TRIGGER_RETENTION) 
     turns = db.query(VoiceTurn).filter(VoiceTurn.session_id.in_(session_ids)).all() if session_ids else []
     audio_paths = [turn.audio_path for turn in turns if turn.audio_path]
 
-    for model in (RequirementResult, CvClaim, CultureNote, Consent, CandidateBrief, InterviewScorecard):
+    for model in (RequirementResult, CvClaim, CultureNote, Consent, CandidateBrief, InterviewScorecard, RejectionFeedback):
         for row in db.query(model).filter_by(application_id=application_id):
             _erase(row)
     for session in sessions:
@@ -279,9 +289,10 @@ def run(db, now=None) -> int:
 def counts(db, company, now=None) -> dict:
     now = _naive_utc(now)
     due_ids = _due_ids(db, company.id, company.retention_days, now)
-    due = db.query(Application).filter(Application.id.in_(due_ids)).all() if due_ids else []
-    live = db.query(Application.id).filter(Application.company_id == company.id, Application.anonymized_at.is_(None)).count()
-    gone = db.query(Application.id).filter(Application.company_id == company.id, Application.anonymized_at.isnot(None)).count()
+    due = db.query(Application).filter(Application.id.in_(due_ids), Application.is_simulated.is_(False)).all() if due_ids else []
+    real = db.query(Application.id).filter(Application.company_id == company.id, Application.is_simulated.is_(False))
+    live = real.filter(Application.anonymized_at.is_(None)).count()
+    gone = real.filter(Application.anonymized_at.isnot(None)).count()
     return {
         "retention_days": company.retention_days,
         "undecided_retention_days": UNDECIDED_RETENTION_DAYS,

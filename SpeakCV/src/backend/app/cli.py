@@ -34,6 +34,13 @@ def build_parser() -> argparse.ArgumentParser:
     seed_parser.add_argument("--only", help="Seed one sample company by slug.")
 
     commands.add_parser("retention", help="Anonymize every application past its retention date")
+
+    simulate_parser = commands.add_parser(
+        "simulate-hiring", help="Replace a sample company's labelled simulated hiring data. Makes no AI calls."
+    )
+    simulate_parser.add_argument("--company", required=True, help="Company slug. Sample companies only.")
+    simulate_parser.add_argument("--seed", type=int, default=42)
+    simulate_parser.add_argument("--count", type=int, default=240)
     return parser
 
 
@@ -145,6 +152,29 @@ def retention_command(_args) -> int:
         db.close()
 
 
+def simulate_hiring(args) -> int:
+    from app.insights import simulator
+
+    db = SessionLocal()
+    try:
+        company = db.query(Company).filter(Company.slug == args.company).first()
+        if company is None:
+            print(f"No company with the slug '{args.company}'.", file=sys.stderr)
+            return 1
+        try:
+            summary = simulator.simulate(db, company, seed=args.seed, count=args.count)
+        except (PermissionError, ValueError) as exc:
+            print(str(exc), file=sys.stderr)
+            return 1
+        print(
+            f"Simulated {summary.applications} applications for '{args.company}' with seed {summary.seed}: "
+            f"{summary.hires} hires, {summary.channel_costs} cost rows, {summary.replaced} earlier rows replaced."
+        )
+        return 0
+    finally:
+        db.close()
+
+
 def main(argv=None) -> int:
     args = build_parser().parse_args(argv)
     if args.command == "migrate":
@@ -157,6 +187,8 @@ def main(argv=None) -> int:
         return seed_samples(args)
     elif args.command == "retention":
         return retention_command(args)
+    elif args.command == "simulate-hiring":
+        return simulate_hiring(args)
     return 0
 
 

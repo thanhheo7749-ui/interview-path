@@ -1,4 +1,4 @@
-"""Human decisions about an application. `decide` is the only code that writes `hr_decision`.
+"""Human decisions about an application. `decide` is the only code that writes `hr_decision` on a real application.
 
 Nothing here calls AI, and AI output never reaches this module. Callers own the transaction and commit.
 """
@@ -76,6 +76,16 @@ def decide(db, application, decision, actor_user_id, reason=None) -> None:
                  payload={"decision": decision, "reason": reason})
     _notify(db, application, decision)
     db.flush()
+
+
+def record_simulated(application, decision: str, decided_at: datetime) -> None:
+    """For the simulator's labelled rows, which no person decided: no actor, no audit row and no notification."""
+    if not application.is_simulated:
+        raise ValueError("Only a simulated application can take a simulated decision")
+    if decision not in DECISIONS:
+        raise ValueError("Decision must be approved or rejected")
+    application.hr_decision = decision
+    application.hr_decided_at = decided_at
 
 
 def correct_cv_status(db, application, cv_status, actor_user_id, reason) -> None:
