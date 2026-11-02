@@ -371,6 +371,7 @@ def unmasked_document(client, world, db, monkeypatch, text="Kim Minjun ships on 
     fake.enqueue("kb_extract", json.dumps({"nodes": [], "edges": []}))
     intake.run_completion(session.id)
     monkeypatch.setattr(gateway, "generate_structured", real)
+    db.rollback()  # on MySQL this session's snapshot is older than the completion that just committed
     db.expire_all()
     return session, db.query(KbDocument).filter_by(source_type="intake").one()
 
