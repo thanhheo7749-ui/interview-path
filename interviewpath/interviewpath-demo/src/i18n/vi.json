@@ -440,7 +440,7 @@
     "roleHint": "Chọn vai trò sẽ điền sẵn tiêu đề, mô tả và yêu cầu từ tri thức công ty. Bạn có thể sửa mọi thứ.",
     "jobTitle": "Tiêu đề việc làm",
     "description": "Mô tả",
-    "descriptionHint": "JD Studio, công cụ hỗ trợ viết mô tả công việc, sẽ có sau. Hiện tại hãy tự viết hoặc sửa mô tả tại đây.",
+    "descriptionHint": "Để viết mô tả với JD Studio, hãy mở một yêu cầu tuyển dụng và dùng JD Studio. Bạn cũng có thể tự viết hoặc sửa mô tả tại đây, trừ công việc đã được tạo trong JD Studio.",
     "languages": "Ngôn ngữ phỏng vấn",
     "language": {
       "vi": "Tiếng Việt",

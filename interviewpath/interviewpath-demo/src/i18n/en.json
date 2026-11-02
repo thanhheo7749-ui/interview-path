@@ -441,7 +441,7 @@
     "roleHint": "Choosing a role fills in the title, description and requirements from the company knowledge. You can edit everything.",
     "jobTitle": "Job title",
     "description": "Description",
-    "descriptionHint": "JD Studio, which will help write job descriptions, arrives later. For now, write or edit the description here.",
+    "descriptionHint": "To write a description with JD Studio, open a hiring request and use JD Studio. You can also write or edit the description here, except for a job that was made in JD Studio.",
     "languages": "Interview languages",
     "language": {
       "vi": "Vietnamese",
