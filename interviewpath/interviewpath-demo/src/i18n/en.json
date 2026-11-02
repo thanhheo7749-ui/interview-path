@@ -494,6 +494,8 @@
     },
     "fastTracked": "Fast-tracked",
     "fastTrackedNote": "This candidate was fast-tracked without an interview, so there is no interview evidence.",
+    "notTaken": "Did not take the interview",
+    "anonymizedNotice": "This candidate's data has been deleted. There is nothing left to review and no action is available.",
     "analysisFailed": "The analysis of this interview failed. You can retry it.",
     "hiddenText": "Note: the CV file contained hidden text, which was ignored.",
     "stage": {

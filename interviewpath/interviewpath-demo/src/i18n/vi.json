@@ -493,6 +493,8 @@
     },
     "fastTracked": "Đi tắt",
     "fastTrackedNote": "Ứng viên này được đi tắt, không qua phỏng vấn, nên không có bằng chứng phỏng vấn.",
+    "notTaken": "Không tham gia phỏng vấn",
+    "anonymizedNotice": "Dữ liệu của ứng viên này đã bị xóa. Không còn gì để xem xét và không có hành động nào khả dụng.",
     "analysisFailed": "Phân tích buổi phỏng vấn này không thành công. Bạn có thể thử lại.",
     "hiddenText": "Lưu ý: tệp CV có chứa văn bản ẩn và phần này đã bị bỏ qua.",
     "stage": {
