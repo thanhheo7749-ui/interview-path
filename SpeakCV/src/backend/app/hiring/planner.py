@@ -121,6 +121,14 @@ def _one_line(text: str) -> str:
     return " ".join((text or "").split())
 
 
+_TRAILING_PUNCTUATION = " .,;:!?\u2026\u3002\uff0e\uff01\uff1f"
+
+
+def _requirement_text(text: str) -> str:
+    """The template adds its own full stop, so a requirement written as a sentence must not end in one."""
+    return _one_line(text).rstrip(_TRAILING_PUNCTUATION) or _one_line(text)
+
+
 def _select(db, application, job, words: dict) -> list[PlannedQuestion]:
     """Everything a question may hold is read here, through filters that admit only the public layer."""
     why = words["why"]
@@ -135,7 +143,7 @@ def _select(db, application, job, words: dict) -> list[PlannedQuestion]:
         if row.visibility == "public" and row.must_have and cv_status.get(row.id) != "met"
     ]
     for row in missing[:MAX_REQUIREMENTS]:
-        selected.append(PlannedQuestion(words["requirement"].format(text=_one_line(row.text)), "requirement",
+        selected.append(PlannedQuestion(words["requirement"].format(text=_requirement_text(row.text)), "requirement",
                                         f"requirement:{row.id}", why["requirement"]))
 
     claims = db.query(CvClaim).filter_by(application_id=application.id).order_by(CvClaim.id).limit(MAX_CLAIMS)

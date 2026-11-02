@@ -48,6 +48,9 @@ function CandidateCard({ card, selected, checked, onToggle, onClick }) {
               </span>
             )}
           </div>
+          {card.analysis_status === 'not_taken' && (
+            <p data-testid="interview-note" className="mt-2 text-xs font-semibold text-amber-800">{t('board.notTaken')}</p>
+          )}
           <p className="mt-2 text-xs font-semibold text-slate-500">{t(`board.stage.${card.stage}`, { defaultValue: card.stage })}</p>
           {card.hidden_text_detected && <p className="mt-2 text-xs text-slate-500">{t('board.hiddenText')}</p>}
         </button>

@@ -247,6 +247,18 @@ def test_the_system_prompt_treats_items_as_data(db, full):
     assert "data" in fake.last_system().lower()
 
 
+@pytest.mark.parametrize("language", ["en", "vi", "ko"])
+@pytest.mark.parametrize("ending", [".", "...", "!", " ."])
+def test_a_requirement_ending_in_punctuation_gets_no_double_stop(db, language, ending):
+    world = build_world(db, f"stop{language}{abs(hash(ending))}", "Dev", "", [], [], [(f"Python services{ending}", True, "public")])
+    fake.register("session_plan", _ai_down)
+    plan = planner.build_plan(db, world.application, language)
+    asked = [item.text for item in _by_source(plan, "requirement")]
+    assert len(asked) == 1 and "Python services" in asked[0]
+    assert not re.search(r"[.!]\s*[.!]|\.\.", asked[0]), asked[0]
+    assert "Python services!" not in asked[0] and "Python services ." not in asked[0]
+
+
 # 4. AI failure
 
 
