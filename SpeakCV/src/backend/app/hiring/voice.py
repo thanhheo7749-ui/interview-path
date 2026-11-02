@@ -212,6 +212,7 @@ class PurposeRules:
     max_counted_gap_seconds: int
     decide_followup: FOLLOWUP_HOOK
     on_complete: Callable[["SessionInfo"], None]  # runs after the completing request has committed; must not raise
+    on_abandon: Callable[["SessionInfo"], None] | None = None  # the same, after a session ends with nothing said
 
 
 def schedule_analysis(application_id: int) -> None:
@@ -258,12 +259,17 @@ def _on_intake_complete(info: SessionInfo) -> None:
     schedule_intake(info.id)
 
 
+def _on_intake_abandon(info: SessionInfo) -> None:
+    """An abandoned intake has no document to wait for, so what it saved (audio of an answer that could not be read) goes."""
+    importlib.import_module("app.bridges.intake").erase_raw(info.id)
+
+
 # Add a purpose here, with its own limits and hooks. A session of a purpose not listed cannot be created.
 PURPOSES = {
     "screening": PurposeRules(*PURPOSE_LIMITS["screening"], RESUME_HOURS, MAX_FOLLOWUPS_PER_QUESTION,
                               MAX_COUNTED_GAP_SECONDS, screening_followup, _on_screening_complete),
     "intake": PurposeRules(*PURPOSE_LIMITS["intake"], RESUME_HOURS, MAX_FOLLOWUPS_PER_QUESTION,
-                           MAX_COUNTED_GAP_SECONDS, screening_followup, _on_intake_complete),
+                           MAX_COUNTED_GAP_SECONDS, screening_followup, _on_intake_complete, _on_intake_abandon),
 }
 
 
@@ -273,6 +279,16 @@ def _after_complete(info: SessionInfo) -> None:
         PURPOSES[info.purpose].on_complete(info)
     except Exception as exc:
         logger.error("Completion hook failed for session %s: %s", info.id, type(exc).__name__)
+
+
+def _after_abandon(info: SessionInfo) -> None:
+    hook = PURPOSES[info.purpose].on_abandon
+    if hook is None:
+        return
+    try:
+        hook(info)
+    except Exception as exc:
+        logger.error("Abandon hook failed for session %s: %s", info.id, type(exc).__name__)
 
 
 def _info(session: VoiceSession) -> SessionInfo:
@@ -457,6 +473,8 @@ def _apply_clock(db, session: VoiceSession, now: datetime | None = None, upload:
     db.commit()
     if action is _complete:
         _after_complete(info)
+    elif action is _abandon:
+        _after_abandon(info)
     return True
 
 

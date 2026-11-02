@@ -151,6 +151,9 @@ def upgrade() -> None:
         batch_op.create_index(batch_op.f('ix_job_draft_messages_id'), ['id'], unique=False)
         batch_op.create_index(batch_op.f('ix_job_draft_messages_job_draft_id'), ['job_draft_id'], unique=False)
 
+    with op.batch_alter_table('kb_documents', schema=None) as batch_op:
+        batch_op.add_column(sa.Column('masking_note', sa.String(length=50), nullable=True))
+
     with op.batch_alter_table('kb_nodes', schema=None) as batch_op:
         batch_op.add_column(sa.Column('guard_category', sa.String(length=30), nullable=True))
         batch_op.add_column(sa.Column('guard_reason', sa.Text(), nullable=True))
@@ -164,6 +167,9 @@ def downgrade() -> None:
     with op.batch_alter_table('kb_nodes', schema=None) as batch_op:
         batch_op.drop_column('guard_reason')
         batch_op.drop_column('guard_category')
+
+    with op.batch_alter_table('kb_documents', schema=None) as batch_op:
+        batch_op.drop_column('masking_note')
 
     with op.batch_alter_table('job_draft_messages', schema=None) as batch_op:
         batch_op.drop_index(batch_op.f('ix_job_draft_messages_job_draft_id'))

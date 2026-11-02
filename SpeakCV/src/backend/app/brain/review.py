@@ -242,11 +242,13 @@ def _is_incomplete(job: KbIngestionJob | None) -> bool:
 
 def publish_hold(db: Session, document: KbDocument, job: KbIngestionJob | None) -> dict | None:
     """Why a document in review waits for HR's say beyond its drafts, or None. job is the document's latest."""
-    if document.status != "review" or not _is_incomplete(job):
+    masking = bool(document.masking_note)
+    if document.status != "review" or not (masking or _is_incomplete(job)):
         return None
     return {
-        "dropped_items": job.dropped_items, "failed_chunks": job.failed_chunks,
-        "contradiction_check_failed": bool(job.contradiction_check_failed),
+        "dropped_items": job.dropped_items if job else 0, "failed_chunks": job.failed_chunks if job else 0,
+        "contradiction_check_failed": bool(job.contradiction_check_failed) if job else False,
+        "masking_failed": masking,
         "pending_drafts": has_drafts(db, document),
     }
 
@@ -267,6 +269,8 @@ def finish_document_if_decided(db: Session, document_id: int, publish_incomplete
     document = lock_document(db, document_id)
     if document is None or document.status != "review" or has_drafts(db, document, fresh=True):
         return False
+    if document.masking_note:
+        return False  # the names were not masked: its text is not published, even on HR's say, until masking is retried
     if not publish_incomplete and _is_incomplete(_latest_job(db, document_id)):
         return False
     document.status = "published"

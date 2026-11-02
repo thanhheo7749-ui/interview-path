@@ -41,6 +41,8 @@ class KbDocument(Base):
     effective_date = Column(Date, nullable=True)
     uploaded_by = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     status = Column(String(20), nullable=False, default="processing")  # processing | review | published | failed | withdrawn
+    # A code, not a sentence: "names_unchecked" when the masking of an intake transcript could not look for names.
+    masking_note = Column(String(50), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
 

@@ -77,7 +77,13 @@ def review_queue(
             KbNode.company_id == company_id, KbNode.id.in_(list(end_ids) or [-1])
         )
     }
+    held = db.query(KbDocument).filter(KbDocument.company_id == company_id, KbDocument.masking_note.isnot(None),
+                                        KbDocument.status.in_(("review", "failed")))
+    if document_id is not None:
+        held = held.filter(KbDocument.id == document_id)
     return {
+        "held_documents": [{"id": d.id, "title": d.title, "masking_note": d.masking_note}
+                           for d in held.order_by(KbDocument.id).all()],
         "nodes": [_node_out(n, sources.get(n.id, [])) for n in nodes],
         "edges": [
             {

@@ -12,6 +12,7 @@ from app.database.sql_models import (
     Application, AuditLog, CandidateBrief, Company, CompanyMember, Consent, CultureNote, CvClaim, InterviewScorecard,
     Job, Notification, RejectionFeedback, RequirementResult, ScreeningCache, VoiceSession, VoiceTurn,
 )
+from app.bridges import intake
 from app.hiring import audit, notify, voice
 from app.hiring.state import advance
 from app.posthire import feedback
@@ -375,7 +376,7 @@ def send_reminders(db, now=None) -> int:
 def _daily_pass() -> None:
     db = SessionLocal()
     try:
-        for step in (voice.sweep_abandoned, run, _expire_talent_pool, send_reminders, feedback.send_overdue_notices,
+        for step in (voice.sweep_abandoned, intake.sweep_terminal, run, _expire_talent_pool, send_reminders, feedback.send_overdue_notices,
                      notify.send_pending):
             try:
                 step(db)

@@ -3,7 +3,7 @@ from sqlalchemy.sql import false as sa_false, func
 
 from .database import Base
 
-HIRING_REQUEST_STATUSES = ("open", "intake_in_progress", "intake_done", "drafting", "published", "cancelled")
+HIRING_REQUEST_STATUSES = ("open", "intake_in_progress", "intake_done", "intake_empty", "drafting", "published", "cancelled")
 JOB_DRAFT_STATUSES = ("draft", "manager_review", "approved", "published")
 
 __all__ = [
