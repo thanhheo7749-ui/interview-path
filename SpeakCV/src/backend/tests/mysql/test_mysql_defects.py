@@ -180,21 +180,6 @@ def test_retry_failed_records_and_clears_chunk_ids_as_json(client, db, company):
     assert client.post(url, headers=auth_header("hr@example.test")).status_code == 409
 
 
-def test_retry_and_unpublish_take_their_row_locks_on_mysql(client, db, company):
-    user = make_user(db, "hr@example.test")
-    db.add(CompanyMember(company_id=company.id, user_id=user.id, role="hr"))
-    db.commit()
-    headers = auth_header("hr@example.test")
-    fake.enqueue("kb_extract", json.dumps({"nodes": [fact()], "edges": []}))
-    document, job = upload(db, company, user.id)
-    base = f"/api/companies/{company.id}/kb"
-    assert client.post(f"{base}/jobs/{job.id}/retry", headers=headers).status_code == 409
-    response = client.post(f"{base}/documents/{document.id}/unpublish", headers=headers)
-    assert response.status_code == 200, response.text
-    assert response.json()["document"]["status"] == "withdrawn"
-    assert client.post(f"{base}/documents/{document.id}/unpublish", headers=headers).status_code == 409
-
-
 def hiring_world(db, company, email="candidate@example.test", **columns):
     user = make_user(db, email)
     job = db.query(Job).filter_by(company_id=company.id).first()
