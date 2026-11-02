@@ -127,6 +127,56 @@ test('Retry failed sections shows for failed sections or a failed contradiction 
   expect(calls).toBe(1);
 });
 
+test('Publish anyway states what was dropped, asks first, and publishes once', async ({ page }) => {
+  await signIn(page, BRAIN_USER);
+  const held = (id, title, hold, extra = {}) => ({
+    ...doc(id, title, 'review', { status: 'review', dropped_items: hold.dropped_items, failed_chunks: hold.failed_chunks, ...extra }),
+    publish_hold: hold,
+  });
+  await stubDocuments(page, [
+    held(921, 'Stub dropped', { dropped_items: 3, failed_chunks: 0, contradiction_check_failed: false, pending_drafts: false }),
+    held(922, 'Stub with drafts', { dropped_items: 1, failed_chunks: 0, contradiction_check_failed: false, pending_drafts: true }),
+    doc(923, 'Stub complete', 'review', { status: 'review' }),
+  ]);
+  const decisions = [];
+  await page.route('**/kb/review/decide', async (route) => {
+    decisions.push(route.request().postDataJSON());
+    await route.fulfill(jsonOf({ ok: true, applied: 1, warnings: [] }));
+  });
+  await page.getByRole('link', { name: 'Documents' }).click();
+
+  const row = page.getByRole('row', { name: /Stub dropped/ });
+  await expect(row.getByText('3 items were dropped')).toBeVisible();
+  await expect(page.getByRole('row', { name: /Stub with drafts/ }).getByRole('button', { name: 'Publish anyway' })).toHaveCount(0);
+  await expect(page.getByRole('row', { name: /Stub complete/ }).getByRole('button')).toHaveCount(0);
+
+  await row.getByRole('button', { name: 'Publish anyway' }).click();
+  await expect(row.getByRole('alertdialog')).toContainText('3 items');
+  expect(decisions).toEqual([]);
+  await row.getByRole('button', { name: 'Cancel' }).click();
+  await expect(row.getByRole('alertdialog')).toHaveCount(0);
+
+  await row.getByRole('button', { name: 'Publish anyway' }).click();
+  await row.getByRole('button', { name: 'Publish document' }).dblclick();
+  await expect(row.getByText('Published', { exact: true })).toBeVisible();
+  expect(decisions).toEqual([{ items: [{ action: 'publish_document', document_id: 921 }] }]);
+  await expect(row.getByRole('button', { name: 'Publish anyway' })).toHaveCount(0);
+});
+
+test('Retry shows only on a failed document, not on a failed section retry', async ({ page }) => {
+  await signIn(page, BRAIN_USER);
+  await stubDocuments(page, [
+    doc(931, 'Stub whole failure', 'failed', { status: 'failed', error: 'Reading failed' }),
+    doc(932, 'Stub section retry failed', 'published', { status: 'failed', error: 'Retry failed', failed_chunks: 1, failed_chunk_ids: [4] }),
+  ]);
+  await page.getByRole('link', { name: 'Documents' }).click();
+  await expect(page.getByRole('row', { name: /Stub whole failure/ }).getByRole('button', { name: 'Retry', exact: true })).toBeVisible();
+  const row = page.getByRole('row', { name: /Stub section retry failed/ });
+  await expect(row.getByRole('button', { name: 'Retry failed sections' })).toBeVisible();
+  await expect(row.getByRole('button', { name: 'Retry', exact: true })).toHaveCount(0);
+  await expect(row.getByText('Retry failed', { exact: true })).toBeVisible();
+});
+
 test('the upload form sends a language only when one is chosen', async ({ page }) => {
   await signIn(page, BRAIN_USER);
   await page.getByRole('link', { name: 'Documents' }).click();
