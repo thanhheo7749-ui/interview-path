@@ -178,7 +178,7 @@ def publish(db: Session, draft: JobDraft, user_id: int) -> tuple[Job, list[str]]
         job.description = _description(draft, lang)
         warnings = jobs.update_requirements(db, job, requirements, checked)
         if job.status == "draft":
-            jobs.publish(db, job, company)
+            warnings = [*warnings, *jobs.publish(db, job, company)]
     except jobs.JobError as error:
         db.rollback()
         raise PublishError(error.status_code, error.detail) from error

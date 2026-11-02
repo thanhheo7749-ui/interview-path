@@ -9,7 +9,10 @@ from sqlalchemy.orm import Session
 from app.brain import audience as aud
 from app.brain import retriever
 from app.bridges import discrimination
-from app.database.sql_models import Company, Job, JobChannelLink, JobRequirement
+from app.database.sql_models import Company, Job, JobChannelLink, JobRequirement, RequirementResult
+
+
+NO_PUBLIC_REQUIREMENT = "no_public_requirement"
 
 
 class JobError(ValueError):
@@ -25,6 +28,41 @@ def active_requirements(db: Session, job_id: int) -> list[JobRequirement]:
     return (
         db.query(JobRequirement)
         .filter(JobRequirement.job_id == job_id, JobRequirement.active.is_(True))
+        .order_by(JobRequirement.position, JobRequirement.id)
+        .all()
+    )
+
+
+def requirements_for(db: Session, application) -> list[JobRequirement]:
+    """What this application is measured against: the rows its results name, whatever the job has become since.
+
+    A later edit makes new rows and leaves these alone, so it changes nothing for this application, and a requirement
+    added later is not part of it. Only before the CV was assessed are there no results, and then the job's current
+    rows apply."""
+    named = db.query(RequirementResult.requirement_id).filter(RequirementResult.application_id == application.id)
+    rows = (
+        db.query(JobRequirement)
+        .filter(JobRequirement.id.in_(named), JobRequirement.job_id == application.job_id)
+        .order_by(JobRequirement.position, JobRequirement.id)
+        .all()
+    )
+    return rows or active_requirements(db, application.job_id)
+
+
+def scored_requirements(db: Session, application) -> list[JobRequirement]:
+    """The requirements the interview asks about and its band measures: public only, the must-haves if there are any.
+
+    A job with no public requirement gives an empty list, so its band is always `few`, and publishing it warns HR."""
+    public = [row for row in requirements_for(db, application) if row.visibility == "public"]
+    return [row for row in public if row.must_have] or public
+
+
+def visible_requirements(db: Session, job_id: int, viewer: aud.Audience) -> list[JobRequirement]:
+    """The job's current requirements that this audience may read."""
+    return (
+        db.query(JobRequirement)
+        .join(Job, Job.id == JobRequirement.job_id)
+        .filter(JobRequirement.job_id == job_id, JobRequirement.active.is_(True), aud.requirement_filter(viewer))
         .order_by(JobRequirement.position, JobRequirement.id)
         .all()
     )
@@ -139,12 +177,14 @@ def _slugify(text: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-")
 
 
-def publish(db: Session, job: Job, company: Company) -> None:
+def publish(db: Session, job: Job, company: Company) -> list[str]:
+    """Returns warning codes for HR. The portal words them."""
     if job.status != "draft":
         raise JobError(409, "Only a draft job can be published")
     if not (job.description or "").strip():
         raise JobError(422, "A job needs a description before it is published")
-    if not active_requirements(db, job.id):
+    requirements = active_requirements(db, job.id)
+    if not requirements:
         raise JobError(422, "A job needs at least one requirement before it is published")
     base = _slugify(f"{company.slug} {job.title}")[:130].strip("-") or "job"
     slug = f"{base}-{secrets.token_hex(3)}"
@@ -154,6 +194,7 @@ def publish(db: Session, job: Job, company: Company) -> None:
     job.status = "published"
     job.published_at = datetime.now(timezone.utc)
     db.flush()
+    return [] if any(row.visibility == "public" for row in requirements) else [NO_PUBLIC_REQUIREMENT]
 
 
 def ensure_channels(db: Session, job: Job, channels: list[str]) -> list[JobChannelLink]:

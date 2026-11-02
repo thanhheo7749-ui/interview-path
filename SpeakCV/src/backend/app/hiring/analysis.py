@@ -9,6 +9,7 @@ import re
 from typing import Literal
 
 from pydantic import BaseModel
+from sqlalchemy import and_, or_
 
 from app.ai import gateway
 from app.ai.config import get_config
@@ -20,7 +21,7 @@ from app.database.sql_models import (
 )
 from app.hiring import audit, jobs, voice
 from app.hiring.screening import _DIRECTIVE
-from app.hiring.state import NOT_TAKEN, InvalidTransition, advance
+from app.hiring.state import NOT_TAKEN, TRANSCRIPTION_FAILED, InvalidTransition, advance
 
 logger = logging.getLogger(__name__)
 
@@ -182,13 +183,27 @@ def _record_not_taken(db, application_id: int) -> None:
     db.commit()
 
 
+def _record_transcription_failed(db, application_id: int) -> None:
+    """An answer has audio and no transcript, so the candidate spoke and the transcripts are not all here. No AI runs."""
+    application = _locked(db, application_id)
+    if application is None or application.anonymized_at is not None:
+        db.rollback()
+        return
+    application.analysis_status = TRANSCRIPTION_FAILED
+    application.interview_band = None
+    application.ai_suggestion = None
+    if application.stage == "analyzing":
+        advance(application, "ready_for_hr")
+    db.commit()
+
+
 def _analyse(db, application_id: int) -> None:
     application = db.get(Application, application_id)
     company_id = application.company_id
     company = db.get(Company, company_id)
     must_pct, claims_pct = company.band_must_have_pct, company.band_claims_pct
     job = db.get(Job, application.job_id)
-    requirements = [r for r in jobs.active_requirements(db, job.id) if r.must_have and r.visibility == "public"]
+    requirements = jobs.scored_requirements(db, application)
     claims = db.query(CvClaim).filter_by(application_id=application_id).order_by(CvClaim.id).all()
     values = (
         db.query(KbNode)
@@ -196,7 +211,11 @@ def _analyse(db, application_id: int) -> None:
                 KbNode.status == "published")
         .order_by(KbNode.id).all()
     )
-    turns = [t for t in _latest_turns(db, application) if (t.transcript or "").strip()]
+    all_turns = _latest_turns(db, application)
+    if any(voice.untranscribed(t) for t in all_turns):
+        _record_transcription_failed(db, application_id)
+        return
+    turns = [t for t in all_turns if (t.transcript or "").strip()]
     if not turns:
         _record_not_taken(db, application_id)
         return
@@ -283,19 +302,23 @@ def _analyse(db, application_id: int) -> None:
     db.commit()
 
 
+def _analyse_or_mark_failed(db, application_id: int) -> None:
+    try:
+        _analyse(db, application_id)
+    except Exception as exc:
+        db.rollback()
+        if not isinstance(exc, (AIError, InvalidTransition)):
+            logger.warning("Analysis failed for application %s: %s", application_id, type(exc).__name__)
+        _mark_failed(application_id)
+
+
 def run(application_id: int) -> None:
     """Never raises. Opens its own session. Exception text can quote a transcript, so only its type is logged."""
     db = SessionLocal()
     try:
         if not _claim(db, application_id):
             return
-        try:
-            _analyse(db, application_id)
-        except Exception as exc:
-            db.rollback()
-            if not isinstance(exc, (AIError, InvalidTransition)):
-                logger.warning("Analysis failed for application %s: %s", application_id, type(exc).__name__)
-            _mark_failed(application_id)
+        _analyse_or_mark_failed(db, application_id)
     except Exception as exc:
         db.rollback()
         logger.warning("Analysis could not finish for application %s: %s", application_id, type(exc).__name__)
@@ -303,19 +326,62 @@ def run(application_id: int) -> None:
         db.close()
 
 
+def _retranscribe(db, application_id: int) -> bool:
+    """Run STT on the answers that have none, outside any lock. Returns whether the transcripts are now all here."""
+    session_id = (
+        db.query(VoiceSession.id)
+        .filter(VoiceSession.application_id == application_id, VoiceSession.purpose == "screening")
+        .order_by(VoiceSession.id.desc()).limit(1).scalar()
+    )
+    heard = voice.retry_failed_transcripts(db, session_id) if session_id is not None else {}
+    application = _locked(db, application_id)
+    if (application is None or application.anonymized_at is not None or application.stage != "ready_for_hr"
+            or application.analysis_status != "running"):
+        db.rollback()  # deleted or restarted during the call: nothing of this result is written
+        return False
+    if session_id is not None:
+        voice.store_transcripts(db, session_id, heard)
+    if any(voice.untranscribed(t) for t in _latest_turns(db, application)):
+        application.analysis_status = TRANSCRIPTION_FAILED
+        db.commit()
+        return False
+    db.commit()
+    return True
+
+
+def retry_transcription(application_id: int) -> None:
+    """HR's retry, which the route has claimed by setting `running`: STT first, and the paid analysis only if STT worked.
+
+    Never raises. Opens its own session."""
+    db = SessionLocal()
+    try:
+        if _retranscribe(db, application_id):
+            _analyse_or_mark_failed(db, application_id)
+    except Exception as exc:
+        db.rollback()
+        logger.warning("Transcription retry failed for application %s: %s", application_id, type(exc).__name__)
+        _mark_failed(application_id)
+    finally:
+        db.close()
+
+
 def requeue_interrupted() -> list[int]:
-    """At startup nothing can still be running. Whatever a crash left waiting or half analysed waits to be analysed."""
+    """At startup nothing can still be running. Whatever a crash left waiting or half analysed waits to be analysed.
+
+    A retry a crash left running reads as failed, which is what `_claim` takes, and what HR can retry if scheduling fails."""
     db = SessionLocal()
     try:
         rows = (
             db.query(Application)
-            .filter(Application.stage.in_(("session_completed", "analyzing")), Application.anonymized_at.is_(None))
+            .filter(or_(Application.stage.in_(("session_completed", "analyzing")),
+                        and_(Application.stage == "ready_for_hr", Application.analysis_status == "running")),
+                    Application.anonymized_at.is_(None))
             .populate_existing().with_for_update().all()
         )
         for application in rows:
             if application.stage == "analyzing":
                 advance(application, "session_completed")
-            application.analysis_status = None
+            application.analysis_status = "failed" if application.stage == "ready_for_hr" else None
         application_ids = [application.id for application in rows]
         db.commit()
         return application_ids

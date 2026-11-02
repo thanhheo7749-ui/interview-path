@@ -35,6 +35,7 @@ FRIENDLY_STATUS = {
     "withdrawn": "withdrawn",
 }
 FIT_WORDS = {"met": "matches", "partial": "partly", "not_found": "not_seen"}
+NOT_ASSESSED = "not_assessed"  # HR invited this candidate although their CV could not be processed
 FIT_NOT_READY = {"submitted", "cv_processing", "cv_failed"}
 STYLE_TYPES = ("value", "behavior")
 NOT_FOUND = "Application not found"
@@ -208,8 +209,8 @@ def get_fit(application_id: int, user: User = Depends(get_authenticated_user), d
         for row in db.query(RequirementResult).filter_by(application_id=application.id, source="cv")
     }
     requirements = [
-        FitItem(requirement_id=row.id, text=row.text, fit=FIT_WORDS.get(statuses.get(row.id), "not_seen"))
-        for row in jobs.active_requirements(db, application.job_id)
+        FitItem(requirement_id=row.id, text=row.text, fit=FIT_WORDS.get(statuses.get(row.id), NOT_ASSESSED))
+        for row in jobs.requirements_for(db, application)
         if row.visibility == "public"
     ]
     return FitOut(requirements=requirements, team_style=_team_style(db, db.get(Job, application.job_id)))

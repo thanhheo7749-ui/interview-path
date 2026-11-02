@@ -895,10 +895,20 @@ def test_withdraw_needs_no_reason(client, world, db):
 
 
 def test_withdraw_from_another_stage_gets_409(client, world, db):
-    application_id = apply(client, data=make_pdf([]), name="cv.pdf", content_type="application/pdf").json()["id"]
+    application_id = apply(client).json()["id"]
+    fresh(db, application_id).stage = "ready_for_hr"
+    db.commit()
     assert client.post(f"/api/applications/{application_id}/withdraw", json={"reason": "x"}, headers=auth_header(CANDIDATE)).status_code == 409
     application = fresh(db, application_id)
-    assert application.stage == "cv_failed" and application.withdraw_reason is None
+    assert application.stage == "ready_for_hr" and application.withdraw_reason is None
+
+
+def test_withdraw_while_the_cv_could_not_be_processed(client, world, db):
+    application_id = apply(client, data=make_pdf([]), name="cv.pdf", content_type="application/pdf").json()["id"]
+    assert fresh(db, application_id).stage == "cv_failed"
+    assert client.post(f"/api/applications/{application_id}/withdraw", json={"reason": "x"}, headers=auth_header(CANDIDATE)).status_code == 200
+    application = fresh(db, application_id)
+    assert application.stage == "withdrawn" and application.withdraw_reason == "x"
 
 
 def test_withdraw_reason_has_a_length_limit(client, world):

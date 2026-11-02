@@ -150,6 +150,7 @@ def _detail_setup(db, world):
         RequirementResult(application_id=application.id, requirement_id=reqs[0].id, source="interview",
                           status="evidence", quote="built a FastAPI service", voice_turn_id=turns[0].id),
         RequirementResult(application_id=application.id, requirement_id=reqs[1].id, source="cv", status="not_found"),
+        RequirementResult(application_id=application.id, requirement_id=reqs[3].id, source="cv", status="not_found"),
         CultureNote(application_id=application.id, value_node_id=world["value"].id, note="Owns outcomes",
                     quote="Docker in production", voice_turn_id=turns[1].id),
     ])
