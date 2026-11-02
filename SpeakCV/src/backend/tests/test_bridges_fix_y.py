@@ -49,6 +49,7 @@ def test_rejected_lines_are_stored_on_the_draft_and_read_back(api, db, world):
     got = api.get(_url(world, f"/job-drafts/{created.json()['id']}"), headers=HR)
     assert [r["line_id"] for r in got.json()["rejected"]] == ["l2"]
     assert got.json()["rejected"][0]["reason"] and got.json()["rejected"][0]["text"]["en"] == "You earn 50 million VND"
+    assert got.json()["rejected"][0]["code"] == "unsupported_numbers" and got.json()["rejected"][0]["detail"] == ["50"]
 
 
 # --- M-5: a dismissed proposal stays gone ------------------------------------------------------------------------

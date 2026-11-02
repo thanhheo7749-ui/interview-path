@@ -175,20 +175,25 @@ def validate_lines(lines: list[dict], allowed_node_ids, node_texts: dict[int, st
     allowed = set(allowed_node_ids)
     valid, rejected = [], []
     for item in lines:
-        reason = None
+        reason = code = None
+        detail: list = []
         sources = item.get("source_node_ids") or []
         if item.get("hr_confirmed"):
             pass
         elif not sources:
-            reason = "The line has no source in the knowledge graph."
+            code, reason = "no_source", "The line has no source in the knowledge graph."
         elif not set(sources) <= allowed:
-            reason = f"The line cites nodes that are not in the company context: {sorted(set(sources) - allowed)}."
+            detail = sorted(set(sources) - allowed)
+            code, reason = "unknown_nodes", f"The line cites nodes that are not in the company context: {detail}."
         elif node_texts is not None and (missing := _unsupported_numbers(item, node_texts)):
-            reason = f"The line states numbers that its sources do not contain: {', '.join(missing)}."
+            detail = missing
+            code, reason = "unsupported_numbers", f"The line states numbers that its sources do not contain: {', '.join(missing)}."
         if reason is None:
             valid.append(item)
         else:
-            rejected.append({"line_id": item["id"], "reason": reason, "text": dict(item.get("text") or {})})
+            # The code and detail let the portal word the reason in the reader's language; reason stays for logs and tests.
+            rejected.append({"line_id": item["id"], "code": code, "detail": detail, "reason": reason,
+                             "text": dict(item.get("text") or {})})
     return LineValidation(valid, rejected)
 
 
