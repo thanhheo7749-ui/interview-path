@@ -248,8 +248,17 @@ def _embed_nodes(db: Session, company_id: int, nodes: list[KbNode]) -> None:
         node.embedding_dim = result.dimension
 
 
+def _states_claim(node: KbNode, name: str, old: str | None) -> bool:
+    """Whether the node's body says the old value of a claim field."""
+    if name == "fact_value":
+        return contradiction.value_in_quote(node.fact_kind, old, node.body)
+    needle = normalise_title(old or "")
+    return bool(needle) and needle in normalise_title(node.body)
+
+
 def _apply_fields(item, node: KbNode, reembed: dict[int, KbNode], edited_facts: dict[int, KbNode],
                  changed_claims: set[int]) -> None:
+    replaced_claim: dict[str, str | None] = {}
     for name in EDITABLE:
         value = getattr(item, name)
         if value is None:
@@ -263,7 +272,11 @@ def _apply_fields(item, node: KbNode, reembed: dict[int, KbNode], edited_facts: 
             edited_facts[node.id] = node
         if changed and name in FACT_CLAIM and node.fact_kind:
             changed_claims.add(node.id)
+            replaced_claim[name] = getattr(node, name)
         setattr(node, name, value)
+    # The body is read with the fact, so a correction that leaves it alone would still tell the old value.
+    if item.body is None and any(_states_claim(node, name, old) for name, old in replaced_claim.items()):
+        node.body = ""
 
 
 def _guard(node: KbNode, item, before: tuple[str, str], publishing: bool) -> None:
@@ -309,13 +322,17 @@ def _merge(db: Session, company_id: int, node: KbNode, into_id: int, user_id: in
         raise ReviewError(422, "The merge target must have the same type")
     if target.status not in LIVE:
         raise ReviewError(422, "The merge target is not active")
-    have = {(row[0], row[1]) for row in db.query(KbNodeSource.chunk_id, KbNodeSource.quote).filter(KbNodeSource.node_id == target.id)}
+    have = {
+        (row.chunk_id, row.quote): row for row in db.query(KbNodeSource).filter(KbNodeSource.node_id == target.id)
+    }
     for source in db.query(KbNodeSource).filter(KbNodeSource.node_id == node.id).all():
-        if (source.chunk_id, source.quote) in have:
+        twin = have.get((source.chunk_id, source.quote))
+        if twin is not None:
+            twin.stale = twin.stale or source.stale
             db.delete(source)
         else:
             source.node_id = target.id
-            have.add((source.chunk_id, source.quote))
+            have[(source.chunk_id, source.quote)] = source
     edges = db.query(KbEdge).filter(
         KbEdge.company_id == company_id, or_(KbEdge.source_node_id == node.id, KbEdge.target_node_id == node.id)
     ).order_by(KbEdge.id).all()
@@ -375,6 +392,8 @@ def apply_decisions(db: Session, company_id: int, user_id: int, items) -> dict[i
             touched.add(item.into_node_id)
             changed = True
         db.flush()
+        if node.id in changed_claims:
+            db.query(KbNodeSource).filter(KbNodeSource.node_id == node.id).update({KbNodeSource.stale: True})
 
     # After every item, so an edit of both sides in one request is compared on the final values.
     for node in edited_facts.values():

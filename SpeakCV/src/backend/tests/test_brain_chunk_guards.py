@@ -368,3 +368,128 @@ def test_a_chunk_far_from_the_quote_is_not_linked_by_a_chance_match_at_its_edge(
     chunks = ["Annual leave is 12 days per year. Then more.", "year. A different section starts here.",
               "Filler that says nothing.", "year. This chunk is far from the quote."]
     assert chunks_sharing_quote(quote, chunks) == [0, 1]
+
+
+# An edit corrects the fact, not the document: the chunk it came from still says the old value.
+
+
+def decision(**fields):
+    return SimpleNamespace(**{**dict(action="edit", node_id=None, into_node_id=None, document_id=None, title=None,
+                                     body=None, visibility=None, fact_value=None, fact_unit=None, scope_text=None),
+                              **fields})
+
+
+def stated_fact(world, title, body, value, unit, document, chunk_text):
+    node = world.node(title, body, "public", document=document, chunk_text=chunk_text)
+    node.fact_kind, node.fact_value, node.fact_unit, node.scope_text = "number", value, unit, "all staff"
+    world.db.commit()
+    return node
+
+
+def test_a_conflict_settled_by_an_edit_leaves_no_old_value_in_the_prompt(db, world):
+    keep = stated_fact(world, "Annual leave days entitlement", "Annual leave is 17 days.", "17", "days",
+                       world.document("Handbook 2026", "public"), "Annual leave entitlement is 17 days CANARY17 per year.")
+    edited = stated_fact(world, "Annual leave days entitlement", "Annual leave is 19 days.", "19", "days",
+                         world.document("Old memo", "public"), "Annual leave entitlement is 19 days CANARY19 per year.")
+    world.open_conflict(keep, edited)
+
+    review.apply_decisions(db, world.company_id, world.hr_id, [decision(node_id=edited.id, fact_value="17")])
+    db.commit()
+    db.refresh(world.conflict)
+    assert world.conflict.resolution == contradiction.EDIT_RESOLVED
+
+    seen = candidate_sees(db, world.company_id, "How many days of annual leave entitlement?")
+    assert "CANARY19" not in seen
+    assert "19 days" not in seen
+    assert "CANARY17" in seen  # the side nobody edited still speaks from its chunk
+
+
+def test_a_corrected_published_value_leaves_no_old_value_in_the_prompt(db, world):
+    edited = stated_fact(world, "Probation length policy", "Probation is 6 months.", "6", "months",
+                         world.document("Handbook", "public"), "Probation length policy: probation lasts 6 months CANARY6.")
+
+    review.apply_decisions(db, world.company_id, world.hr_id, [decision(node_id=edited.id, fact_value="2")])
+    db.commit()
+
+    seen = candidate_sees(db, world.company_id, "What is the probation length policy?")
+    assert "CANARY6" not in seen
+    assert "6 months" not in seen
+    assert "2 months" in seen or "2\n" in seen or "2 " in seen
+    assert db.query(KbNodeSource).filter_by(node_id=edited.id).one().stale is True
+
+
+@pytest.mark.parametrize("field,value", [("fact_unit", "weeks"), ("scope_text", "contractors")])
+def test_every_claim_field_marks_the_sources_stale(db, world, field, value):
+    edited = stated_fact(world, "Probation length policy", "Probation applies widely.", "6", "months",
+                         world.document("Handbook", "public"), "Probation lasts 6 months CANARY6.")
+    review.apply_decisions(db, world.company_id, world.hr_id, [decision(node_id=edited.id, **{field: value})])
+    db.commit()
+    assert db.query(KbNodeSource).filter_by(node_id=edited.id).one().stale is True
+
+
+def test_a_wording_edit_keeps_the_chunk(db, world):
+    edited = stated_fact(world, "Probation length policy", "Probation is 6 months.", "6", "months",
+                         world.document("Handbook", "public"), "Probation lasts 6 months CANARY6.")
+    review.apply_decisions(db, world.company_id, world.hr_id, [decision(node_id=edited.id, body="Six months it is, 6.")])
+    db.commit()
+    assert db.query(KbNodeSource).filter_by(node_id=edited.id).one().stale is False
+    assert "CANARY6" in candidate_sees(db, world.company_id, "What is the probation length policy?")
+
+
+def test_a_non_fact_with_no_claim_is_not_marked_stale(db, world):
+    edited = world.node("A plain note", "Words.", "public", type="policy", document=world.document("Handbook", "public"))
+    review.apply_decisions(db, world.company_id, world.hr_id, [decision(node_id=edited.id, body="Other words.")])
+    db.commit()
+    assert db.query(KbNodeSource).filter_by(node_id=edited.id).one().stale is False
+
+
+@pytest.mark.parametrize("kind", ["candidate", "employee", "manager", "hr"])
+def test_a_stale_link_withholds_the_chunk_from_every_audience(db, world, kind):
+    node = world.node("Probation length policy", "Probation is 6 months.", "public",
+                      document=world.document("Handbook", "public"), chunk_text="Probation lasts 6 months CANARY6.")
+    db.query(KbNodeSource).filter_by(node_id=node.id).update({"stale": True})
+    db.commit()
+    bundle = retriever.search(db, aud.Audience(world.company_id, kind), "What is the probation length policy?",
+                              top_k=100, char_budget=10 ** 6)
+    assert not any("CANARY6" in item.text for item in bundle.items)
+
+
+def test_a_body_edited_with_the_value_is_kept_as_written(db, world):
+    edited = stated_fact(world, "Probation length policy", "Probation is 6 months.", "6", "months",
+                         world.document("Handbook", "public"), "Probation lasts 6 months CANARY6.")
+    review.apply_decisions(db, world.company_id, world.hr_id,
+                           [decision(node_id=edited.id, fact_value="2", body="Probation is 2 months now.")])
+    db.commit()
+    db.refresh(edited)
+    assert edited.body == "Probation is 2 months now."
+
+
+def test_a_body_that_does_not_state_the_old_claim_survives_the_edit(db, world):
+    edited = stated_fact(world, "Probation length policy", "Probation follows the handbook.", "6", "months",
+                         world.document("Handbook", "public"), "Probation lasts 6 months CANARY6.")
+    review.apply_decisions(db, world.company_id, world.hr_id, [decision(node_id=edited.id, fact_value="2")])
+    db.commit()
+    db.refresh(edited)
+    assert edited.body == "Probation follows the handbook."
+
+
+def test_the_conflict_check_is_not_shown_the_old_quote_of_an_edited_fact(db, world):
+    edited = stated_fact(world, "Probation length policy", "", "6", "months",
+                         world.document("Handbook", "public"), "Probation lasts 6 months CANARY6.")
+    db.query(KbNodeSource).filter_by(node_id=edited.id).update({"stale": True, "quote": "lasts 6 months QUOTECANARY"})
+    db.commit()
+    assert "QUOTECANARY" not in contradiction._fact_block(db, edited)
+
+
+def test_merging_a_stale_link_onto_the_same_chunk_keeps_it_stale(db, world):
+    document = world.document("Handbook", "public")
+    stale = world.node("Leave days", "Words.", "public", status="draft", document=document, chunk_text="Leave CANARY.")
+    link = db.query(KbNodeSource).filter_by(node_id=stale.id).one()
+    target = world.node("Leave days total", "Words.", "public")
+    db.add(KbNodeSource(node_id=target.id, chunk_id=link.chunk_id, quote=link.quote))
+    link.stale = True
+    db.commit()
+    review.apply_decisions(db, world.company_id, world.hr_id,
+                           [decision(action="merge", node_id=stale.id, into_node_id=target.id)])
+    db.commit()
+    assert db.query(KbNodeSource).filter_by(node_id=target.id).one().stale is True

@@ -290,7 +290,9 @@ def bump_kb_version(db: Session, company_id: int) -> None:
 
 
 def _quote(db: Session, node: KbNode) -> str:
-    source = db.query(KbNodeSource.quote).filter(KbNodeSource.node_id == node.id).order_by(KbNodeSource.id).first()
+    source = db.query(KbNodeSource.quote).filter(
+        KbNodeSource.node_id == node.id, KbNodeSource.stale.is_(False)
+    ).order_by(KbNodeSource.id).first()
     return source[0] if source else node.body
 
 

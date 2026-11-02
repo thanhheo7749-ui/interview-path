@@ -181,6 +181,7 @@ def upgrade() -> None:
     sa.Column('node_id', sa.Integer(), nullable=False),
     sa.Column('chunk_id', sa.Integer(), nullable=False),
     sa.Column('quote', sa.Text(), nullable=False),
+    sa.Column('stale', sa.Boolean(), server_default=sa.false(), nullable=False),
     sa.ForeignKeyConstraint(['chunk_id'], ['kb_chunks.id'], ondelete='CASCADE'),
     sa.ForeignKeyConstraint(['node_id'], ['kb_nodes.id'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id')

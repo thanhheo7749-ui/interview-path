@@ -1,5 +1,5 @@
 from sqlalchemy import JSON, Boolean, Column, Date, DateTime, ForeignKey, Index, Integer, LargeBinary, String, Text
-from sqlalchemy.sql import func
+from sqlalchemy.sql import false, func
 
 from .database import Base
 
@@ -103,6 +103,8 @@ class KbNodeSource(Base):
     node_id = Column(Integer, ForeignKey("kb_nodes.id", ondelete="CASCADE"), nullable=False, index=True)
     chunk_id = Column(Integer, ForeignKey("kb_chunks.id", ondelete="CASCADE"), nullable=False, index=True)
     quote = Column(Text, nullable=False)
+    # HR changed the claim this source was extracted for, so its chunk still says the old value and no audience reads it.
+    stale = Column(Boolean, nullable=False, default=False, server_default=false())
 
 
 class KbEdge(Base):
