@@ -71,7 +71,8 @@ function EvidenceTable({ companyId, appId, requirements, claims, cultureNotes, t
         <ul className="mt-2 space-y-3">
           {claims.map((claim) => (
             <li key={claim.id} className="rounded-xl bg-slate-50 p-3">
-              <p className="text-sm font-semibold text-slate-900">{claim.text}</p>
+              <p className="text-xs font-bold uppercase text-slate-500">{t('board.claims.cvSays')}</p>
+              <blockquote className="mt-1 border-l-2 border-slate-300 pl-2 text-sm font-semibold text-slate-900">{claim.quote}</blockquote>
               <p className="mt-1 text-xs font-bold text-slate-600">{t(`board.claims.status.${claim.status}`, { defaultValue: claim.status ?? '' })}</p>
               <Quote text={claim.evidence_quote} />
               {claim.position != null && audioPositions.has(claim.position) && (

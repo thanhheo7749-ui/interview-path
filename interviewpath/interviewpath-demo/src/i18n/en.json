@@ -7,7 +7,8 @@
     "remove": "Remove",
     "rename": "Rename",
     "none": "None",
-    "genericError": "Something went wrong. Please try again."
+    "genericError": "Something went wrong. Please try again.",
+    "aiBudgetExceeded": "This company has reached its daily AI limit. Please try again tomorrow."
   },
   "login": {
     "title": "Sign in to InterviewPath",
@@ -581,7 +582,8 @@
         "explained": "Explained",
         "partly": "Partly explained",
         "not_explained": "Not explained"
-      }
+      },
+      "cvSays": "What the CV says"
     },
     "culture": {
       "title": "Culture notes",
@@ -605,7 +607,9 @@
       "restart": "Grant a restart",
       "fastTrack": "Fast-track",
       "retry": "Retry analysis",
-      "reveal": "Reveal identity"
+      "reveal": "Reveal identity",
+      "rejectConfirm": "Reject this candidate? The candidate will be told that the hiring team decided not to move forward. This cannot be undone.",
+      "rejectConfirmButton": "Yes, reject"
     },
     "reveal": {
       "title": "Reveal identity",
@@ -621,7 +625,8 @@
       "submit": "Save correction",
       "corrected": "CV label corrected by HR",
       "reasonShown": "Correction reason: {{reason}}"
-    }
+    },
+    "longPause": "Long pause during the interview"
   },
   "bridges": {
     "nav": {

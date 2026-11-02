@@ -63,6 +63,7 @@ function CandidateDetailPanel({ companyId, appId, onClose, onChanged }) {
           {detail.hidden_text_detected && <p className="text-xs text-slate-500">{t('board.hiddenText')}</p>}
           {detail.fast_tracked && <p className="text-sm font-semibold text-slate-700">{t('board.fastTrackedNote')}</p>}
           {detail.analysis_status === 'not_taken' && <p data-testid="interview-note" className="text-sm font-semibold text-amber-800">{t('board.notTaken')}</p>}
+          {detail.long_pause && <p data-testid="long-pause-note" className="text-xs text-slate-500">{t('board.longPause')}</p>}
           {detail.analysis_status === 'failed' && <p className="text-sm font-semibold text-red-700">{t('board.analysisFailed')}</p>}
           {detail.cv_status_correction_reason && (
             <p className="text-xs text-slate-600">{t('board.cvCorrection.reasonShown', { reason: detail.cv_status_correction_reason })}</p>

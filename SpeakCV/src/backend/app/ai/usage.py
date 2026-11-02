@@ -74,6 +74,8 @@ def spent_today_usd(company_id: int) -> float:
                 .filter(AIUsageLog.company_id == company_id, AIUsageLog.created_at >= func.current_date())
                 .scalar()
             )
+            session.commit()  # not close() alone: on a shared connection (SQLite in memory) its rollback would drop the
+            # caller's pending writes. This commits them instead, exactly as writing the usage row after a call does.
             return float(total or 0.0)
         finally:
             session.close()

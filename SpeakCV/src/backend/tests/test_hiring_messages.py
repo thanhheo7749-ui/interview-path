@@ -34,6 +34,27 @@ def test_the_detail_route_carries_the_flag_too(client, world, monkeypatch):
     assert body["email_enabled"] is True
 
 
+def _decided(db, application_id, decision):
+    application = fresh(db, application_id)
+    application.stage = "ready_for_hr"
+    application.hr_decision = decision
+    db.commit()
+
+
+def test_an_approved_candidate_is_given_their_account_email_to_show(client, world, db):
+    application_id = apply(client).json()["id"]
+    _decided(db, application_id, "approved")
+    body = mine(client)
+    assert body["decision"] == "approved" and body["contact_email"] == CANDIDATE
+
+
+@pytest.mark.parametrize("decision", ["rejected", "pending"])
+def test_the_email_is_not_sent_for_any_other_state(client, world, db, decision):
+    application_id = apply(client).json()["id"]
+    _decided(db, application_id, decision)
+    assert mine(client)["contact_email"] is None
+
+
 def test_the_approval_email_names_the_next_step_and_does_not_send_people_back_to_the_app():
     for language, texts in decisions.NOTIFICATIONS.items():
         subject, body = texts["approved"]

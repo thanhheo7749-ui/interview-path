@@ -7,7 +7,8 @@
     "remove": "Xóa",
     "rename": "Đổi tên",
     "none": "Không có",
-    "genericError": "Đã xảy ra lỗi. Vui lòng thử lại."
+    "genericError": "Đã xảy ra lỗi. Vui lòng thử lại.",
+    "aiBudgetExceeded": "Công ty này đã đạt giới hạn AI trong ngày. Vui lòng thử lại vào ngày mai."
   },
   "login": {
     "title": "Đăng nhập InterviewPath",
@@ -580,7 +581,8 @@
         "explained": "Đã giải thích",
         "partly": "Giải thích một phần",
         "not_explained": "Chưa được giải thích"
-      }
+      },
+      "cvSays": "Điều CV nêu"
     },
     "culture": {
       "title": "Ghi chú văn hóa",
@@ -604,7 +606,9 @@
       "restart": "Cho phỏng vấn lại",
       "fastTrack": "Đi tắt",
       "retry": "Phân tích lại",
-      "reveal": "Tiết lộ danh tính"
+      "reveal": "Tiết lộ danh tính",
+      "rejectConfirm": "Từ chối ứng viên này? Ứng viên sẽ được báo rằng đội ngũ tuyển dụng quyết định không tiếp tục. Không thể hoàn tác.",
+      "rejectConfirmButton": "Có, từ chối"
     },
     "reveal": {
       "title": "Tiết lộ danh tính",
@@ -620,7 +624,8 @@
       "submit": "Lưu chỉnh sửa",
       "corrected": "Nhãn CV đã được HR chỉnh sửa",
       "reasonShown": "Lý do chỉnh sửa: {{reason}}"
-    }
+    },
+    "longPause": "Có khoảng dừng dài trong buổi phỏng vấn"
   },
   "bridges": {
     "nav": {

@@ -55,6 +55,7 @@ class ApplicationOut(BaseModel):
     decision: str | None = None  # approved or rejected once HR has decided; never a reason, label or band
     failure_reason: str | None = None  # a fixed code for why the CV failed; the app words it
     email_enabled: bool = False  # whether this deployment can send email at all
+    contact_email: str | None = None  # the candidate's own account email, only once they are approved
 
 
 class FitItem(BaseModel):
@@ -106,6 +107,9 @@ def _out(db: Session, application: Application, **overrides) -> ApplicationOut:
     if decision is not None:
         fields["status"] = "decided"
         fields["decision"] = decision
+        if decision == "approved" and application.candidate_user_id is not None:
+            owner = db.get(User, application.candidate_user_id)
+            fields["contact_email"] = owner.email if owner is not None else None
     return ApplicationOut(**{**fields, **overrides})
 
 

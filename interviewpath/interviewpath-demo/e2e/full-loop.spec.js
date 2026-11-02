@@ -202,6 +202,7 @@ test('5. HR sees the application as an alias on the board, reads the transcript 
   await expect(card).toContainText('CV does not meet');
 
   await panel.getByRole('button', { name: 'Reject', exact: true }).click();
+  await panel.getByRole('button', { name: 'Yes, reject', exact: true }).click();
   await expect(panel.getByTestId('decided-state')).toHaveText('Rejected');
 });
 

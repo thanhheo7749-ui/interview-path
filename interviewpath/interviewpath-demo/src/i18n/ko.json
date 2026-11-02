@@ -12,7 +12,8 @@
     "remove": "삭제",
     "rename": "이름 변경",
     "none": "없음",
-    "genericError": "문제가 발생했습니다. 다시 시도해 주세요."
+    "genericError": "문제가 발생했습니다. 다시 시도해 주세요.",
+    "aiBudgetExceeded": "이 회사는 오늘의 AI 사용 한도에 도달했습니다. 내일 다시 시도해 주세요."
   },
   "login": {
     "title": "InterviewPath 로그인",
@@ -347,6 +348,16 @@
         "religion": "종교",
         "ethnicity": "민족"
       }
+    }
+  },
+  "board": {
+    "longPause": "인터뷰 중 긴 휴지 구간이 있었습니다",
+    "actions": {
+      "rejectConfirm": "이 지원자를 거절하시겠습니까? 지원자에게 채용팀이 진행하지 않기로 결정했다고 안내됩니다. 되돌릴 수 없습니다.",
+      "rejectConfirmButton": "예, 거절합니다"
+    },
+    "claims": {
+      "cvSays": "CV에 적힌 내용"
     }
   }
 }
