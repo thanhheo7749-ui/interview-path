@@ -7,7 +7,7 @@ from .database import Base
 
 __all__ = [
     "Job", "JobRequirement", "JobChannelLink", "Application", "ScreeningCache", "RequirementResult", "CvClaim",
-    "VoiceSession", "VoiceTurn", "CultureNote", "Consent", "AuditLog", "Notification",
+    "VoiceSession", "VoiceTurn", "CultureNote", "Consent", "AuditLog", "Notification", "ReapplyGuard",
 ]
 
 
@@ -235,3 +235,13 @@ class Notification(Base):
     body = Column(Text, nullable=False)
     status = Column(String(30), nullable=False, default="pending", index=True)
     sent_at = Column(DateTime(timezone=True), nullable=True)
+
+
+class ReapplyGuard(Base):
+    """Stops a deleted application resetting the 90-day limit. A keyed hash of user and job, and the date applied:
+    nothing else about the person. Retention removes the row when the 90 days are over."""
+    __tablename__ = "reapply_guards"
+
+    id = Column(Integer, primary_key=True)
+    key_hash = Column(String(64), nullable=False, index=True)
+    applied_at = Column(DateTime(timezone=True), nullable=False)

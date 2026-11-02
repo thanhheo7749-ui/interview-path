@@ -19,7 +19,7 @@ function DecisionBar({ companyId, detail, onChanged }) {
   const awaiting = detail.stage === 'ready_for_hr' && detail.hr_decision === 'pending';
   const failed = detail.stage === 'ready_for_hr' && detail.analysis_status === 'failed';
   const untranscribed = detail.stage === 'ready_for_hr' && detail.analysis_status === 'transcription_failed';
-  const cvFailed = detail.stage === 'cv_failed';
+  const cvFailed = detail.stage === 'cv_failed' && !detail.cv_consent_withdrawn;
   const invited = detail.stage === 'invited';
   const otherLabel = detail.cv_status === 'meets' ? 'not_met' : 'meets';
 

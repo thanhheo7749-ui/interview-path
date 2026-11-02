@@ -44,12 +44,15 @@ export function PlayFromMoment({ companyId, appId, position, label }) {
 }
 
 // The transcript is the first thing HR reads.
-function TranscriptPanel({ companyId, appId, turns }) {
+function TranscriptPanel({ companyId, appId, turns, masked }) {
   const { t } = useTranslation();
   return (
     <section aria-labelledby="transcript-title" data-testid="transcript">
       <h3 id="transcript-title" className="text-sm font-extrabold text-slate-950">{t('board.transcript.title')}</h3>
       {turns.length === 0 && <p className="mt-2 text-sm text-slate-500">{t('board.transcript.empty')}</p>}
+      {masked && turns.length > 0 && (
+        <p data-testid="transcript-masked-note" className="mt-2 text-xs text-slate-500">{t('board.transcript.maskedNote')}</p>
+      )}
       <ol className="mt-3 space-y-3">
         {turns.map((turn) => (
           <li key={turn.position} id={`turn-${turn.position}`} className="rounded-xl bg-slate-50 p-3">

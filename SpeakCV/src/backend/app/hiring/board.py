@@ -1,11 +1,16 @@
-"""Read models for the HR board. Nothing here returns identity or the raw CV: HR reads blind text first."""
+"""Read models for the HR board. Nothing here returns identity or the raw CV: HR reads blind text first.
+
+What the candidate said is masked at read time until this HR member has made a logged reveal. A quote must still be
+found in the transcript shown beside it, so it is checked against the masked text, and left out if it no longer fits.
+"""
 from datetime import timezone
 
+from app.brain.text import quote_in
 from app.database.sql_models import (
-    Application, AuditLog, CandidateBrief, CultureNote, CvClaim, Job, KbNode, RequirementResult, VoiceSession, VoiceTurn,
+    Application, AuditLog, CandidateBrief, CultureNote, CvClaim, Job, KbNode, RequirementResult, User, VoiceSession, VoiceTurn,
 )
-from app.hiring import decisions, jobs
-from app.hiring.state import NOT_TAKEN, TRANSCRIPTION_FAILED
+from app.hiring import consents, decisions, identity, jobs
+from app.hiring.state import CONSENT_WITHDRAWN, NOT_TAKEN, TRANSCRIPTION_FAILED
 
 CELLS = {
     ("meets", "many"): "priority",
@@ -16,6 +21,8 @@ CELLS = {
 LANES = ("not_interviewed", "refused_recording", "withdrawn", "analysis_failed", "analyzing", "transcription_failed", "cv_failed")
 NOT_ENOUGH_EVIDENCE = "not_enough_evidence"
 NOT_TAKEN_NOTE = "did not take the interview"
+CONSENT_WITHDRAWN_NOTE = "withdrew consent to recording"
+NO_EVIDENCE_NOTES = {NOT_TAKEN: NOT_TAKEN_NOTE, CONSENT_WITHDRAWN: CONSENT_WITHDRAWN_NOTE}
 NOT_INTERVIEWED = ("invited", "session_in_progress")
 ANALYZING = ("session_completed", "analyzing")
 
@@ -23,7 +30,7 @@ ANALYZING = ("session_completed", "analyzing")
 def cell_for(application) -> str | None:
     if application.stage != "ready_for_hr":
         return None
-    if application.analysis_status == NOT_TAKEN:  # whatever the CV label says: the interview gave no evidence
+    if application.analysis_status in NO_EVIDENCE_NOTES:  # whatever the CV label says: the interview gave no evidence
         return NOT_ENOUGH_EVIDENCE
     if application.analysis_status == TRANSCRIPTION_FAILED:  # the candidate spoke: never in a cell HR can reject in bulk
         return None
@@ -31,7 +38,7 @@ def cell_for(application) -> str | None:
 
 
 def interview_note(application) -> str | None:
-    return NOT_TAKEN_NOTE if application.analysis_status == NOT_TAKEN else None
+    return NO_EVIDENCE_NOTES.get(application.analysis_status)
 
 
 def _lane_for(application, refused_ids=frozenset()) -> str | None:
@@ -140,10 +147,38 @@ def long_pause(turns) -> bool:
     )
 
 
-def detail(db, application) -> dict:
+def _has_revealed(db, application, viewer_id: int | None) -> bool:
+    if viewer_id is None:
+        return False
+    return db.query(AuditLog.id).filter(
+        AuditLog.company_id == application.company_id, AuditLog.action == decisions.REVEAL_ACTION, AuditLog.target_type == "application",
+        AuditLog.target_id == application.id, AuditLog.actor_user_id == viewer_id,
+    ).first() is not None
+
+
+def _candidate_terms(db, application) -> list[str]:
+    user = db.get(User, application.candidate_user_id) if application.candidate_user_id else None
+    return identity.registered_terms(user.full_name, user.email) if user is not None else []
+
+
+def detail(db, application, viewer_id: int | None = None) -> dict:
     job = db.get(Job, application.job_id)
-    turns = latest_turns(db, application)
+    turns = [] if application.analysis_status == CONSENT_WITHDRAWN else latest_turns(db, application)
     position_of = {turn.id: turn.position for turn in turns}
+    masked = not _has_revealed(db, application, viewer_id)
+    terms = _candidate_terms(db, application) if masked else []
+
+    def spoken(text):
+        return identity.mask_spoken(text, terms) if masked and text else text
+
+    transcripts = {turn.position: spoken(turn.transcript) for turn in turns if turn.transcript}
+
+    def spoken_quote(quote, position):
+        shown = spoken(quote)
+        if masked and shown and position in transcripts and not quote_in(shown, transcripts[position]):
+            return None
+        return shown
+
     results: dict[tuple[int, str], RequirementResult] = {}
     for row in db.query(RequirementResult).filter_by(application_id=application.id).order_by(RequirementResult.id):
         results[(row.requirement_id, row.source)] = row
@@ -151,10 +186,10 @@ def detail(db, application) -> dict:
     def evidence(row, with_position):
         if row is None:
             return None
-        item = {"status": row.status, "quote": row.quote}
-        if with_position:
-            item["position"] = position_of.get(row.voice_turn_id)
-        return item
+        if not with_position:
+            return {"status": row.status, "quote": row.quote}  # from the CV, already blind
+        position = position_of.get(row.voice_turn_id)
+        return {"status": row.status, "quote": spoken_quote(row.quote, position), "position": position}
 
     requirements = [
         {
@@ -166,20 +201,22 @@ def detail(db, application) -> dict:
         for requirement in jobs.requirements_for(db, application)
     ]
     claims = [
-        {"id": c.id, "text": c.text, "quote": c.quote, "status": c.status, "evidence_quote": c.evidence_quote,
+        {"id": c.id, "text": c.text, "quote": c.quote, "status": c.status,
+         "evidence_quote": spoken_quote(c.evidence_quote, position_of.get(c.voice_turn_id)),
          "position": position_of.get(c.voice_turn_id)}
         for c in db.query(CvClaim).filter_by(application_id=application.id).order_by(CvClaim.id)
     ]
     titles = {n.id: n.title for n in db.query(KbNode).filter(KbNode.company_id == application.company_id)}
     culture_notes = [
-        {"value": titles.get(n.value_node_id), "note": n.note, "quote": n.quote,
-         "position": position_of.get(n.voice_turn_id)}
+        {"value": titles.get(n.value_node_id), "note": spoken(n.note),
+         "quote": spoken_quote(n.quote, position_of.get(n.voice_turn_id)), "position": position_of.get(n.voice_turn_id)}
         for n in db.query(CultureNote).filter_by(application_id=application.id).order_by(CultureNote.id)
     ]
     return {
         "id": application.id,
         "alias": application.alias,
         "anonymized": application.anonymized_at is not None,
+        "identity_masked": masked,
         "job": {"id": job.id, "title": job.title},
         "stage": application.stage,
         "cell": cell_for(application),
@@ -196,6 +233,7 @@ def detail(db, application) -> dict:
         "hr_decided_at": application.hr_decided_at.isoformat() if application.hr_decided_at else None,
         "fast_tracked": bool(application.fast_tracked),
         "restart_available": decisions.restart_available(db, application),
+        "cv_consent_withdrawn": consents.was_withdrawn(db, application.id, "cv_processing"),
         "long_pause": long_pause(turns),
         "hidden_text_detected": bool(application.hidden_text_detected),
         "cv_text_blind": application.cv_text_blind,
@@ -203,10 +241,10 @@ def detail(db, application) -> dict:
         "claims": claims,
         "culture_notes": culture_notes,
         "transcript": [
-            {"position": t.position, "question": t.question_text, "transcript": t.transcript,
+            {"position": t.position, "question": spoken(t.question_text), "transcript": transcripts.get(t.position),
              "transcript_status": t.transcript_status, "is_followup": bool(t.is_followup),
              "has_audio": bool(t.audio_path)}
             for t in turns
         ],
-        "suggestion": {"text": application.ai_suggestion, "source": "ai"} if application.ai_suggestion else None,
+        "suggestion": {"text": spoken(application.ai_suggestion), "source": "ai"} if application.ai_suggestion else None,
     }

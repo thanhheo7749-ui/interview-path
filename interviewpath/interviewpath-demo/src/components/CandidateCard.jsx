@@ -1,4 +1,5 @@
 import { useTranslation } from 'react-i18next';
+import { CONSENT_WITHDRAWN } from '../lib/board.js';
 
 const CV_TONE = { meets: 'bg-emerald-50 text-emerald-700', not_met: 'bg-amber-50 text-amber-800' };
 
@@ -50,6 +51,9 @@ function CandidateCard({ card, selected, checked, onToggle, onClick }) {
           </div>
           {card.analysis_status === 'not_taken' && (
             <p data-testid="interview-note" className="mt-2 text-xs font-semibold text-amber-800">{t('board.notTaken')}</p>
+          )}
+          {card.analysis_status === CONSENT_WITHDRAWN && (
+            <p data-testid="interview-note" className="mt-2 text-xs font-semibold text-amber-800">{t('board.consentWithdrawn')}</p>
           )}
           {card.analysis_status === 'transcription_failed' && (
             <p data-testid="transcription-note" className="mt-2 text-xs font-semibold text-amber-800">{t('board.lanes.transcription_failed')}</p>

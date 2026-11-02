@@ -39,7 +39,7 @@ from app.ai import gateway
 from app.ai.types import AIError
 from app.database.sql_models import Application, VoiceSession, VoiceTurn
 from app.hiring import audit, recordings
-from app.hiring.state import NOT_TAKEN, TRANSCRIPTION_FAILED, advance
+from app.hiring.state import CONSENT_WITHDRAWN, NOT_TAKEN, TRANSCRIPTION_FAILED, advance
 
 logger = logging.getLogger(__name__)
 
@@ -140,6 +140,10 @@ class PositionNotCurrent(Exception):
 
 class SessionGone(Exception):
     """The session's application was deleted. Whatever was being done for it is discarded."""
+
+
+class ConsentWithdrawn(Exception):
+    """The candidate withdrew recording consent. Whatever was being done for this answer is discarded."""
 
 
 @dataclass(frozen=True)
@@ -624,6 +628,15 @@ def _commit_or_current(db, session_id: int, position: int, path: str) -> bool:
         return False
 
 
+def _refuse_if_consent_withdrawn(db, session: VoiceSession) -> None:
+    """On a session just locked: `_lock` has refreshed the application, so this sees a withdrawal made at any moment."""
+    if session.application_id is None:
+        return
+    if db.get(Application, session.application_id).analysis_status == CONSENT_WITHDRAWN:
+        db.rollback()
+        raise ConsentWithdrawn
+
+
 def _release_claim(db, session_id: int, position: int, claim: datetime) -> None:
     """Clear this request's claim after a failure. Only its own: one that expired and was taken over stays."""
     try:
@@ -645,8 +658,8 @@ def submit_answer(db, session: VoiceSession, position: int, audio: bytes, mime_t
     calls. Before them the position is claimed (`stt_started_at`), so a second upload of it is refused with
     TranscriptionInFlight instead of paying again; the re-check under the lock before storing still keeps one winner if
     a claim ever expires under a slow call. Files are written only then, so the stored audio always matches the stored
-    transcript. Raises SessionGone if the application was deleted, including during the AI calls: no file has been
-    written by then. Raises AudioTooLong if the provider measured more than MAX_ANSWER_AUDIO_SECONDS.
+    transcript. Raises SessionGone if the application was deleted, and ConsentWithdrawn if recording consent was
+    withdrawn, both including during the AI calls: no file has been written by then. Raises AudioTooLong if the provider measured more than MAX_ANSWER_AUDIO_SECONDS.
     """
     suffix = ALLOWED_AUDIO.get(mime_type)
     if suffix is None:
@@ -656,6 +669,7 @@ def submit_answer(db, session: VoiceSession, position: int, audio: bytes, mime_t
 
     session_id = session.id
     session = _lock(db, session_id)
+    _refuse_if_consent_withdrawn(db, session)
     if session.status in TERMINAL_STATUSES:
         return _released_state(db, session)
     if _apply_clock(db, session, upload=True):
@@ -706,6 +720,7 @@ def _transcribe_and_store(db, info: SessionInfo, question: AnsweredTurn, positio
         followup = _ask_followup(hook, info, replace(question, transcript=text))
 
     session = _lock(db, session_id)
+    _refuse_if_consent_withdrawn(db, session)
     turn = _current_turn(_turns(db, session_id))
     if session.status in TERMINAL_STATUSES or turn is None or turn.position != position:
         return _released_state(db, session)  # another upload of this position finished first
@@ -795,13 +810,15 @@ def question_audio(db, session_id: int, position: int) -> tuple[bytes, str]:
         suffix = QUESTION_AUDIO_SUFFIXES.get(result.mime_type, ".bin")
         path = recordings.save_question_audio(company_id, owner_key, position, result.audio, suffix)
         try:
-            _lock(db, session_id)
+            # Consent withdrawn during the call ends the session, and no question audio may come back afterwards.
+            if _lock(db, session_id).status in TERMINAL_STATUSES:
+                raise SessionEnded
             row = db.query(VoiceTurn).filter_by(session_id=session_id, position=position).populate_existing().first()
             if row is None:
                 raise NoSuchTurn
             row.question_audio_path = path
             db.commit()
-        except (SessionGone, NoSuchTurn):
+        except (SessionGone, SessionEnded, NoSuchTurn):
             db.rollback()
             recordings.delete(path)  # the application was deleted meanwhile: nothing of it may stay
             raise

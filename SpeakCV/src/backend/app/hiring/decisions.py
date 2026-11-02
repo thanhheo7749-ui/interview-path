@@ -5,11 +5,12 @@ Nothing here calls AI, and AI output never reaches this module. Callers own the 
 from datetime import datetime, timezone
 
 from app.database.sql_models import Company, CultureNote, CvClaim, Job, RequirementResult, VoiceSession
-from app.hiring import audit, notify
-from app.hiring.state import InvalidTransition, advance
+from app.hiring import audit, consents, notify
+from app.hiring.state import CONSENT_WITHDRAWN, InvalidTransition, advance
 
 DECISIONS = ("approved", "rejected")
 CV_STATUSES = ("meets", "not_met")
+REVEAL_ACTION = "identity_revealed"
 
 # One plain message per decision and language. It names no reason, label or band.
 NOTIFICATIONS = {
@@ -148,7 +149,7 @@ def reveal(db, application, actor_user_id) -> dict:
     user = db.get(User, application.candidate_user_id) if application.candidate_user_id else None
     if user is None:
         raise DecisionError(404, "Identity is no longer available")
-    audit.record(db, application.company_id, actor_user_id, "identity_revealed", "application", application.id)
+    audit.record(db, application.company_id, actor_user_id, REVEAL_ACTION, "application", application.id)
     db.flush()
     return {"name": user.full_name, "email": user.email}
 
@@ -172,7 +173,7 @@ def _screening_sessions(db, application) -> list:
 
 def restart_available(db, application) -> bool:
     """Whether `grant_restart` would be accepted: HR's button is shown only then."""
-    if application.anonymized_at is not None or application.fast_tracked:
+    if application.anonymized_at is not None or application.fast_tracked or application.analysis_status == CONSENT_WITHDRAWN:
         return False
     if application.stage != "ready_for_hr" or application.hr_decision != "pending":
         return False
@@ -183,6 +184,8 @@ def restart_available(db, application) -> bool:
 def grant_restart(db, application, actor_user_id) -> None:
     """One restart per application. The old session and its audio stay as they are. The candidate is told."""
     _check_not_anonymized(application)
+    if application.analysis_status == CONSENT_WITHDRAWN:
+        raise DecisionError(409, "The candidate withdrew consent to recording, so the interview cannot be restarted")
     if application.stage != "ready_for_hr" or application.hr_decision != "pending":
         raise DecisionError(409, "A restart can only be granted while the application awaits review")
     sessions = _screening_sessions(db, application)
@@ -207,6 +210,8 @@ def invite_without_cv(db, application, actor_user_id) -> None:
     _check_not_anonymized(application)
     if application.stage != "cv_failed":
         raise DecisionError(409, "Only an application whose CV could not be processed can be invited this way")
+    if consents.was_withdrawn(db, application.id, "cv_processing"):
+        raise DecisionError(409, "The candidate withdrew consent to CV processing, so they cannot be invited to the interview")
     advance(application, "invited")
     application.processing_error = None
     audit.record(db, application.company_id, actor_user_id, "invited_without_cv", "application", application.id)

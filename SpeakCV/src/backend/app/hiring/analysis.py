@@ -21,7 +21,7 @@ from app.database.sql_models import (
 )
 from app.hiring import audit, jobs, voice
 from app.hiring.screening import _DIRECTIVE
-from app.hiring.state import NOT_TAKEN, TRANSCRIPTION_FAILED, InvalidTransition, advance
+from app.hiring.state import CONSENT_WITHDRAWN, NOT_TAKEN, TRANSCRIPTION_FAILED, InvalidTransition, advance
 
 logger = logging.getLogger(__name__)
 
@@ -142,7 +142,7 @@ def _mark_failed(application_id: int) -> None:
     db = SessionLocal()
     try:
         application = _locked(db, application_id)
-        if application is None or application.anonymized_at is not None:
+        if application is None or application.anonymized_at is not None or application.analysis_status == CONSENT_WITHDRAWN:
             return
         if application.stage == "analyzing":
             advance(application, "ready_for_hr")
@@ -176,7 +176,7 @@ def _claim(db, application_id: int) -> bool:
 def _record_not_taken(db, application_id: int) -> None:
     """With no answers there is nothing to send to the paid model, and nothing it could say."""
     application = _locked(db, application_id)
-    if application is None or application.anonymized_at is not None:
+    if application is None or application.anonymized_at is not None or application.analysis_status == CONSENT_WITHDRAWN:
         db.rollback()
         return
     application.analysis_status = NOT_TAKEN
@@ -191,7 +191,7 @@ def _record_not_taken(db, application_id: int) -> None:
 def _record_transcription_failed(db, application_id: int) -> None:
     """An answer has audio and no transcript, so the candidate spoke and the transcripts are not all here. No AI runs."""
     application = _locked(db, application_id)
-    if application is None or application.anonymized_at is not None:
+    if application is None or application.anonymized_at is not None or application.analysis_status == CONSENT_WITHDRAWN:
         db.rollback()
         return
     application.analysis_status = TRANSCRIPTION_FAILED
@@ -279,8 +279,11 @@ def _analyse(db, application_id: int) -> None:
     suggestion = output.suggestion.strip()[:MAX_SUGGESTION_CHARS] or None
 
     application = _locked(db, application_id)
-    if application is None or application.anonymized_at is not None or application.stage not in ("analyzing", "ready_for_hr"):
-        db.rollback()  # deleted during the call: nothing of this result is written
+    if (
+        application is None or application.anonymized_at is not None or application.stage not in ("analyzing", "ready_for_hr")
+        or application.analysis_status == CONSENT_WITHDRAWN
+    ):
+        db.rollback()  # deleted, or consent withdrawn, during the call: nothing of this result is written
         return
     db.query(RequirementResult).filter_by(application_id=application_id, source="interview").delete(
         synchronize_session=False)

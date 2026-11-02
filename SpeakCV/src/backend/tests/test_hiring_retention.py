@@ -15,8 +15,8 @@ from app.core import storage
 from app.database import models_hiring
 from app.database.database import Base
 from app.database.sql_models import (
-    Application, AuditLog, Company, CompanyMember, Consent, CultureNote, CvClaim, Job, JobRequirement, KbNode,
-    Notification, RejectionFeedback, RequirementResult, ScreeningCache, VoiceSession, VoiceTurn,
+    Application, AssistantQuestion, AuditLog, Company, CompanyMember, Consent, CultureNote, CvClaim, Job, JobRequirement,
+    KbNode, Notification, ReapplyGuard, RejectionFeedback, RequirementResult, ScreeningCache, VoiceSession, VoiceTurn,
 )
 from app.hiring import notify, retention
 from tests.helpers import auth_header, make_user
@@ -596,6 +596,224 @@ def test_the_candidates_delete_is_not_attributed_to_them(client, db, world):
     assert CANDIDATE not in text and CANARY not in text
 
 
+# 9b. HR's free text in the audit log
+
+
+def _reasons(db, world, item):
+    from app.hiring import audit
+
+    audit.record(db, world.company_id, world.hr_id, "hr_decision", "application", item.id,
+                 payload={"decision": "rejected", "reason": f"{CANARY} Nguyen 0901234567"})
+    audit.record(db, world.company_id, world.hr_id, "cv_status_corrected", "application", item.id,
+                 payload={"from": "meets", "to": "not_met", "reason": f"{CANARY} she is pregnant"})
+    audit.record(db, world.company_id, world.hr_id, "hr_decision", "application", item.id,
+                 payload={"decision": "approved", "reason": None})
+    db.commit()
+
+
+def test_anonymizing_strips_reasons_from_the_audit_log_and_keeps_that_one_existed(client, db, world):
+    item = full_application(db, world)
+    _reasons(db, world, item)
+    db.rollback()
+    assert client.delete(f"/api/me/applications/{item.id}", headers=auth_header(CANDIDATE)).status_code == 204
+    db.rollback()
+    response = client.get(f"/api/companies/{world.company_id}/trust/audit", headers=auth_header(HR))
+    assert response.status_code == 200
+    assert CANARY not in response.text and "0901234567" not in response.text
+    payloads = {row["action"]: [] for row in response.json()["items"]}
+    for row in response.json()["items"]:
+        payloads[row["action"]].append(row["payload"])
+    assert {"decision": "rejected", "has_reason": True} in payloads["hr_decision"]
+    assert {"decision": "approved"} in payloads["hr_decision"]
+    assert payloads["cv_status_corrected"] == [{"from": "meets", "to": "not_met", "has_reason": True}]
+    assert CANARY not in database_dump(db)
+
+
+def test_a_reason_on_another_application_stays(db, world):
+    from app.hiring import audit
+
+    item = full_application(db, world)
+    other = bare_application(db, world, candidate_user_id=world.other_id)
+    other_id = other.id
+    audit.record(db, world.company_id, world.hr_id, "hr_decision", "application", other_id, payload={"decision": "approved", "reason": "kept"})
+    db.commit()
+    retention.anonymize_application(db, item.application)
+    db.rollback()
+    row = db.query(AuditLog).filter_by(action="hr_decision", target_id=other_id).one()
+    assert row.payload["reason"] == "kept"
+
+
+# 9c. Ask the Company questions
+
+
+def asked(db, world, user_id=None, audience="candidate", created_at=None, company_id=None):
+    row = AssistantQuestion(company_id=company_id or world.company_id, user_id=user_id or world.candidate_id, audience=audience,
+                            question=f"{CANARY} I am 3 months pregnant", language="en", answered=False, state="not_found",
+                            embedding=b"1234", embedding_model="m", created_at=created_at or days_ago(1))
+    db.add(row)
+    db.commit()
+    return row
+
+
+def test_deleting_the_last_application_at_a_company_erases_the_candidates_questions(client, db, world):
+    item = full_application(db, world)
+    question = asked(db, world)
+    db.rollback()
+    assert client.delete(f"/api/me/applications/{item.id}", headers=auth_header(CANDIDATE)).status_code == 204
+    db.rollback()
+    db.expire_all()
+    row = db.get(AssistantQuestion, question.id)
+    assert row.user_id is None and row.question == "" and row.embedding is None
+    assert CANARY not in database_dump(db)
+
+
+def test_an_erased_question_leaves_the_gap_list(client, db, world):
+    item = full_application(db, world)
+    asked(db, world)
+    db.rollback()
+    url = f"/api/companies/{world.company_id}/kb/gaps"
+    assert len(client.get(url, headers=auth_header(HR)).json()) == 1
+    assert client.delete(f"/api/me/applications/{item.id}", headers=auth_header(CANDIDATE)).status_code == 204
+    db.rollback()
+    assert client.get(url, headers=auth_header(HR)).json() == []
+
+
+def test_questions_stay_while_another_application_at_the_company_is_live(client, db, world):
+    item = full_application(db, world)
+    bare_application(db, world)
+    question = asked(db, world)
+    db.rollback()
+    assert client.delete(f"/api/me/applications/{item.id}", headers=auth_header(CANDIDATE)).status_code == 204
+    db.rollback()
+    db.expire_all()
+    row = db.get(AssistantQuestion, question.id)
+    assert row.user_id == world.candidate_id and CANARY in row.question
+
+
+def test_an_application_already_anonymized_does_not_count_as_live(client, db, world):
+    first, second = full_application(db, world, cv_blind_hash="a"), full_application(db, world, cv_blind_hash="b")
+    question = asked(db, world)
+    db.rollback()
+    assert client.delete(f"/api/me/applications/{first.id}", headers=auth_header(CANDIDATE)).status_code == 204
+    db.rollback()
+    db.expire_all()
+    assert db.get(AssistantQuestion, question.id).user_id == world.candidate_id
+    assert client.delete(f"/api/me/applications/{second.id}", headers=auth_header(CANDIDATE)).status_code == 204
+    db.rollback()
+    db.expire_all()
+    assert db.get(AssistantQuestion, question.id).user_id is None
+
+
+def test_deletion_leaves_staff_questions_and_other_people_and_companies(client, db, world):
+    item = full_application(db, world)
+    rival = Company(slug="rival", name="Rival")
+    db.add(rival)
+    db.commit()
+    staff = asked(db, world, audience="employee")
+    someone_else = asked(db, world, user_id=world.other_id)
+    elsewhere = asked(db, world, company_id=rival.id)
+    db.rollback()
+    assert client.delete(f"/api/me/applications/{item.id}", headers=auth_header(CANDIDATE)).status_code == 204
+    db.rollback()
+    db.expire_all()
+    for row in (staff, someone_else, elsewhere):
+        assert db.get(AssistantQuestion, row.id).user_id is not None
+        assert CANARY in db.get(AssistantQuestion, row.id).question
+
+
+def test_a_retention_run_does_not_erase_recent_questions_when_it_anonymizes(db, world):
+    item = bare_application(db, world, **decided(world, RETENTION_DAYS + 1))
+    question = asked(db, world)
+    assert retention.run(db) == 1
+    db.rollback()
+    db.expire_all()
+    assert fresh(db, item.id).anonymized_at is not None
+    assert CANARY in db.get(AssistantQuestion, question.id).question
+
+
+def test_candidate_questions_expire_after_180_days(db, world):
+    old = asked(db, world, created_at=days_ago(181))
+    recent = asked(db, world, created_at=days_ago(179))
+    staff = asked(db, world, audience="employee", created_at=days_ago(400))
+    retention.run(db)
+    db.rollback()
+    db.expire_all()
+    row = db.get(AssistantQuestion, old.id)
+    assert row.question == "" and row.user_id is None and row.embedding is None and row.resolved is True
+    assert CANARY in db.get(AssistantQuestion, recent.id).question
+    assert CANARY in db.get(AssistantQuestion, staff.id).question
+
+
+# 9d. The re-apply guard
+
+
+def guard_rows(db):
+    db.rollback()
+    return db.query(ReapplyGuard).all()
+
+
+def test_a_guard_holds_only_a_keyed_hash_and_its_date():
+    assert set(ReapplyGuard.__table__.columns.keys()) == {"id", "key_hash", "applied_at"}
+
+
+def test_deleting_after_a_session_or_a_decision_leaves_a_guard(client, db, world):
+    with_session = full_application(db, world)
+    db.rollback()
+    client.delete(f"/api/me/applications/{with_session.id}", headers=auth_header(CANDIDATE))
+    rows = guard_rows(db)
+    assert len(rows) == 1 and len(rows[0].key_hash) == 64
+    decided_only = bare_application(db, world, candidate_user_id=world.other_id, **decided(world, 1))
+    db.rollback()
+    client.delete(f"/api/me/applications/{decided_only.id}", headers=auth_header(OTHER))
+    assert len(guard_rows(db)) == 2
+
+
+def test_an_application_with_no_session_or_decision_leaves_no_guard(client, db, world):
+    item = bare_application(db, world, stage="invited")
+    db.rollback()
+    assert client.delete(f"/api/me/applications/{item.id}", headers=auth_header(CANDIDATE)).status_code == 204
+    assert guard_rows(db) == []
+
+
+def test_an_application_already_past_the_limit_leaves_no_guard(db, world):
+    item = full_application(db, world, created_at=days_ago(181))
+    assert retention.run(db) == 1
+    assert fresh(db, item.id).anonymized_at is not None
+    assert guard_rows(db) == []
+
+
+def test_the_hash_depends_on_user_job_and_secret(monkeypatch):
+    import hashlib
+
+    from app.hiring import reapply_guard
+
+    base = reapply_guard.key_hash(1, 2)
+    assert base != reapply_guard.key_hash(1, 3) and base != reapply_guard.key_hash(2, 2) and base != reapply_guard.key_hash(12, 2)
+    assert base != hashlib.sha256(b"1:2").hexdigest()
+    monkeypatch.setenv("SECRET_KEY", "another-secret-key-another-secret-key-000")
+    assert reapply_guard.key_hash(1, 2) != base
+
+
+def test_retention_removes_guards_after_90_days(db, world):
+    from app.hiring import reapply_guard
+
+    reapply_guard.remember(db, world.candidate_id, world.job_id, days_ago(89))
+    db.add(ReapplyGuard(key_hash="o" * 64, applied_at=days_ago(91)))
+    db.commit()
+    retention.run(db)
+    assert len(guard_rows(db)) == 1
+
+
+def test_the_guard_uses_the_days_left_of_the_original_application(db, world):
+    from app.hiring import reapply_guard
+
+    reapply_guard.remember(db, world.candidate_id, world.job_id, days_ago(10))
+    db.commit()
+    until = reapply_guard.blocked_until(db, world.candidate_id, world.job_id)
+    assert abs((until - (days_ago(10) + timedelta(days=90))).total_seconds()) < 5
+    assert reapply_guard.blocked_until(db, world.other_id, world.job_id) is None
+
+
 # 10. Failures do not stop the run
 
 
@@ -660,7 +878,7 @@ SCREENED_TYPES = (String, Text, JSON)
 
 
 def hiring_tables():
-    return [getattr(models_hiring, name).__table__ for name in models_hiring.__all__]
+    return [getattr(models_hiring, name).__table__ for name in models_hiring.__all__] + [AssistantQuestion.__table__]
 
 
 def holds_content_or_a_user(column) -> bool:

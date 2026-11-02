@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
 import { Strings, format, useLang } from "@/lib/i18n";
-import { Application, HiringError, listMyApplications, reuploadCv, withdrawApplication } from "@/services/hiring";
+import { Application, CV_CONSENT_WITHDRAWN, errorCode, HiringError, listMyApplications, reuploadCv, withdrawApplication } from "@/services/hiring";
 import { ConfirmDialog, LangToggle } from "@/components/Hiring/SampleNotice";
 
 const POLL_MS = 3000;
@@ -17,6 +17,7 @@ function failureText(a: Application, t: Strings): string {
     case "too_large": return t.failTooLarge;
     case "try_again": return t.failTryAgain;
     case "interrupted": return t.failInterrupted;
+    case "consent_withdrawn": return t.cvConsentWithdrawn;
     default: return t.statusUnreadable;
   }
 }
@@ -56,7 +57,8 @@ function Reupload({ id, onDone }: { id: number; onDone: () => void }) {
     } catch (err) {
       const status = err instanceof HiringError ? err.status : 0;
       setError(
-        status === 413 ? t.tooLarge : status === 415 ? t.unsupportedType : status === 422 ? t.cvTooLong
+        errorCode(err) === CV_CONSENT_WITHDRAWN ? t.cvConsentWithdrawn
+          : status === 413 ? t.tooLarge : status === 415 ? t.unsupportedType : status === 422 ? t.cvTooLong
           : status === 429 ? t.rateLimited : t.genericError,
       );
     } finally {
@@ -189,7 +191,7 @@ export default function ApplicationsPage() {
               <p className="mt-2 text-sm text-theme-text">{statusText(a, t)}</p>
               {a.status === "cv_unreadable" && (
                 <>
-                  <Reupload id={a.id} onDone={load} />
+                  {a.failure_reason !== "consent_withdrawn" && <Reupload id={a.id} onDone={load} />}
                   <WithdrawUnreadable id={a.id} onDone={load} />
                 </>
               )}

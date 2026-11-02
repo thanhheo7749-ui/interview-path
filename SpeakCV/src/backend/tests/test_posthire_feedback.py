@@ -998,3 +998,36 @@ def test_the_candidate_still_sees_the_decision_while_hr_has_not_sent(db, world, 
     draft_now(db, application)
     listed = api.get(f"/api/applications/{application.id}", headers=auth_header(CANDIDATE_EMAIL)).json()
     assert listed["status"] == "decided" and listed["decision"] == "rejected" and listed["feedback"] is None
+
+
+def test_anonymizing_strips_the_decision_reason_and_keeps_feedback_audit_rows(db, client):
+    """Every audit payload about the application stays free of HR's free text, whichever module wrote it."""
+    from datetime import datetime, timezone
+
+    from app.database.sql_models import Application, AuditLog, Company, Job, RejectionFeedback
+    from app.hiring import audit, retention
+    from tests.helpers import make_user
+
+    company = Company(slug="audit-acme", name="Acme")
+    db.add(company)
+    db.commit()
+    job = Job(company_id=company.id, title="Backend", slug="audit-backend", status="published", interview_languages=["en"])
+    db.add(job)
+    db.commit()
+    user = make_user(db, "audit-candidate@example.test")
+    application = Application(company_id=company.id, job_id=job.id, candidate_user_id=user.id, alias="#A1", stage="ready_for_hr",
+                              hr_decision="rejected", hr_decided_at=datetime.now(timezone.utc))
+    db.add(application)
+    db.commit()
+    audit.record(db, company.id, None, "hr_decision", "application", application.id, payload={"decision": "rejected", "reason": "Nguyen is pregnant"})
+    audit.record(db, company.id, None, "feedback_drafted", "application", application.id,
+                 payload={"source": "ai", "guard_failures": ["unverified_quote"], "language": "en"})
+    db.add(RejectionFeedback(company_id=company.id, application_id=application.id, language="en", draft="Nguyen said", status="sent"))
+    db.commit()
+    retention.anonymize_application(db, application, trigger=retention.TRIGGER_CANDIDATE)
+    db.rollback()
+    rows = {row.action: row.payload for row in db.query(AuditLog).all()}
+    assert rows["hr_decision"] == {"decision": "rejected", "has_reason": True}
+    assert rows["feedback_drafted"] == {"source": "ai", "guard_failures": ["unverified_quote"], "language": "en"}
+    assert db.query(RejectionFeedback).one().draft == ""
+

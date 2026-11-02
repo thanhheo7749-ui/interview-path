@@ -1,7 +1,7 @@
 import { Gem } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { isUndecided } from '../../lib/board.js';
+import { isBulkSelectable, isUndecided } from '../../lib/board.js';
 import CandidateCard from '../CandidateCard.jsx';
 
 // `onBulkReject(ids)` resolves when the rejection is done. The count is confirmed before it runs.
@@ -12,7 +12,7 @@ function BoardCell({ cellKey, cards, selectedId, onSelect, onBulkReject }) {
   const [busy, setBusy] = useState(false);
   const gem = cellKey === 'hidden_gem';
   const undecided = cards.filter(isUndecided).length;
-  const chosen = picked.filter((id) => cards.some((card) => card.id === id && isUndecided(card)));
+  const chosen = picked.filter((id) => cards.some((card) => card.id === id && isBulkSelectable(card)));
 
   const toggle = (id) => {
     setConfirming(false);
@@ -87,7 +87,7 @@ function BoardCell({ cellKey, cards, selectedId, onSelect, onBulkReject }) {
             card={card}
             selected={card.id === selectedId}
             checked={chosen.includes(card.id)}
-            onToggle={isUndecided(card) ? () => toggle(card.id) : null}
+            onToggle={isBulkSelectable(card) ? () => toggle(card.id) : null}
             onClick={() => onSelect(card.id)}
           />
         ))}

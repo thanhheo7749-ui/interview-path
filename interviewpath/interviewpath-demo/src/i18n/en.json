@@ -434,7 +434,7 @@
     "roleHint": "Choosing a role fills in the title, description and requirements from the company knowledge. You can edit everything.",
     "jobTitle": "Job title",
     "description": "Description",
-    "descriptionHint": "JD Studio, which will help write job descriptions, arrives later. For now, write or edit the description here.",
+    "descriptionHint": "Write or edit the description here. To draft one from the company knowledge, open a hiring request and use JD Studio.",
     "languages": "Interview languages",
     "language": {
       "vi": "Vietnamese",
@@ -525,6 +525,8 @@
     "fastTracked": "Fast-tracked",
     "fastTrackedNote": "This candidate was fast-tracked without an interview, so there is no interview evidence.",
     "notTaken": "Did not take the interview",
+    "consentWithdrawn": "Withdrew consent to recording",
+    "cvConsentWithdrawn": "This candidate withdrew consent to CV processing, so AI no longer works on this CV and they cannot be invited to the interview.",
     "anonymizedNotice": "This candidate's data has been deleted. There is nothing left to review and no action is available.",
     "analysisFailed": "The analysis of this interview failed. You can retry it.",
     "hiddenText": "Note: the CV file contained hidden text, which was ignored.",
@@ -565,7 +567,8 @@
       "empty": "There is no interview transcript for this candidate.",
       "question": "Question",
       "followup": "Follow-up",
-      "unavailable": "No transcript is available for this answer."
+      "unavailable": "No transcript is available for this answer.",
+      "maskedNote": "Names, emails, phone numbers and similar details are hidden until you reveal the candidate. Anything else they said about themselves may remain."
     },
     "evidence": {
       "title": "Requirements: CV and interview side by side",
