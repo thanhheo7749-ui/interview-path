@@ -132,11 +132,18 @@ test('HR drafts, the manager approves in Korean, HR publishes and copies channel
   await manager.getByLabel('Password').fill(MANAGER_PASSWORD);
   await manager.getByRole('button', { name: 'Sign in' }).click();
   await expect(manager.getByRole('heading', { name: '회사 설정' })).toBeVisible();
-  await manager.goto(`/jd-studio/${draftId}`);
+  // The manager finds the draft from the request list: it is marked as waiting for their approval.
+  await manager.getByRole('link', { name: '채용 요청' }).click();
+  const managerRow = manager.getByRole('listitem').filter({ hasText: TITLE });
+  await expect(managerRow.getByTestId('awaiting-approval')).toHaveText('승인 대기 중');
+  await managerRow.getByTestId('open-draft').click();
+  await expect(manager).toHaveURL(new RegExp(`/jd-studio/${draftId}$`));
   await expect(manager.getByRole('heading', { name: 'JD 스튜디오' })).toBeVisible();
   await expect(manager.getByRole('tab', { name: '한국어' })).toHaveAttribute('aria-selected', 'true');
   await expect(manager.getByTestId('jd-lines').getByRole('listitem').first().getByTestId('jd-line-text')).toHaveText(KOREAN_LINE);
   await expect(manager.getByTestId('draft-status')).toContainText('매니저 검토 대기');
+  // The manager's source chips carry titles their layer allows, never the placeholder.
+  await expect(manager.getByTestId('source-chip').first()).toBeVisible();
   await expect(manager.getByRole('button', { name: /^수정$|^보내기$/ })).toHaveCount(0); // a manager reads; HR edits
   await manager.getByRole('button', { name: '승인', exact: true }).click();
   await expect(manager.getByTestId('draft-status')).toContainText('승인됨');

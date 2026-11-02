@@ -3,13 +3,13 @@ import { useTranslation } from 'react-i18next';
 import { inputClass, primaryButton, secondaryButton } from '../KbFeedback.jsx';
 
 // One line of the description in the chosen language: its source chips, an inline edit, and a mark when nothing in the
-// knowledge graph supports it. `titles` maps node ids to titles; a manager has none, so a chip then names the node id.
-function LineEditor({ line, number, lang, titles, canEdit, busy, onSave, onRemove, onConfirm, onFlag }) {
+// knowledge graph supports it. The API sends each line's sources with the title the reader may see; a source above the reader's layer has no title and reads as restricted.
+function LineEditor({ line, number, lang, canEdit, busy, onSave, onRemove, onConfirm, onFlag }) {
   const { t } = useTranslation();
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState('');
   const text = line.text?.[lang] ?? '';
-  const sources = line.source_node_ids ?? [];
+  const sources = line.sources ?? [];
   const unsourced = sources.length === 0 && !line.hr_confirmed;
 
   const start = () => {
@@ -51,9 +51,9 @@ function LineEditor({ line, number, lang, titles, canEdit, busy, onSave, onRemov
       )}
 
       <div className="flex flex-wrap items-center gap-2">
-        {sources.map((id) => (
-          <span key={id} data-testid="source-chip" className="rounded-full bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-800">
-            {titles?.[id] ?? t('jd.sourceNode', { id })}
+        {sources.map((source) => (
+          <span key={source.node_id} data-testid="source-chip" data-restricted={source.title == null ? 'true' : 'false'} className="rounded-full bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-800">
+            {source.title ?? t('jd.restrictedSource')}
           </span>
         ))}
         {unsourced && (

@@ -44,7 +44,7 @@ test('HR builds a job from a role, publishes it, and gets one tracked link per c
   await expect(page.getByLabel('Job title')).toHaveValue('Backend Developer');
   await expect(page.getByRole('combobox', { name: 'Department' })).not.toHaveValue('');
   await expect(page.getByLabel('Description')).not.toHaveValue('');
-  await expect(page.getByText(/JD Studio.*arrives later/)).toBeVisible();
+  await expect(page.getByText(/open a hiring request and use JD Studio/)).toBeVisible();
   const rows = page.getByTestId('requirement-row');
   await expect.poll(() => rows.count()).toBeGreaterThan(1);
   const prefilledCount = await rows.count();

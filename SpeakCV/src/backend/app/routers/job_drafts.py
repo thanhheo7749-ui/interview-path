@@ -8,7 +8,7 @@ from app.brain import audience as aud
 from app.brain import retriever
 from app.bridges import channels, jd_studio, lint, publishing
 from app.database.database import get_db
-from app.database.sql_models import CompanyMember, HiringRequest, JobDraft, JobDraftMessage
+from app.database.sql_models import CompanyMember, HiringRequest, JobDraft, JobDraftMessage, KbNode
 from app.schemas.bridges import AcknowledgeIn, AssistantIn, DraftFromRequestIn, DraftFromRoleIn, DraftPatchIn
 
 router = APIRouter()
@@ -31,11 +31,24 @@ def _get_draft(db: Session, member: CompanyMember, draft_id: int) -> JobDraft:
     return draft
 
 
-def _line_out(item: dict) -> dict:
-    return {**item, "label": jd_studio.CONFIRMED_LABEL if item.get("hr_confirmed") else None}
+def _source_titles(db: Session, draft: JobDraft, reader: aud.Audience) -> dict[int, str]:
+    """Titles of the cited nodes this reader may read; the audience filter runs in SQL."""
+    ids = {i for item in draft.lines or [] for i in item.get("source_node_ids") or []}
+    if not ids:
+        return {}
+    rows = db.query(KbNode.id, KbNode.title).filter(KbNode.id.in_(ids), aud.node_filter(reader)).all()
+    return dict(rows)
 
 
-def _draft_out(db: Session, draft: JobDraft) -> dict:
+def _line_out(item: dict, titles: dict[int, str]) -> dict:
+    sources = [{"node_id": i, "title": titles.get(i)} for i in item.get("source_node_ids") or []]
+    return {**item, "sources": sources, "label": jd_studio.CONFIRMED_LABEL if item.get("hr_confirmed") else None}
+
+
+def _draft_out(db: Session, draft: JobDraft, member: CompanyMember | None = None) -> dict:
+    # Without a member (a path that is HR-only) the reader is HR of the draft's company.
+    reader = aud.for_member(db, member) if member is not None else aud.Audience(draft.company_id, "hr")
+    titles = _source_titles(db, draft, reader)
     messages = (db.query(JobDraftMessage)
                 .filter(JobDraftMessage.job_draft_id == draft.id, JobDraftMessage.company_id == draft.company_id,
                         JobDraftMessage.role.in_(("user", "assistant"))).order_by(JobDraftMessage.id).all())
@@ -43,7 +56,7 @@ def _draft_out(db: Session, draft: JobDraft) -> dict:
     return {
         "id": draft.id, "hiring_request_id": draft.hiring_request_id, "job_id": draft.job_id,
         "version": draft.version, "status": draft.status,
-        "lines": [_line_out(item) for item in draft.lines or []],
+        "lines": [_line_out(item, titles) for item in draft.lines or []],
         "requirement_lines": draft.requirement_lines or [],
         "failed_languages": draft.failed_languages or [],
         "lint": issues, "blocks_publish": any(i["severity"] == "block" for i in issues),
@@ -88,7 +101,7 @@ def create_from_role(company_id: int, body: DraftFromRoleIn, member: CompanyMemb
 @router.get(BASE + "/job-drafts/{draft_id}")
 def read_draft(company_id: int, draft_id: int, member: CompanyMember = Depends(require_member("hr", "manager")),
                db: Session = Depends(get_db)):
-    return _draft_out(db, _get_draft(db, member, draft_id))
+    return _draft_out(db, _get_draft(db, member, draft_id), member)
 
 
 @router.patch(BASE + "/job-drafts/{draft_id}")
@@ -175,7 +188,7 @@ def approve_draft(company_id: int, draft_id: int, member: CompanyMember = Depend
     except publishing.PublishError as error:
         db.rollback()
         raise _publish_error(error) from error
-    return _draft_out(db, draft)
+    return _draft_out(db, draft, member)
 
 
 @router.post(BASE + "/job-drafts/{draft_id}/publish")

@@ -31,7 +31,9 @@ export async function api(path, { method = 'GET', body, formData, skipAuthRedire
   }
   if (!response.ok) {
     const detail = await response.json().catch(() => ({}));
-    throw new ApiError(response.status, typeof detail.detail === 'string' ? detail.detail : `Request failed (${response.status})`);
+    // A detail is text, or an object whose `message` says what happened (a draft blocked by lint, for one).
+    const text = typeof detail.detail === 'string' ? detail.detail : detail.detail?.message;
+    throw new ApiError(response.status, typeof text === 'string' && text ? text : `Request failed (${response.status})`);
   }
   return response.status === 204 ? null : response.json();
 }

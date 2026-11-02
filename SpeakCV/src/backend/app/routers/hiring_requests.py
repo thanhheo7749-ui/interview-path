@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from app.auth.dependencies import require_member
 from app.bridges import intake
 from app.database.database import get_db
-from app.database.sql_models import CompanyMember, Department, HiringRequest, VoiceSession
+from app.database.sql_models import CompanyMember, Department, HiringRequest, JobDraft, VoiceSession
 from app.hiring import audit, voice
 from app.routers.screening import StateOut, state_out
 from app.schemas.bridges import HiringRequestIn, IntakeStartIn
@@ -17,8 +17,20 @@ BASE = "/api/companies/{company_id}"
 INTAKE_OPEN_STATUSES = ("open", "intake_in_progress")
 
 
-def _out(row: HiringRequest) -> dict:
+def _latest_drafts(db: Session, company_id: int, request_ids: list[int]) -> dict[int, tuple[int, str]]:
+    """Request id -> (id, status) of its newest draft, in one query."""
+    if not request_ids:
+        return {}
+    rows = (db.query(JobDraft.hiring_request_id, JobDraft.id, JobDraft.status)
+            .filter(JobDraft.company_id == company_id, JobDraft.hiring_request_id.in_(request_ids))
+            .order_by(JobDraft.id).all())
+    return {request_id: (draft_id, status) for request_id, draft_id, status in rows}  # the last row of each wins
+
+
+def _out(row: HiringRequest, drafts: dict[int, tuple[int, str]] | None = None) -> dict:
+    draft_id, draft_status = (drafts or {}).get(row.id, (None, None))
     return {
+        "latest_draft_id": draft_id, "latest_draft_status": draft_status,
         "id": row.id, "title": row.title, "department_id": row.department_id, "manager_user_id": row.manager_user_id,
         "status": row.status, "intake_session_id": row.intake_session_id, "intake_document_id": row.intake_document_id,
         "job_id": row.job_id, "created_at": row.created_at.isoformat() if row.created_at else None,
@@ -64,7 +76,9 @@ def list_requests(company_id: int, member: CompanyMember = Depends(require_membe
     query = db.query(HiringRequest).filter(HiringRequest.company_id == company_id)
     if member.role == "manager":
         query = query.filter(HiringRequest.manager_user_id == member.user_id)
-    return [_out(row) for row in query.order_by(HiringRequest.id.desc()).all()]
+    rows = query.order_by(HiringRequest.id.desc()).all()
+    drafts = _latest_drafts(db, company_id, [row.id for row in rows])
+    return [_out(row, drafts) for row in rows]
 
 
 @router.get(BASE + "/hiring-requests/{req_id}")
@@ -73,7 +87,7 @@ def read_request(company_id: int, req_id: int, member: CompanyMember = Depends(r
     row = _get(db, company_id, req_id)
     if member.role == "manager" and row.manager_user_id != member.user_id:
         raise HTTPException(status_code=404, detail="Hiring request not found")
-    return _out(row)
+    return _out(row, _latest_drafts(db, company_id, [row.id]))
 
 
 def _running_session(db: Session, row: HiringRequest) -> VoiceSession | None:
