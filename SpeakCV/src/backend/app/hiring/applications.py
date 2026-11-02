@@ -58,7 +58,7 @@ def _channel(db, job_id: int, src_token: str | None) -> str:
     return link.channel if link is not None else DIRECT
 
 
-def _check_reapply(db, user_id: int, job_id: int) -> None:
+def check_reapply(db, user_id: int, job_id: int) -> None:
     now = datetime.now(timezone.utc).replace(tzinfo=None)
     recent = (
         db.query(Application.created_at)
@@ -87,7 +87,7 @@ def create_application(db, user, job, file_bytes, suffix, src_token, consent_ver
             job = db.get(Job, job_id)
             if job.status != "published":
                 raise JobNotOpen
-            _check_reapply(db, user_id, job_id)
+            check_reapply(db, user_id, job_id)
             if path is None:
                 path = storage.save_bytes(job.company_id, "cv", suffix, file_bytes)
             application = Application(
