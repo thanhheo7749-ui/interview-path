@@ -24,6 +24,10 @@ NODE_REJECTED = "node_rejected"
 NODE_SUPERSEDED = "node_superseded"
 
 
+class ConflictClosed(Exception):
+    """Another request closed this conflict first."""
+
+
 class ConflictNotLive(Exception):
     """One side of the conflict is no longer live, so choosing between them could leave no value."""
 
@@ -437,11 +441,13 @@ def resolve(db: Session, conflict: KbConflict, action: str, user_id: int) -> KbC
         raise ValueError(f"Unknown action: {action}")
     company_id = conflict.company_id
     node_ids = {conflict.node_a_id, conflict.node_b_id}
+    # The same order as a review decision, so an accept and a resolve wait for each other instead of deadlocking.
+    review.lock_for_nodes(db, company_id, node_ids)
     # Locked and read fresh, so another resolve that has just superseded one side is seen here.
-    sides = {
-        node.id: node for node in db.query(KbNode).filter(KbNode.id.in_(node_ids), KbNode.company_id == company_id)
-        .order_by(KbNode.id).populate_existing().with_for_update()
-    }
+    sides = {node.id: node for node in review.lock_nodes(db, node_ids).values() if node.company_id == company_id}
+    conflict = db.query(KbConflict).filter(KbConflict.id == conflict.id).populate_existing().with_for_update().one()
+    if conflict.status != "open":
+        raise ConflictClosed(f"Conflict {conflict.id} is already closed")
     if len(sides) != 2 or any(node.status not in COMPARABLE for node in sides.values()):
         raise ConflictNotLive(f"Conflict {conflict.id} has a side that is not live")
     conflict.status = "dismissed" if action == "different_scope" else "resolved"

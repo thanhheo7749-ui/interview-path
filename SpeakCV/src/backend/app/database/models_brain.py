@@ -3,7 +3,7 @@ from sqlalchemy.sql import false, func
 
 from .database import Base
 
-VISIBILITIES = ("public", "internal", "confidential")
+VISIBILITIES = ("public", "internal", "confidential")  # from most to least open
 NODE_TYPES = ("company", "department", "role", "requirement", "skill", "value", "behavior",
               "policy", "process", "fact", "private_note")
 EXTRACTABLE_NODE_TYPES = tuple(t for t in NODE_TYPES if t not in {"company", "department"})
@@ -15,8 +15,14 @@ DEFAULT_VISIBILITY_BY_TYPE = {
     "private_note": "confidential",
 }
 
+
+
+def stricter_layer(a: str, b: str) -> str:
+    return a if VISIBILITIES.index(a) >= VISIBILITIES.index(b) else b
+
+
 __all__ = [
-    "VISIBILITIES", "NODE_TYPES", "RELATIONS", "EXTRACTABLE_NODE_TYPES", "FACT_KINDS", "DEFAULT_VISIBILITY_BY_TYPE",
+    "stricter_layer", "VISIBILITIES", "NODE_TYPES", "RELATIONS", "EXTRACTABLE_NODE_TYPES", "FACT_KINDS", "DEFAULT_VISIBILITY_BY_TYPE",
     "KbDocument", "KbIngestionJob", "KbChunk", "KbNode", "KbNodeSource", "KbEdge", "KbConflict", "AssistantQuestion",
 ]
 

@@ -158,6 +158,9 @@ def ask(db: Session, audience: Audience, question: str, user_id: int | None) -> 
 
         # While a conflict is open Copilot asserts neither value, so a lower-ranked side is not offered to the model.
         items = tuple(item for item in bundle.items if item.ref not in conflicts)
+        # What was relevant may have been what was withheld, and the rest is no reason to call the model.
+        if not any(_is_relevant(item.cosine, item.keyword_coverage, embedded.model) for item in items):
+            return finish("not_found", NOT_FOUND[language], [], False)
         answer = _generate(items, question, audience.company_id)
     except (AIError, retriever.NoEmbeddingsError):
         log("failed", False)

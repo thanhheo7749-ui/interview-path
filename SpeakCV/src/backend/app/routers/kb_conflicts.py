@@ -58,20 +58,19 @@ def resolve_conflict(
     member: CompanyMember = Depends(require_member("hr")),
     db: Session = Depends(get_db),
 ):
-    conflict = (
-        db.query(KbConflict)
-        .filter(KbConflict.id == conflict_id, KbConflict.company_id == company_id)
-        .populate_existing()
-        .with_for_update()
-        .first()
-    )
+    # Not locked here: resolve takes its documents and nodes first, then this row, as every other path does.
+    conflict = db.query(KbConflict).filter(KbConflict.id == conflict_id, KbConflict.company_id == company_id).first()
     if conflict is None:
         raise HTTPException(status_code=404, detail="Conflict not found")
-    if conflict.status != "open":
-        db.rollback()
-        raise HTTPException(status_code=409, detail="This conflict is already closed")
+    user_id = member.user_id
     try:
-        return _conflict_out(db, contradiction.resolve(db, conflict, body.action, member.user_id))
+        return _conflict_out(db, contradiction.resolve(db, conflict, body.action, user_id))
+    except contradiction.ConflictClosed as exc:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="This conflict is already closed") from exc
     except contradiction.ConflictNotLive as exc:
         db.rollback()
         raise HTTPException(status_code=409, detail="One side of this conflict is no longer active") from exc
+    except review.ReviewError as exc:
+        db.rollback()
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc

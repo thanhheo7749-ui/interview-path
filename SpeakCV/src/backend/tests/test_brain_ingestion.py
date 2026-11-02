@@ -7,6 +7,7 @@ from app import cli
 from app.ai.providers import fake
 from app.brain import audience as aud
 from app.brain import ingestion, retriever
+from app.database.database import SessionLocal
 from app.database.sql_models import (
     Company, CompanyMember, Department, KbChunk, KbConflict, KbDocument, KbEdge, KbIngestionJob, KbNode, KbNodeSource,
 )
@@ -402,7 +403,7 @@ def test_failed_chunks_stay_visible_on_a_finished_document(client, db, company, 
     fake.enqueue("kb_extract", "still not json")
     document = make_doc(db, company)
     job = run(db, document)
-    assert db.get(KbDocument, document.id).status == "published"
+    assert db.get(KbDocument, document.id).status == "review"  # the unread section may say what HR would hide
     assert job.status == "review" and job.failed_chunks == 1
     body = client.get(f"/api/companies/{company.id}/kb/jobs/{job.id}", headers=hr).json()
     assert body["failed_chunks"] == 1 and len(body["failed_chunk_ids"]) == 1
@@ -891,3 +892,52 @@ def test_two_values_of_one_title_embed_differently(db, company):
     run(db, make_doc(db, company, data=SECOND.encode()))
     first, second = facts(db)
     assert first.embedding != second.embedding
+
+
+# A node HR rejected while the job ran takes no more sources: the job starts a new draft instead.
+
+
+def test_a_node_rejected_during_the_job_gets_a_new_draft_and_no_new_source(db, company):
+    item = fact("Annual leave", "12 days of annual leave")
+    first = make_doc(db, company)
+    fake.enqueue("kb_extract", extraction([item]))
+    run(db, first)
+    original = db.query(KbNode).filter_by(title="Annual leave").one()
+    original_id = original.id
+    before = db.query(KbNodeSource).filter_by(node_id=original_id).count()
+
+    second = make_doc(db, company)
+    job = ingestion.start_job(db, second.id)
+
+    def reject_then_extract(*_):
+        rejecting = SessionLocal()
+        rejecting.get(KbNode, original_id).status = "rejected"
+        rejecting.commit()
+        rejecting.close()
+        return extraction([item])
+
+    fake.register("kb_extract", reject_then_extract)
+    ingestion.run_job(job.id)
+    db.expire_all()
+    assert db.get(KbNode, original_id).status == "rejected"
+    assert db.query(KbNodeSource).filter_by(node_id=original_id).count() == before
+    replacement = db.query(KbNode).filter(KbNode.title == "Annual leave", KbNode.id != original_id).one()
+    assert replacement.status == "draft"
+    assert db.query(KbNodeSource).filter_by(node_id=replacement.id).count() == 1
+
+
+def test_a_live_node_still_takes_the_source_during_a_job(db, company):
+    item = fact("Annual leave", "12 days of annual leave")
+    fake.enqueue("kb_extract", extraction([item]))
+    run(db, make_doc(db, company))
+    fake.enqueue("kb_extract", extraction([item]))
+    run(db, make_doc(db, company))
+    assert db.query(KbNode).filter_by(title="Annual leave").count() == 1
+
+
+def test_a_document_with_a_dropped_item_stays_in_review_after_the_job(db, company):
+    fake.enqueue("kb_extract", extraction([fact("Invented", "30 days of annual leave")]))
+    document = make_doc(db, company)
+    job = run(db, document)
+    assert job.dropped_items == 1 and job.status == "review"
+    assert db.get(KbDocument, document.id).status == "review"
