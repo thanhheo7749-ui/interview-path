@@ -6,7 +6,8 @@ from sqlalchemy.orm import Session
 from app.auth.dependencies import require_member
 from app.brain import audience
 from app.database.database import get_db
-from app.database.sql_models import Company, CompanyMember, Department, Job, JobChannelLink, KbNode
+from app.bridges import discrimination
+from app.database.sql_models import Company, CompanyMember, Department, Job, JobChannelLink, JobDraft, KbNode
 from app.hiring import audit, jobs
 from app.schemas.jobs import (
     ChannelOut, ChannelsIn, JobCreate, JobOut, JobPatch, JobSummary, Prefill, RoleOption,
@@ -134,6 +135,9 @@ def patch_job(company_id: int, job_id: int, body: JobPatch, member: CompanyMembe
         _check_department(db, company_id, body.department_id)
     warnings: list[str] = []
     checked = None
+    description = body.description if body.description is not None and body.description != job.description else None
+    if description is not None:
+        warnings += _guard_description(db, job, description)
     if body.requirements is not None:
         _check_nodes(db, company_id, {r.node_id for r in body.requirements if r.node_id is not None})
         try:
@@ -152,7 +156,7 @@ def patch_job(company_id: int, job_id: int, body: JobPatch, member: CompanyMembe
         job.department_id = body.department_id
     if checked is not None:
         try:
-            warnings = jobs.update_requirements(db, job, body.requirements, checked)
+            warnings += jobs.update_requirements(db, job, body.requirements, checked)
         except jobs.JobError as error:
             db.rollback()
             raise _translate(error) from error
@@ -165,6 +169,23 @@ def patch_job(company_id: int, job_id: int, body: JobPatch, member: CompanyMembe
     audit.record(db, company_id, member.user_id, "job.update", "job", job.id)
     db.commit()
     return _out(db, job, warnings)
+
+
+def _guard_description(db: Session, job: Job, description: str) -> list[str]:
+    """A job made in JD Studio is edited there, where lint and the manager's approval apply. Any other description goes
+    through the discrimination guard, which can call AI: run it before the request's first write."""
+    draft_id = db.query(JobDraft.id).filter(JobDraft.job_id == job.id, JobDraft.company_id == job.company_id).order_by(
+        JobDraft.id.desc()).limit(1).scalar()
+    if draft_id is not None:
+        raise HTTPException(status_code=409, detail={
+            "code": "description_in_jd_studio", "draft_id": draft_id,
+            "message": "This job was made in JD Studio. Edit its description there so the check and the approval apply."})
+    result = discrimination.check(description, job.company_id)
+    if result is None:
+        return []
+    if result.unchecked:
+        return ["The discrimination check could not run for the description. Read it again."]
+    raise HTTPException(status_code=422, detail=f"Description not allowed ({result.category}): {result.reason}")
 
 
 def _lock_job(db: Session, company_id: int, job_id: int) -> Job:
