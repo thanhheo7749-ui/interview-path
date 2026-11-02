@@ -111,25 +111,30 @@ def get_brief(company_id: int, app_id: int, member: CompanyMember = Depends(requ
 @router.get(BASE + "/applications/{app_id}/scorecard")
 def get_scorecard(company_id: int, app_id: int, member: CompanyMember = Depends(require_member("hr")),
                   db: Session = Depends(get_db)):
-    """What the hiring manager submitted. Advice to HR: reading it changes nothing."""
+    """Every manager's submitted scorecard, newest first. Advice to HR: reading them changes nothing."""
     application = _live_application(db, company_id, app_id)
-    row = (
+    rows = (
         db.query(InterviewScorecard)
         .filter(InterviewScorecard.application_id == application.id,
                 InterviewScorecard.company_id == company_id, InterviewScorecard.submitted_at.isnot(None))
-        .order_by(InterviewScorecard.submitted_at.desc(), InterviewScorecard.id.desc()).first()
+        .order_by(InterviewScorecard.submitted_at.desc(), InterviewScorecard.id.desc()).all()
     )
-    if row is None:
-        raise HTTPException(status_code=404, detail="Scorecard not found")
-    manager = db.get(User, row.manager_user_id)
     texts = {r.id: r.text for r in db.query(JobRequirement).filter(
         JobRequirement.job_id == application.job_id, JobRequirement.company_id == company_id)}
-    body = _scorecard(row)
-    body["requirement_scores"] = [
-        {**score, "text": texts.get(score.get("requirement_id"), "")} for score in (row.requirement_scores or [])
-    ]
-    body["manager_name"] = (manager.full_name or manager.email) if manager is not None else ""
-    return body
+    manager_ids = {r.manager_user_id for r in rows if r.manager_user_id is not None}
+    names = {}
+    if manager_ids:
+        for user in db.query(User).filter(User.id.in_(manager_ids)):
+            names[user.id] = user.full_name or user.email
+    cards = []
+    for row in rows:
+        card = _scorecard(row)
+        card["requirement_scores"] = [
+            {**score, "text": texts.get(score.get("requirement_id"), "")} for score in (row.requirement_scores or [])
+        ]
+        card["manager_name"] = names.get(row.manager_user_id, "")  # "" once the manager's account is deleted
+        cards.append(card)
+    return {"scorecards": cards}
 
 
 @router.patch(BASE + "/applications/{app_id}/brief")

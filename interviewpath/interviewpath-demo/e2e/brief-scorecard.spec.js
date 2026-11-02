@@ -180,7 +180,8 @@ test('HR approves, drafts a Korean brief, reviews it and sends it; the manager s
   await expect(workflow.getByTestId('brief-to-clarify')).toContainText('HR wording, edited again.');
   await expect(workflow.getByRole('button', { name: 'Generate brief' })).toHaveCount(0);
   const card = panel.getByTestId('hr-scorecard');
-  await expect(card).toContainText('Brief Manager');
+  await expect(card.getByTestId('scorecard-item')).toHaveCount(1);
+  await expect(card.getByTestId('scorecard-manager')).toHaveText('Brief Manager');
   await expect(card.getByTestId('scorecard-recommendation')).toHaveText('Recommends hiring');
   await expect(card.getByRole('listitem').filter({ hasText: 'Run services in production' })).toContainText('4');
   await expect(card.getByRole('listitem').filter({ hasText: 'Lead incident reviews' })).toContainText('2');

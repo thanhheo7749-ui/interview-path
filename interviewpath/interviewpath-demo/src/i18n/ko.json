@@ -193,17 +193,18 @@
       "submit": "평가서 제출",
       "resubmit": "다시 제출",
       "hrView": {
-        "title": "채용 담당 매니저의 평가서",
+        "title": "채용 담당 매니저들의 평가서",
         "hint": "HR을 위한 참고 의견입니다. 최종 결정은 HR이 내리며, 자동으로 바뀌는 것은 없습니다.",
-        "none": "채용 담당 매니저가 아직 평가서를 제출하지 않았습니다.",
-        "by": "{{name}}님이 {{date}}에 제출",
+        "none": "아직 평가서를 제출한 채용 담당 매니저가 없습니다.",
         "hire": "채용 추천",
         "no_hire": "채용 비추천",
         "recommendation": "추천 의견",
         "scores": "요구 사항별 점수",
         "score": "{{score}} / 5",
         "notes": "메모",
-        "noNotes": "메모가 없습니다."
+        "noNotes": "메모가 없습니다.",
+        "submittedOn": "{{date}}에 제출",
+        "unknownManager": "이전 매니저"
       }
     },
     "outcome": {

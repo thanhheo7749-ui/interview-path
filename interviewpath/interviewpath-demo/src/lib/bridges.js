@@ -26,7 +26,9 @@ async function orNull(request) {
   }
 }
 export const getBrief = (companyId, appId) => orNull(api(`${application(companyId, appId)}/brief`));
-export const getScorecard = (companyId, appId) => orNull(api(`${application(companyId, appId)}/scorecard`));
+// Every manager's submitted scorecard, newest first; an empty list when none. 404 (anonymized) reads as none.
+export const getScorecards = async (companyId, appId) =>
+  (await orNull(api(`${application(companyId, appId)}/scorecard`)))?.scorecards ?? [];
 export const saveBrief = (companyId, appId, content) =>
   api(`${application(companyId, appId)}/brief`, {
     method: 'PATCH',

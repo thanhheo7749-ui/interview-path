@@ -731,17 +731,18 @@
       "submit": "Nộp phiếu đánh giá",
       "resubmit": "Nộp lại",
       "hrView": {
-        "title": "Phiếu đánh giá của quản lý tuyển dụng",
+        "title": "Phiếu đánh giá của các quản lý tuyển dụng",
         "hint": "Chỉ là lời khuyên cho bạn. HR đưa ra quyết định cuối cùng; không có gì tự động thay đổi.",
-        "none": "Quản lý tuyển dụng chưa nộp phiếu đánh giá.",
-        "by": "{{name}} đã nộp vào {{date}}",
+        "none": "Chưa có quản lý tuyển dụng nào nộp phiếu đánh giá.",
         "hire": "Đề xuất tuyển",
         "no_hire": "Không đề xuất tuyển",
         "recommendation": "Đề xuất",
         "scores": "Điểm theo từng yêu cầu",
         "score": "{{score}} / 5",
         "notes": "Ghi chú",
-        "noNotes": "Không có ghi chú."
+        "noNotes": "Không có ghi chú.",
+        "submittedOn": "Nộp vào {{date}}",
+        "unknownManager": "Quản lý cũ"
       }
     },
     "outcome": {

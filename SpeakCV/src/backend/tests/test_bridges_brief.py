@@ -502,11 +502,13 @@ def test_the_reads_do_not_cross_companies(db, world, api):
 def test_hr_reads_the_scorecard_as_advice_with_the_managers_name(db, world, api):
     application = make_app(db, world)
     send_brief(api, world, application)
-    assert api.get(card_url(world, application), headers=hr(world)).status_code == 404
+    empty = api.get(card_url(world, application), headers=hr(world))
+    assert empty.status_code == 200 and empty.json() == {"scorecards": []}
     submit_card(api, world, application, notes="Solid operator")
     response = api.get(card_url(world, application), headers=hr(world))
     assert response.status_code == 200, response.text
-    body = response.json()
+    assert len(response.json()["scorecards"]) == 1
+    body = response.json()["scorecards"][0]
     assert body["recommendation"] == "hire" and body["notes"] == "Solid operator" and body["submitted_at"]
     assert body["manager_name"]
     assert [(s["requirement_id"], s["score"]) for s in body["requirement_scores"]] == [(r.id, 4) for r in world["reqs"][:3]]
@@ -541,3 +543,37 @@ def test_an_anonymized_application_answers_404_for_both_reads_and_the_detail_sta
     detail = api.get(url(world, f"/applications/{application.id}"), headers=hr(world))
     assert detail.status_code == 200
     assert detail.json()["brief_status"] is None
+
+
+def second_manager(db, world):
+    user = make_user(db, "mgr2@example.test")
+    user.full_name = "Second Manager"
+    db.add(CompanyMember(company_id=world["id"], user_id=user.id, role="manager",
+                         department_id=world["job"].department_id))
+    db.commit()
+    return auth_header(user.email)
+
+
+def test_hr_sees_every_managers_scorecard_newest_first_so_no_hire_is_not_hidden(db, world, api):
+    application = make_app(db, world)
+    send_brief(api, world, application)
+    submit_card(api, world, application, recommendation="no_hire", notes="First")
+    second = api.post(card_url(world, application), headers=second_manager(db, world),
+                      json={"scores": scores(world, 5), "recommendation": "hire", "notes": "Second"})
+    assert second.status_code == 200, second.text
+    cards = api.get(card_url(world, application), headers=hr(world)).json()["scorecards"]
+    assert [c["notes"] for c in cards] == ["Second", "First"]
+    assert [c["recommendation"] for c in cards] == ["hire", "no_hire"]
+    assert cards[0]["manager_name"] == "Second Manager" and cards[1]["manager_name"]
+
+
+def test_a_scorecard_whose_manager_was_deleted_has_an_empty_manager_name(db, world, api):
+    application = make_app(db, world)
+    send_brief(api, world, application)
+    submit_card(api, world, application)
+    db.query(InterviewScorecard).update({InterviewScorecard.manager_user_id: None})
+    db.commit()
+    response = api.get(card_url(world, application), headers=hr(world))
+    assert response.status_code == 200, response.text
+    cards = response.json()["scorecards"]
+    assert len(cards) == 1 and cards[0]["manager_name"] == "" and cards[0]["recommendation"] == "hire"
