@@ -4,6 +4,7 @@ Nothing here reaches the candidate until `approve`. The guard runs on AI output,
 prompt or CV injection cannot carry label wording, confidential titles, comparisons or invented links to an approval
 HR did not notice. What the guard checks cannot be a promise about meaning: an unquoted paraphrase is left for HR to read.
 """
+import hashlib
 import logging
 import re
 from dataclasses import dataclass
@@ -596,10 +597,18 @@ def _subject(language: str, title: str) -> str:
     return SUBJECTS.get(language, SUBJECTS["en"]).format(title=title)[:255]
 
 
-def approve(db, company_id, ids, user_id) -> int:
-    """Send these applications' feedback through the outbox, all or nothing, and return how many were sent now. IDs are
-    application IDs. What was sent already is skipped. The caller commits, or rolls back on FeedbackError."""
-    unique = sorted(set(ids))
+def version_of(db, company_id: int, row: RejectionFeedback) -> str:
+    """Names the text HR reads: the message and the catalogue links it carries. A change to either changes this."""
+    ids = ",".join(str(item.id) for item in sorted(learning.linked(db, company_id, row.draft), key=lambda item: item.id))
+    return hashlib.sha256(f"{row.draft}\0{ids}".encode()).hexdigest()[:16]
+
+
+def approve(db, company_id, items, user_id) -> int:
+    """Send these applications' feedback through the outbox, all or nothing, and return how many were sent now.
+    `items` are (application ID, version HR read). A text that changed since is a 409 naming the alias, and nothing is
+    sent. What was sent already is skipped. The caller commits, or rolls back on FeedbackError."""
+    seen = dict(items)
+    unique = sorted(seen)
     applications = (
         db.query(Application)
         .filter(Application.id.in_(unique), Application.company_id == company_id, Application.is_simulated.is_(False))
@@ -617,6 +626,10 @@ def approve(db, company_id, ids, user_id) -> int:
         raise FeedbackError(409, "Some applications have no feedback draft yet", {str(a.id): ["no_draft"] for a in waiting})
     pending = [application for application in applications if rows[application.id].status != "sent"]
     problems: dict[str, list[str]] = {}
+    changed = [a for a in pending if version_of(db, company_id, rows[a.id]) != seen[a.id]]
+    if changed:
+        raise FeedbackError(409, f"The feedback for {changed[0].alias} changed after you read it. Please read it again.",
+                            {str(a.id): ["changed"] for a in changed})
     for application in pending:
         if application.anonymized_at is not None or application.candidate_user_id is None:
             problems[str(application.id)] = ["candidate_gone"]
