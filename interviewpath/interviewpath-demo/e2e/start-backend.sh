@@ -41,6 +41,14 @@ printf '%s' "$INTAKE_PASSWORD" > "$E2E_TMP/portal_e2e_intake_password"
 # A company for the Bridges loop spec, which publishes knowledge from an intake and then runs a job to its outcome.
 LOOP_PASSWORD=$($PY -m app.cli create-company --slug loop --name "Loop Company" --hr-email loop-hr@e2e.test --hr-name "Loop HR" | awk '/Temporary password/ {print $NF}')
 printf '%s' "$LOOP_PASSWORD" > "$E2E_TMP/portal_e2e_loop_password"
+if [ "${E2E_SIMULATE:-}" = "1" ]; then
+  # A sample company for the insights spec: simulated hiring data (seed 42) plus a few real rows, written as real rows.
+  INSIGHTS_PASSWORD=$($PY -m app.cli create-company --slug insights --name "Insights Company" --hr-email insights-hr@e2e.test --hr-name "Insights HR" --sample | awk '/Temporary password/ {print $NF}')
+  printf '%s' "$INSIGHTS_PASSWORD" > "$E2E_TMP/portal_e2e_insights_password"
+  PYTHONPATH=. $PY "$E2E_DIR/seed_insights.py" jobs "$E2E_TMP/insights_seed.json"
+  $PY -m app.cli simulate-hiring --company insights --seed 42 > /dev/null
+  PYTHONPATH=. $PY "$E2E_DIR/seed_insights.py" real "$E2E_TMP/insights_seed.json"
+fi
 # One user in two companies, to test that nothing from the previous company survives a switch.
 SWITCH_PASSWORD=$($PY -m app.cli create-company --slug switch-a --name "Switch Alpha" --hr-email switch-hr@e2e.test --hr-name "Switch HR" | awk '/Temporary password/ {print $NF}')
 printf '%s' "$SWITCH_PASSWORD" > "$E2E_TMP/portal_e2e_switch_password"

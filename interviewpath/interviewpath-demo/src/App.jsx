@@ -18,6 +18,8 @@ import TrustPage from './routes/TrustPage.jsx';
 import JobEditorPage from './routes/JobEditorPage.jsx';
 import JobsPage from './routes/JobsPage.jsx';
 import BoardPage from './routes/BoardPage.jsx';
+import ChannelsPage from './routes/ChannelsPage.jsx';
+import RealityCheckPage from './routes/RealityCheckPage.jsx';
 import HiringRequestsPage from './routes/HiringRequestsPage.jsx';
 import IntakePage from './routes/IntakePage.jsx';
 import InterviewBriefPage from './routes/InterviewBriefPage.jsx';
@@ -95,6 +97,8 @@ function App() {
           <Route path="/jobs/new" element={<JobEditorPage />} />
           <Route path="/jobs/:jobId" element={<JobEditorPage />} />
           <Route path="/jobs/:jobId/board" element={<BoardPage />} />
+          <Route path="/jobs/:jobId/channels" element={<ChannelsPage />} />
+          <Route path="/jobs/:jobId/reality-check" element={<RealityCheckPage />} />
         </Route>
         <Route element={<HrOrManager />}>
           <Route path="/hiring-requests" element={<HiringRequestsPage />} />

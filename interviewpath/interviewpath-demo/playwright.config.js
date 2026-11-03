@@ -36,7 +36,7 @@ export default defineConfig({
       timeout: 60000,
       env: {
         E2E_TMP: process.env.E2E_TMP, E2E_API_PORT: process.env.E2E_API_PORT, E2E_WEB_PORT: process.env.E2E_WEB_PORT,
-        E2E_CANDIDATE_PORT: process.env.E2E_CANDIDATE_PORT, E2E_SEED_SAMPLES: '1', E2E_SEED_BOARD: '1',
+        E2E_CANDIDATE_PORT: process.env.E2E_CANDIDATE_PORT, E2E_SEED_SAMPLES: '1', E2E_SEED_BOARD: '1', E2E_SIMULATE: '1',
       },
     },
     {
