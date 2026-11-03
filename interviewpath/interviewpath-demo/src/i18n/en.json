@@ -1107,5 +1107,57 @@
       "no_draft": "There is no draft yet",
       "changed": "The text changed after you read it"
     }
+  },
+  "onboarding": {
+    "nav": "My onboarding",
+    "start": {
+      "title": "Onboarding",
+      "hint": "Drafts a 30-60-90 day plan from the team's knowledge. The AI only proposes; you and the manager edit and approve it.",
+      "create": "Create onboarding plan",
+      "creating": "Drafting the plan...",
+      "open": "Open onboarding plan"
+    },
+    "plan": {
+      "title": "Onboarding plan",
+      "notFound": "This plan was not found.",
+      "status": {
+        "draft": "Draft, waiting for approval",
+        "active": "Approved",
+        "done": "Completed"
+      },
+      "usedInterview": "Built from the team's knowledge and, with the hire's consent, skills their interview did not confirm.",
+      "teamKnowledgeOnly": "Built from the team's knowledge only.",
+      "phase": "Day {{days}}",
+      "itemTitle": "Item title",
+      "movePhase": "Move to",
+      "remove": "Remove",
+      "fromKnowledge": "From the team's knowledge",
+      "fromResource": "Learning resource",
+      "sourceHidden": "a page the hire cannot read",
+      "save": "Save changes",
+      "approve": "Approve plan",
+      "saveFirst": "Save your changes before approving.",
+      "approveConfirm": "Approve this plan? The hire becomes an employee of the company and sees this checklist.",
+      "approveYes": "Yes, approve"
+    },
+    "probation": {
+      "title": "Probation result",
+      "hint": "Recorded by a person. Nothing here is predicted by AI.",
+      "options": {
+        "passed": "Passed",
+        "extended": "Extended",
+        "failed": "Failed"
+      },
+      "confirm": "Record the probation result as \"{{result}}\"?",
+      "confirmButton": "Yes, record it",
+      "recorded": "Recorded: {{result}}"
+    },
+    "mine": {
+      "title": "My onboarding",
+      "privacy": "Only the time you tick an item is stored. Your manager and HR do not see which items you have done.",
+      "empty": "You have no onboarding plan yet.",
+      "doneOn": "Done on {{date}}",
+      "askCopilot": "Ask Copilot about your plan"
+    }
   }
 }

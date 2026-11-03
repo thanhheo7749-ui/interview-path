@@ -4,8 +4,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
 import { Strings, format, useLang } from "@/lib/i18n";
-import { Application, CV_CONSENT_WITHDRAWN, errorCode, HiringError, listMyApplications, reuploadCv, withdrawApplication } from "@/services/hiring";
+import { Application, CV_CONSENT_WITHDRAWN, errorCode, HiringError, listMyApplications, listMyTalentEntries, reuploadCv, TalentEntry, withdrawApplication } from "@/services/hiring";
 import { ConfirmDialog, LangToggle } from "@/components/Hiring/SampleNotice";
+import { FeedbackBlock, OnboardingConsentPrompt, TalentPoolOffer } from "@/components/Hiring/PostDecision";
 
 const POLL_MS = 3000;
 
@@ -134,6 +135,7 @@ export default function ApplicationsPage() {
   const { t } = useLang();
   const { user, isLoading } = useAuth();
   const [items, setItems] = useState<Application[] | null>(null);
+  const [pool, setPool] = useState<TalentEntry[]>([]);
   const [error, setError] = useState("");
 
   const load = useCallback(async () => {
@@ -143,6 +145,8 @@ export default function ApplicationsPage() {
     } catch {
       setError(t.genericError);
     }
+    // The pool is optional: a failure here must not hide the applications.
+    setPool(await listMyTalentEntries().catch(() => []));
   }, [t.genericError]);
 
   useEffect(() => {
@@ -195,6 +199,13 @@ export default function ApplicationsPage() {
                   <WithdrawUnreadable id={a.id} onDone={load} />
                 </>
               )}
+              {a.status === "decided" && a.decision === "rejected" && (
+                <>
+                  <FeedbackBlock app={a} />
+                  <TalentPoolOffer app={a} entry={pool.find((e) => e.application_id === a.id)} onJoined={load} />
+                </>
+              )}
+              {a.status === "decided" && a.decision === "approved" && <OnboardingConsentPrompt applicationId={a.id} />}
               {a.status === "invited" && (
                 <Link href={`/applications/${a.id}/fit`} className="mt-2 inline-block text-sm text-blue-400 underline">
                   {t.seeFit}

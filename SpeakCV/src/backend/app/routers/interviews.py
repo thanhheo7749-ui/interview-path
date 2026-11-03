@@ -14,7 +14,7 @@ from app.brain import audience
 from app.bridges import brief
 from app.database.database import get_db
 from app.database.sql_models import (
-    Application, CandidateBrief, CompanyMember, HiringRequest, InterviewScorecard, Job, JobRequirement, User,
+    Application, CandidateBrief, CompanyMember, HiringRequest, InterviewScorecard, Job, JobRequirement, OnboardingPlan, User,
 )
 from app.hiring import decisions
 from app.schemas.bridges import BriefIn, BriefPatch, OutcomeIn, ScorecardIn
@@ -36,12 +36,17 @@ def _application(db: Session, company_id: int, application_id: int) -> Applicati
     return application
 
 
-def _managed_query(db: Session, member: CompanyMember):
-    """Sent briefs on live, approved applications this manager reads: of a job from a request assigned to them, or of a
-    job with no request in their department subtree."""
+def job_scope(db: Session, member: CompanyMember):
+    """The jobs a manager reads: those from a request assigned to them, or those with no request in their department
+    subtree. Onboarding uses this too, so one rule decides who opens an interview and who opens its plan."""
     departments = audience.for_member(db, member).department_ids
     from_request = exists().where(HiringRequest.job_id == Job.id, HiringRequest.company_id == member.company_id)
     assigned = from_request.where(HiringRequest.manager_user_id == member.user_id)
+    return or_(assigned, and_(~from_request, Job.department_id.in_(departments)))
+
+
+def _managed_query(db: Session, member: CompanyMember):
+    """Sent briefs on live, approved applications this manager reads."""
     return (
         db.query(Application, Job, CandidateBrief)
         .join(Job, Job.id == Application.job_id)
@@ -49,7 +54,7 @@ def _managed_query(db: Session, member: CompanyMember):
         .filter(Application.company_id == member.company_id, Job.company_id == member.company_id,
                 CandidateBrief.company_id == member.company_id, CandidateBrief.status == "sent",
                 Application.hr_decision == "approved", Application.anonymized_at.is_(None),
-                or_(assigned, and_(~from_request, Job.department_id.in_(departments))))
+                job_scope(db, member))
     )
 
 
@@ -180,10 +185,12 @@ def list_my_interviews(company_id: int, member: CompanyMember = Depends(require_
         application_id for (application_id,) in db.query(InterviewScorecard.application_id).filter(
             InterviewScorecard.company_id == company_id, InterviewScorecard.manager_user_id == member.user_id).all()
     }
+    plans = dict(db.query(OnboardingPlan.application_id, OnboardingPlan.id).filter(
+        OnboardingPlan.company_id == company_id, OnboardingPlan.application_id.in_([a.id for a, _, _ in rows])))
     return [
         {"application_id": application.id, "alias": application.alias, "job_id": job.id, "job_title": job.title,
          "language": row.language, "sent_at": brief.utc_iso(row.sent_at),
-         "scored": application.id in scored}
+         "scored": application.id in scored, "onboarding_plan_id": plans.get(application.id)}
         for application, job, row in rows
     ]
 

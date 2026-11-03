@@ -7,7 +7,7 @@ from datetime import timezone
 
 from app.brain.text import quote_in
 from app.database.sql_models import (
-    Application, AuditLog, CandidateBrief, CultureNote, CvClaim, Job, KbNode, RequirementResult, User, VoiceSession, VoiceTurn,
+    Application, AuditLog, CandidateBrief, CultureNote, CvClaim, Job, KbNode, OnboardingPlan, RequirementResult, User, VoiceSession, VoiceTurn,
 )
 from app.hiring import consents, decisions, identity, jobs
 from app.hiring.state import CONSENT_WITHDRAWN, NOT_TAKEN, TRANSCRIPTION_FAILED
@@ -230,6 +230,7 @@ def detail(db, application, viewer_id: int | None = None) -> dict:
         "hr_decision": application.hr_decision,
         "final_outcome": application.final_outcome,
         "brief_status": _brief_status(db, application),
+        "onboarding_plan_id": db.query(OnboardingPlan.id).filter_by(application_id=application.id).scalar(),
         "hr_decided_at": application.hr_decided_at.isoformat() if application.hr_decided_at else None,
         "fast_tracked": bool(application.fast_tracked),
         "restart_available": decisions.restart_available(db, application),

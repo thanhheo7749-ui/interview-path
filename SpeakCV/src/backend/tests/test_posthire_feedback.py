@@ -12,7 +12,7 @@ from app.database.database import SessionLocal
 from app.database.sql_models import (
     AIUsageLog, Application, AuditLog, Company, CvClaim, KbNode, Notification, RejectionFeedback, RequirementResult,
 )
-from app.hiring import decisions, retention
+from app.hiring import consents, decisions, retention
 from app.main import create_app
 from app.posthire import feedback
 from tests.helpers import auth_header
@@ -1076,3 +1076,30 @@ def test_approve_refuses_text_that_changed_after_hr_read_it(db, world, api):
     assert row_for(db, first.id).status == "draft" and row_for(db, second.id).status == "draft"
     assert db.query(Notification).count() == 0
     assert approve(api, world, first.id, second.id).json() == {"sent": 2}
+
+
+def test_a_rejected_candidate_is_told_when_they_may_apply_again(db, world, api):
+    application = rejected(db, world)
+    listed = api.get(f"/api/applications/{application.id}", headers=auth_header(CANDIDATE_EMAIL)).json()
+    expected = (application.created_at + timedelta(days=consents.REAPPLY_DAYS)).date().isoformat()
+    assert listed["reapply_after"].startswith(expected)
+
+
+def test_nobody_else_gets_a_reapply_date(db, world, api):
+    application = rejected(db, world)
+    application.hr_decision = "approved"
+    db.commit()
+    listed = api.get(f"/api/applications/{application.id}", headers=auth_header(CANDIDATE_EMAIL)).json()
+    assert listed["decision"] == "approved" and listed["reapply_after"] is None
+
+
+def test_the_reapply_date_counts_from_the_newest_application_and_has_a_time_zone(db, world, api):
+    older = rejected(db, world)
+    newer = rejected(db, world, alias="#A2")
+    newer.candidate_user_id = older.candidate_user_id
+    older.created_at = newer.created_at - timedelta(days=30)
+    db.commit()
+    listed = api.get(f"/api/applications/{older.id}", headers=auth_header(CANDIDATE_EMAIL)).json()
+    expected = (newer.created_at + timedelta(days=consents.REAPPLY_DAYS)).date().isoformat()
+    assert listed["reapply_after"].startswith(expected)
+    assert listed["reapply_after"].endswith("+00:00") or listed["reapply_after"].endswith("Z")

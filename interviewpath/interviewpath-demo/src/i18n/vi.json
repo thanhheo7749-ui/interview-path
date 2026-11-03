@@ -1105,5 +1105,57 @@
       "no_draft": "Chưa có bản nháp",
       "changed": "Nội dung đã thay đổi sau khi bạn đọc"
     }
+  },
+  "onboarding": {
+    "nav": "Hội nhập của tôi",
+    "start": {
+      "title": "Hội nhập",
+      "hint": "Soạn kế hoạch 30-60-90 ngày từ tri thức của đội. AI chỉ đề xuất; bạn và quản lý chỉnh sửa và duyệt.",
+      "create": "Tạo kế hoạch hội nhập",
+      "creating": "Đang soạn kế hoạch...",
+      "open": "Mở kế hoạch hội nhập"
+    },
+    "plan": {
+      "title": "Kế hoạch hội nhập",
+      "notFound": "Không tìm thấy kế hoạch này.",
+      "status": {
+        "draft": "Bản nháp, chờ duyệt",
+        "active": "Đã duyệt",
+        "done": "Đã hoàn thành"
+      },
+      "usedInterview": "Soạn từ tri thức của đội và, khi người được tuyển đồng ý, từ các kỹ năng mà buổi phỏng vấn chưa xác nhận.",
+      "teamKnowledgeOnly": "Chỉ soạn từ tri thức của đội.",
+      "phase": "Ngày {{days}}",
+      "itemTitle": "Tiêu đề mục",
+      "movePhase": "Chuyển sang",
+      "remove": "Xóa",
+      "fromKnowledge": "Từ tri thức của đội",
+      "fromResource": "Tài liệu học",
+      "sourceHidden": "một trang mà người được tuyển không đọc được",
+      "save": "Lưu thay đổi",
+      "approve": "Duyệt kế hoạch",
+      "saveFirst": "Hãy lưu thay đổi trước khi duyệt.",
+      "approveConfirm": "Duyệt kế hoạch này? Người được tuyển sẽ thành nhân viên của công ty và thấy danh sách này.",
+      "approveYes": "Có, duyệt"
+    },
+    "probation": {
+      "title": "Kết quả thử việc",
+      "hint": "Do con người ghi nhận. AI không dự đoán điều gì ở đây.",
+      "options": {
+        "passed": "Đạt",
+        "extended": "Gia hạn",
+        "failed": "Không đạt"
+      },
+      "confirm": "Ghi nhận kết quả thử việc là \"{{result}}\"?",
+      "confirmButton": "Có, ghi nhận",
+      "recorded": "Đã ghi nhận: {{result}}"
+    },
+    "mine": {
+      "title": "Hội nhập của tôi",
+      "privacy": "Hệ thống chỉ lưu thời điểm bạn đánh dấu từng mục. Quản lý và HR không thấy bạn đã làm mục nào.",
+      "empty": "Bạn chưa có kế hoạch hội nhập.",
+      "doneOn": "Xong ngày {{date}}",
+      "askCopilot": "Hỏi Copilot về kế hoạch của bạn"
+    }
   }
 }

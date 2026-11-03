@@ -26,6 +26,8 @@ import InterviewBriefPage from './routes/InterviewBriefPage.jsx';
 import MyInterviewsPage from './routes/MyInterviewsPage.jsx';
 import LearningPage from './routes/LearningPage.jsx';
 import JdStudioPage from './routes/JdStudioPage.jsx';
+import OnboardingPage from './routes/OnboardingPage.jsx';
+import MyOnboardingPage from './routes/MyOnboardingPage.jsx';
 import DemoAiNotice from './components/DemoAiNotice.jsx';
 import { useCompany } from './company/CompanyContext.jsx';
 
@@ -105,12 +107,14 @@ function App() {
         <Route element={<HrOrManager />}>
           <Route path="/hiring-requests" element={<HiringRequestsPage />} />
           <Route path="/jd-studio/:draftId" element={<JdStudioPage />} />
+          <Route path="/onboarding/:planId" element={<OnboardingPage />} />
         </Route>
         <Route element={<ManagerOnly />}>
           <Route path="/intake/:requestId" element={<IntakePage />} />
           <Route path="/my-interviews" element={<MyInterviewsPage />} />
           <Route path="/my-interviews/:appId" element={<InterviewBriefPage />} />
         </Route>
+        <Route path="/my-onboarding" element={<MyOnboardingPage />} />
         <Route path="/copilot" element={<CopilotPage />} />
         <Route path="*" element={<Navigate to="/settings" replace />} />
       </Route>

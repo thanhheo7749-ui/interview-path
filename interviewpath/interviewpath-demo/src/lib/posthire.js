@@ -34,3 +34,18 @@ export const listSkills = async (companyId) => (await getGraph(companyId)).nodes
 export const getTalentMatches = (companyId, jobId) => api(`${base(companyId)}/jobs/${jobId}/talent-matches`);
 export const inviteFromPool = (companyId, entryId, jobId) =>
   api(`${base(companyId)}/talent-pool/${entryId}/invite`, { method: 'POST', body: { job_id: jobId } });
+
+// Onboarding 30-60-90. Creating a plan calls the AI; HR and the department's manager edit and approve it.
+export const createOnboarding = (companyId, appId) =>
+  api(`${base(companyId)}/applications/${appId}/onboarding`, { method: 'POST' });
+export const getOnboarding = (companyId, planId) => api(`${base(companyId)}/onboarding/${planId}`);
+export const editOnboarding = (companyId, planId, items) =>
+  api(`${base(companyId)}/onboarding/${planId}`, { method: 'PATCH', body: { items } });
+export const approveOnboarding = (companyId, planId) =>
+  api(`${base(companyId)}/onboarding/${planId}/approve`, { method: 'POST' });
+export const recordProbation = (companyId, appId, result) =>
+  api(`${base(companyId)}/applications/${appId}/probation`, { method: 'POST', body: { result } });
+// The hire's own checklist. The only progress kept is the time an item was ticked.
+export const getMyOnboarding = (companyId) => api(`${base(companyId)}/my-onboarding`);
+export const tickOnboardingItem = (companyId, itemId) =>
+  api(`${base(companyId)}/onboarding/items/${itemId}/done`, { method: 'POST' });

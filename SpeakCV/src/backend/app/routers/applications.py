@@ -1,9 +1,11 @@
 """Candidate routes. Every lookup filters on the signed-in user. No response schema here holds the CV label or text."""
 import os
+from datetime import timedelta, timezone
 
 from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, Query, Request, UploadFile
 from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel, Field
+from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -60,6 +62,7 @@ class ApplicationOut(BaseModel):
     email_enabled: bool = False  # whether this deployment can send email at all
     contact_email: str | None = None  # the candidate's own account email, only once they are approved
     feedback: "FeedbackOut | None" = None  # only what HR approved and sent
+    reapply_after: str | None = None  # once rejected: the first day the same job takes a new application
 
 
 class LearningItem(BaseModel):
@@ -132,6 +135,15 @@ def _out(db: Session, application: Application, **overrides) -> ApplicationOut:
             owner = db.get(User, application.candidate_user_id)
             fields["contact_email"] = owner.email if owner is not None else None
         fields["feedback"] = rejection_feedback.candidate_view(db, application)
+        if decision == "rejected":
+            # The apply check counts from the newest application to the same job, so this does too.
+            newest = application.created_at
+            if application.candidate_user_id is not None:
+                newest = (db.query(func.max(Application.created_at))
+                          .filter(Application.candidate_user_id == application.candidate_user_id,
+                                  Application.job_id == application.job_id).scalar())
+            if newest is not None:
+                fields["reapply_after"] = (newest + timedelta(days=consents.REAPPLY_DAYS)).replace(tzinfo=timezone.utc).isoformat()
     return ApplicationOut(**{**fields, **overrides})
 
 

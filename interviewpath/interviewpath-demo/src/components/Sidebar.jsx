@@ -1,4 +1,4 @@
-import { AlertTriangle, BookOpen, BrainCircuit, Briefcase, ClipboardCheck, ClipboardList, FileText, Users, HelpCircle, KeyRound, LogOut, MessageSquare, Network, Settings, ShieldCheck } from "lucide-react";
+import { AlertTriangle, BookOpen, BrainCircuit, Briefcase, ClipboardCheck, ListChecks, ClipboardList, FileText, Users, HelpCircle, KeyRound, LogOut, MessageSquare, Network, Settings, ShieldCheck } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { NavLink } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext.jsx";
@@ -22,6 +22,7 @@ const navItems = [
   { labelKey: "nav.learning", to: "/learning", icon: BookOpen, hrOnly: true },
   { labelKey: "bridges.nav.hiringRequests", to: "/hiring-requests", icon: ClipboardList, roles: ["hr", "manager"] },
   { labelKey: "bridges.nav.myInterviews", to: "/my-interviews", icon: Users, roles: ["manager"] },
+  { labelKey: "onboarding.nav", to: "/my-onboarding", icon: ListChecks, roles: ["employee"] },
   { labelKey: "nav.copilot", to: "/copilot", icon: MessageSquare },
   { labelKey: "nav.password", to: "/account/password", icon: KeyRound },
 ];
