@@ -1031,3 +1031,22 @@ def test_anonymizing_strips_the_decision_reason_and_keeps_feedback_audit_rows(db
     assert rows["feedback_drafted"] == {"source": "ai", "guard_failures": ["unverified_quote"], "language": "en"}
     assert db.query(RejectionFeedback).one().draft == ""
 
+
+
+def test_job_draft_list_shows_alias_status_and_preview_only(db, world, api):
+    first, second = rejected(db, world, "#A1"), rejected(db, world, "#A2")
+    draft_now(db, first)
+    draft_now(db, second)
+    approve(api, world, second.id)
+    foreign = make_application(db, world["other_job"], alias="#F1", hr_decision="rejected")
+    draft_now(db, foreign)
+    path = url(world, f"/jobs/{world['job'].id}/feedback")
+    rows = api.get(path + "?status=draft", headers=hr(world)).json()
+    assert [(r["application_id"], r["alias"], r["status"]) for r in rows] == [(first.id, "#A1", "draft")]
+    assert set(rows[0]) == {"application_id", "alias", "status", "preview"} and rows[0]["preview"]
+    assert api.get(path + "?status=sent", headers=hr(world)).json()[0]["alias"] == "#A2"
+    assert api.get(path, headers=hr(world)).status_code == 200
+    assert api.get(path + "?status=bogus", headers=hr(world)).status_code == 422
+    assert api.get(path, headers=world["people"]["emp"]["headers"]).status_code == 403
+    foreign_path = f"/api/companies/{world['other'].id}/jobs/{world['job'].id}/feedback"
+    assert api.get(foreign_path, headers=world["people"]["hr2"]["headers"]).status_code == 404
