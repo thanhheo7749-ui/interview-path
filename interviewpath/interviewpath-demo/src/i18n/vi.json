@@ -1120,8 +1120,7 @@
       "notFound": "Không tìm thấy kế hoạch này.",
       "status": {
         "draft": "Bản nháp, chờ duyệt",
-        "active": "Đã duyệt",
-        "done": "Đã hoàn thành"
+        "active": "Đã duyệt"
       },
       "usedInterview": "Soạn từ tri thức của đội và, khi người được tuyển đồng ý, từ các kỹ năng mà buổi phỏng vấn chưa xác nhận.",
       "teamKnowledgeOnly": "Chỉ soạn từ tri thức của đội.",

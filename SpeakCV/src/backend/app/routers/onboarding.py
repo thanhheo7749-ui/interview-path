@@ -206,7 +206,7 @@ def record_probation(company_id: int, app_id: int, body: ProbationIn,
 def my_onboarding(company_id: int, member: CompanyMember = Depends(require_member()), db: Session = Depends(get_db)):
     plans = (db.query(OnboardingPlan)
              .filter(OnboardingPlan.company_id == member.company_id, OnboardingPlan.employee_user_id == member.user_id,
-                     OnboardingPlan.status.in_(("active", "done")))
+                     OnboardingPlan.status == "active")
              .order_by(OnboardingPlan.id).all())
     return [_checklist_out(db, plan) for plan in plans]
 
@@ -217,7 +217,7 @@ def tick_item(company_id: int, item_id: int, member: CompanyMember = Depends(req
     item = db.get(OnboardingItem, item_id)
     plan = db.get(OnboardingPlan, item.plan_id) if item else None
     if (item is None or plan.company_id != member.company_id or item.owner_user_id != member.user_id
-            or plan.status not in ("active", "done")):
+            or plan.status != "active"):
         raise _not_found("Item")
     onboarding.mark_done(db, item, plan)
     db.commit()

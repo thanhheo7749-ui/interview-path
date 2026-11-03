@@ -11,7 +11,7 @@ CHANNEL_COST_SOURCES = ("manual", "csv", "simulated")
 SIMULATED_COST_SOURCE = "simulated"
 FEEDBACK_STATUSES = ("draft", "approved", "sent")
 TALENT_POOL_STATUSES = ("active", "expired", "left")
-ONBOARDING_STATUSES = ("draft", "approved", "active", "done")
+ONBOARDING_STATUSES = ("draft", "approved", "active")
 ONBOARDING_PHASES = (30, 60, 90)
 PROBATION_RESULTS = ("passed", "failed", "extended")
 
@@ -110,6 +110,7 @@ class OnboardingItem(Base):
     learning_resource_id = Column(Integer, ForeignKey("learning_resources.id", ondelete="SET NULL"), nullable=True)
     owner_user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
     done_at = Column(DateTime(timezone=True), nullable=True)
+    from_interview = Column(Boolean, nullable=False, default=False)  # built from the hire's interview gaps; withdrawal deletes it
 
 
 class ProbationOutcome(Base):

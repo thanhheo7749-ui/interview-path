@@ -1122,8 +1122,7 @@
       "notFound": "This plan was not found.",
       "status": {
         "draft": "Draft, waiting for approval",
-        "active": "Approved",
-        "done": "Completed"
+        "active": "Approved"
       },
       "usedInterview": "Built from the team's knowledge and, with the hire's consent, skills their interview did not confirm.",
       "teamKnowledgeOnly": "Built from the team's knowledge only.",
