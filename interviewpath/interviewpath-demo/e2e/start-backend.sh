@@ -59,6 +59,9 @@ fi
 ONBOARDING_PASSWORD=$($PY -m app.cli create-company --slug onboarding --name "Onboarding Company" --hr-email onboarding-hr@e2e.test --hr-name "Onboarding HR" | awk '/Temporary password/ {print $NF}')
 printf '%s' "$ONBOARDING_PASSWORD" > "$E2E_TMP/portal_e2e_onboarding_password"
 PYTHONPATH=. $PY "$E2E_DIR/seed_onboarding.py" "$E2E_TMP/onboarding_seed.json"
+# A sample company for the post-hire spec: rejection feedback, the talent pool, onboarding and the hire's Copilot.
+POSTHIRE_PASSWORD=$($PY -m app.cli create-company --slug posthire --name "Posthire Company" --hr-email posthire-hr@e2e.test --hr-name "Posthire HR" --sample | awk '/Temporary password/ {print $NF}')
+printf '%s' "$POSTHIRE_PASSWORD" > "$E2E_TMP/portal_e2e_posthire_password"
 # One user in two companies, to test that nothing from the previous company survives a switch.
 SWITCH_PASSWORD=$($PY -m app.cli create-company --slug switch-a --name "Switch Alpha" --hr-email switch-hr@e2e.test --hr-name "Switch HR" | awk '/Temporary password/ {print $NF}')
 printf '%s' "$SWITCH_PASSWORD" > "$E2E_TMP/portal_e2e_switch_password"

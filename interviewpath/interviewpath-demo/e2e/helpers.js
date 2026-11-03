@@ -17,6 +17,7 @@ export const BOARD_USER = { email: 'board-hr@e2e.test', passwordFile: 'portal_e2
 export const SWITCH_USER = { email: 'switch-hr@e2e.test', passwordFile: 'portal_e2e_switch_password' };
 export const INSIGHTS_USER = { email: 'insights-hr@e2e.test', passwordFile: 'portal_e2e_insights_password' };
 export const FEEDBACK_USER = { email: 'feedback-hr@e2e.test', passwordFile: 'portal_e2e_feedback_password' };
+export const POSTHIRE_USER = { email: 'posthire-hr@e2e.test', passwordFile: 'portal_e2e_posthire_password' };
 export const ONBOARDING_USER = { email: 'onboarding-hr@e2e.test', passwordFile: 'portal_e2e_onboarding_password' };
 
 export const temporaryPassword = (user = LOGIN_USER) => readFileSync(join(process.env.E2E_TMP, user.passwordFile), 'utf8');
@@ -83,4 +84,31 @@ export async function addManager(request, hr, { email, fullName, password, depar
   });
   expect(changed.ok()).toBe(true);
   return userId;
+}
+
+// HR publishes one internal note, so an onboarding plan has knowledge to draw from and the Copilot has something to answer with.
+// The fake extraction (e2e/fixtures/extraction.json) yields a node from exactly the line "Zephyrk7 quokka lantern ...".
+export async function publishInternalNote(request, { headers, companyId }, { title, line }) {
+  const kb = `${API_URL}/api/companies/${companyId}/kb`;
+  const upload = await request.post(`${kb}/documents`, {
+    headers,
+    multipart: {
+      title,
+      visibility: 'internal',
+      language: 'en',
+      file: { name: 'note.txt', mimeType: 'text/plain', buffer: Buffer.from(`${line}\n\nThis note was written for the end-to-end test.`) },
+    },
+  });
+  expect(upload.status()).toBe(201);
+  const { document } = await upload.json();
+  await expect
+    .poll(async () => (await (await request.get(`${kb}/documents`, { headers })).json()).find((d) => d.id === document.id)?.status, { timeout: 30000 })
+    .toBe('review');
+  const review = await (await request.get(`${kb}/review?document_id=${document.id}`, { headers })).json();
+  expect(review.nodes.length).toBeGreaterThan(0);
+  const decided = await request.post(`${kb}/review/decide`, {
+    headers,
+    data: { items: review.nodes.map((n) => ({ action: 'accept', node_id: n.id, visibility: 'internal' })) },
+  });
+  expect(decided.ok()).toBe(true);
 }
