@@ -598,9 +598,9 @@ def _subject(language: str, title: str) -> str:
 
 
 def version_of(db, company_id: int, row: RejectionFeedback) -> str:
-    """Names the text HR reads: the message and the catalogue links it carries. A change to either changes this."""
+    """Names what HR approves: the message, the catalogue links it carries, and its language (the email subject follows it)."""
     ids = ",".join(str(item.id) for item in sorted(learning.linked(db, company_id, row.draft), key=lambda item: item.id))
-    return hashlib.sha256(f"{row.draft}\0{ids}".encode()).hexdigest()[:16]
+    return hashlib.sha256(f"{row.draft}\0{ids}\0{row.language}".encode()).hexdigest()[:16]
 
 
 def approve(db, company_id, items, user_id) -> int:
