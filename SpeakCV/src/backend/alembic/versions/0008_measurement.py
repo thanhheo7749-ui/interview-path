@@ -127,6 +127,7 @@ def upgrade() -> None:
     sa.Column('learning_resource_id', sa.Integer(), nullable=True),
     sa.Column('owner_user_id', sa.Integer(), nullable=True),
     sa.Column('done_at', sa.DateTime(timezone=True), nullable=True),
+    sa.Column('from_interview', sa.Boolean(), nullable=False),
     sa.ForeignKeyConstraint(['learning_resource_id'], ['learning_resources.id'], ondelete='SET NULL'),
     sa.ForeignKeyConstraint(['owner_user_id'], ['users.id'], ondelete='SET NULL'),
     sa.ForeignKeyConstraint(['plan_id'], ['onboarding_plans.id'], ondelete='CASCADE'),

@@ -47,6 +47,7 @@ Rules:
 - Every item cites what it comes from: source_node_id with an n-id from the context, or learning_resource_id with an
   r-id from the context. Use 0 for the one you do not cite. Never use an id that is not in the context.
 - Never invent a course, a link or a fact. Recommend a resource only when it is in the context.
+- Set from_gap true for an item that exists because of a skill listed in <gaps>, and false for every other item.
 - Titles describe skills and tasks only. Never quote or describe a person, an answer or an interview."""
 
 
@@ -55,6 +56,7 @@ class PlanItem(BaseModel):
     title: str
     source_node_id: int
     learning_resource_id: int
+    from_gap: bool = False  # true only when the item exists because of a skill listed in <gaps>
 
 
 class PlanOutput(BaseModel):
@@ -180,6 +182,7 @@ def check_item(phase, title, node_id, resource_id, node_ids, resource_ids) -> di
 
 
 def validate_output(output: PlanOutput, context: Context) -> list[dict]:
+    """`from_gap` counts only when gaps were in the prompt."""
     node_ids, resource_ids = set(context.nodes), set(context.resources)
     kept: list[dict] = []
     per_phase: dict[int, int] = {}
@@ -188,6 +191,7 @@ def validate_output(output: PlanOutput, context: Context) -> list[dict]:
                              node_ids, resource_ids)
         if checked is None or per_phase.get(checked["phase"], 0) >= MAX_ITEMS_PER_PHASE:
             continue
+        checked["from_interview"] = bool(item.from_gap and context.gaps)
         per_phase[checked["phase"]] = per_phase.get(checked["phase"], 0) + 1
         kept.append(checked)
     return sorted(kept, key=lambda row: row["phase"])
@@ -256,6 +260,20 @@ def create_plan(db: Session, application: Application, user_id: int) -> Onboardi
                  {"items": len(items), "used_interview_data": plan.used_interview_data}, prompt_version=FEATURE)
     db.flush()
     return plan
+
+
+def drop_interview_items(db: Session, consent, user_id: int) -> None:
+    """Called by consents.withdraw for onboarding_use: the interview-derived items go, team and catalogue items stay.
+    Locks the plan after the application and the consent, the order create_plan and withdrawal use."""
+    plan = (db.query(OnboardingPlan).filter_by(application_id=consent.application_id)
+            .populate_existing().with_for_update().first())
+    if plan is None or not plan.used_interview_data:
+        return
+    removed = (db.query(OnboardingItem).filter_by(plan_id=plan.id, from_interview=True)
+               .delete(synchronize_session=False))
+    plan.used_interview_data = False
+    audit.record(db, plan.company_id, user_id, "onboarding.interview_data_removed", "onboarding_plan", plan.id,
+                 {"items": removed})
 
 
 # --- edit and approve -----------------------------------------------------------------------------------------------

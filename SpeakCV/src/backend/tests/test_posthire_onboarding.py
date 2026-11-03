@@ -237,6 +237,27 @@ def test_consent_withdrawal_works_through_the_existing_route_and_the_next_plan_i
     assert create(client, s).json()["used_interview_data"] is False
 
 
+def test_withdrawing_consent_removes_the_gap_items_from_every_view(client, db, s):
+    capturing({}, items=lambda nodes, resources: [
+        {"phase": 30, "title": "GAP-ITEM docker", "source_node_id": nodes[0], "learning_resource_id": 0, "from_gap": True},
+        {"phase": 60, "title": "TEAM-ITEM graph", "source_node_id": nodes[0], "learning_resource_id": 0},
+        {"phase": 90, "title": "CAT-ITEM course", "source_node_id": 0, "learning_resource_id": resources[0]},
+    ])
+    plan = create(client, s).json()
+    assert plan["used_interview_data"] is True
+    assert client.post(company_url(s, f"/onboarding/{plan['id']}/approve"), headers=HR).status_code == 200
+    consent = db.query(Consent).filter_by(purpose="onboarding_use").one()
+    assert client.post(f"/api/me/consents/{consent.id}/withdraw", headers=s.hire).status_code == 200
+    url = company_url(s, f"/onboarding/{plan['id']}")
+    for body in (client.get(url, headers=HR).json(), client.get(url, headers=ENG_MANAGER).json(),
+                 client.get(company_url(s, "/my-onboarding"), headers=s.hire).json()[0]):
+        titles = [item["title"] for item in body["items"]]
+        assert titles == ["TEAM-ITEM graph", "CAT-ITEM course"], titles
+    assert client.get(url, headers=HR).json()["used_interview_data"] is False
+    audit = db.query(AuditLog).filter_by(action="onboarding.interview_data_removed").one()
+    assert audit.payload == {"items": 1}
+
+
 def test_the_consent_text_exists_in_english_and_vietnamese():
     assert "onboarding_use" in consents.PURPOSES
     assert consents.current_text("onboarding_use", "en").text
@@ -614,7 +635,8 @@ def test_the_models_hold_no_attrition_or_monitoring_fields():
         for column in model.__table__.columns:
             assert not any(word in column.name for word in FORBIDDEN), (model.__tablename__, column.name)
     assert {c.name for c in OnboardingItem.__table__.columns} == {
-        "id", "plan_id", "phase", "title", "source_node_id", "learning_resource_id", "owner_user_id", "done_at"}
+        "id", "plan_id", "phase", "title", "source_node_id", "learning_resource_id", "owner_user_id", "done_at",
+        "from_interview"}
     assert {c.name for c in OnboardingPlan.__table__.columns} == {
         "id", "company_id", "application_id", "employee_user_id", "used_interview_data", "status", "approved_by"}
 
@@ -709,7 +731,7 @@ def test_a_manager_opens_a_plan_only_by_the_request_rule(client, db):
     # The department manager is not assigned: no link, no plan, no probation.
     assert client.get(company_url(s, "/my-interviews"), headers=ENG_MANAGER).json() == []
     assert client.get(url, headers=ENG_MANAGER).status_code == 404
-    assert client.post(probation, headers=ENG_MANAGER, json={"result": "failed"}).status_code in (403, 404)
+    assert client.post(probation, headers=ENG_MANAGER, json={"result": "failed"}).status_code == 403
     # The assigned manager gets the link, and it opens.
     listed = client.get(company_url(s, "/my-interviews"), headers=SALES_MANAGER).json()
     assert [row["onboarding_plan_id"] for row in listed] == [plan["id"]]

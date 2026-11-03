@@ -154,4 +154,8 @@ def withdraw(db, consent_id, user_id) -> Consent:
             from app.posthire import talent_pool  # Imported here: talent_pool is built on this module.
 
             talent_pool.end_for_withdrawn_consent(db, consent)
+        elif consent.purpose == "onboarding_use" and consent.application_id is not None:
+            from app.posthire import onboarding  # Imported here: onboarding is built on this module.
+
+            onboarding.drop_interview_items(db, consent, user_id)
     return consent

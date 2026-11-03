@@ -486,7 +486,7 @@ def test_the_measurement_tables_have_the_columns_the_spec_names():
         "onboarding_plans": {"id", "company_id", "application_id", "employee_user_id", "used_interview_data", "status",
                              "approved_by"},
         "onboarding_items": {"id", "plan_id", "phase", "title", "source_node_id", "learning_resource_id",
-                             "owner_user_id", "done_at"},
+                             "owner_user_id", "done_at", "from_interview"},
         "probation_outcomes": {"id", "company_id", "application_id", "result", "recorded_by", "recorded_at"},
     }
     inspector = inspect(engine)
