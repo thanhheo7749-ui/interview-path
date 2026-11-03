@@ -180,6 +180,7 @@ def check_item(phase, title, node_id, resource_id, node_ids, resource_ids) -> di
 
 
 def validate_output(output: PlanOutput, context: Context) -> list[dict]:
+    """With gaps in the prompt, every item is marked interview-derived: code cannot tell which ones the gaps shaped."""
     node_ids, resource_ids = set(context.nodes), set(context.resources)
     kept: list[dict] = []
     per_phase: dict[int, int] = {}
@@ -188,6 +189,7 @@ def validate_output(output: PlanOutput, context: Context) -> list[dict]:
                              node_ids, resource_ids)
         if checked is None or per_phase.get(checked["phase"], 0) >= MAX_ITEMS_PER_PHASE:
             continue
+        checked["from_interview"] = bool(context.gaps)
         per_phase[checked["phase"]] = per_phase.get(checked["phase"], 0) + 1
         kept.append(checked)
     return sorted(kept, key=lambda row: row["phase"])
@@ -258,10 +260,30 @@ def create_plan(db: Session, application: Application, user_id: int) -> Onboardi
     return plan
 
 
+def drop_interview_items(db: Session, consent, user_id: int) -> None:
+    """Called by consents.withdraw for onboarding_use: the interview-derived items go, team and catalogue items stay.
+    Locks the plan after the application and the consent, the order create_plan and withdrawal use."""
+    plan = (db.query(OnboardingPlan).filter_by(application_id=consent.application_id)
+            .populate_existing().with_for_update().first())
+    if plan is None or not plan.used_interview_data:
+        return
+    removed = (db.query(OnboardingItem).filter_by(plan_id=plan.id, from_interview=True)
+               .delete(synchronize_session=False))
+    plan.used_interview_data = False
+    if plan.status == "active" and not db.query(OnboardingItem.id).filter_by(plan_id=plan.id).first():
+        plan.status, plan.approved_by = "draft", None  # an empty checklist is not a plan; HR rebuilds it without gaps
+    audit.record(db, plan.company_id, user_id, "onboarding.interview_data_removed", "onboarding_plan", plan.id,
+                 {"items": removed})
+
+
 # --- edit and approve -----------------------------------------------------------------------------------------------
 
 def update_plan(db: Session, plan: OnboardingPlan, edits: list[dict], additions: list[dict], user_id: int) -> None:
     if plan.status != "draft":
+        raise OnboardingError(409, "Only a draft plan can be edited")
+    # Plan row first, as withdrawal does, so the two cannot deadlock on the items.
+    locked = db.query(OnboardingPlan).filter_by(id=plan.id).populate_existing().with_for_update().first()
+    if locked is None or locked.status != "draft":
         raise OnboardingError(409, "Only a draft plan can be edited")
     items = {row.id: row for row in db.query(OnboardingItem).filter_by(plan_id=plan.id).all()}
     nodes, resources = allowed_references(db, plan.company_id)

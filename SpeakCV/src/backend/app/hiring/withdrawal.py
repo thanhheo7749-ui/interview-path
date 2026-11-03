@@ -19,6 +19,7 @@ from app.hiring.state import CONSENT_WITHDRAWN, advance
 
 RECORDING = "recording_screening"
 CV_PROCESSING = "cv_processing"
+ONBOARDING_USE = "onboarding_use"  # locks the application first, as create_plan does, but changes nothing on it
 # Withdrawing these changes the application itself. Any other purpose keeps to its own rules, in consents.withdraw.
 LOCKS_APPLICATION = (RECORDING, CV_PROCESSING)
 CV_STOPPED = "You withdrew consent to CV processing, so we stopped reading this CV."
@@ -115,7 +116,8 @@ def withdraw(db, consent_id: int, user_id: int) -> Consent | None:
     db.rollback()
     if found is None:
         return None
-    application = _lock_application(db, found.application_id) if found.purpose in LOCKS_APPLICATION else None
+    application = (_lock_application(db, found.application_id)
+                   if found.purpose in LOCKS_APPLICATION or found.purpose == ONBOARDING_USE else None)
     consent = (
         db.query(Consent).filter(Consent.id == consent_id, Consent.user_id == user_id)
         .populate_existing().with_for_update().first()

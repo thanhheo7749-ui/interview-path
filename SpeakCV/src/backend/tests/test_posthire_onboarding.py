@@ -237,6 +237,74 @@ def test_consent_withdrawal_works_through_the_existing_route_and_the_next_plan_i
     assert create(client, s).json()["used_interview_data"] is False
 
 
+def unflagged_items(nodes, resources):
+    return [
+        {"phase": 30, "title": "AI-ITEM one", "source_node_id": nodes[0], "learning_resource_id": 0},
+        {"phase": 60, "title": "AI-ITEM two", "source_node_id": nodes[0], "learning_resource_id": 0},
+        {"phase": 90, "title": "AI-ITEM three", "source_node_id": 0, "learning_resource_id": resources[0]},
+    ]
+
+
+def withdraw_onboarding_consent(client, db, s):
+    consent = db.query(Consent).filter_by(purpose="onboarding_use").one()
+    assert client.post(f"/api/me/consents/{consent.id}/withdraw", headers=s.hire).status_code == 200
+
+
+def test_withdrawing_consent_removes_every_ai_item_even_unflagged_and_keeps_hr_items(client, db, s):
+    capturing({}, items=unflagged_items)
+    plan = create(client, s).json()
+    assert plan["used_interview_data"] is True
+    url = company_url(s, f"/onboarding/{plan['id']}")
+    added = client.patch(url, headers=HR, json={"add": [
+        {"phase": 30, "title": "HR-ITEM catalogue", "learning_resource_id": s.resource.id}]})
+    assert added.status_code == 200, added.text
+    assert client.post(url + "/approve", headers=HR).status_code == 200
+    withdraw_onboarding_consent(client, db, s)
+    for body in (client.get(url, headers=HR).json(), client.get(url, headers=ENG_MANAGER).json(),
+                 client.get(company_url(s, "/my-onboarding"), headers=s.hire).json()[0]):
+        assert [item["title"] for item in body["items"]] == ["HR-ITEM catalogue"]
+    hr_view = client.get(url, headers=HR).json()
+    assert hr_view["used_interview_data"] is False and hr_view["status"] == "active"
+    assert db.query(AuditLog).filter_by(action="onboarding.interview_data_removed").one().payload == {"items": 3}
+
+
+def test_an_active_plan_emptied_by_withdrawal_returns_to_draft_and_can_be_rebuilt(client, db, s):
+    seen = capturing({}, items=unflagged_items)
+    plan = create(client, s).json()
+    url = company_url(s, f"/onboarding/{plan['id']}")
+    assert client.post(url + "/approve", headers=HR).status_code == 200
+    withdraw_onboarding_consent(client, db, s)
+    after = client.get(url, headers=HR).json()
+    assert after["status"] == "draft" and after["items"] == [] and after["approved_by"] is None
+    assert client.get(company_url(s, "/my-onboarding"), headers=s.hire).json() == []
+    rebuilt = create(client, s).json()
+    assert rebuilt["used_interview_data"] is False and rebuilt["items"]
+    assert GAP_TEXT not in prompt_of(seen)
+    assert client.post(url + "/approve", headers=HR).status_code == 200
+
+
+def test_two_active_onboarding_consents_are_ended_together(client, db, s):
+    db.add(Consent(user_id=s.candidate.id, company_id=s.w.company.id, application_id=s.application.id,
+                   purpose="onboarding_use", text_version=consents.VERSION))
+    db.commit()
+    first = db.query(Consent).filter_by(purpose="onboarding_use").order_by(Consent.id).first()
+    assert client.post(f"/api/me/consents/{first.id}/withdraw", headers=s.hire).status_code == 200
+    db.expire_all()
+    assert all(c.withdrawn_at is not None for c in db.query(Consent).filter_by(purpose="onboarding_use"))
+    seen = capturing({})
+    assert create(client, s).json()["used_interview_data"] is False
+    assert GAP_TEXT not in prompt_of(seen)
+
+
+def test_granting_twice_leaves_one_active_consent(client, db):
+    s = build(db, consent=False)
+    url = f"/api/applications/{s.application.id}/onboarding-consent"
+    body = {"version": consents.VERSION}
+    assert client.post(url, headers=s.hire, json=body).status_code == 200
+    assert client.post(url, headers=s.hire, json=body).status_code == 200
+    assert db.query(Consent).filter_by(purpose="onboarding_use", withdrawn_at=None).count() == 1
+
+
 def test_the_consent_text_exists_in_english_and_vietnamese():
     assert "onboarding_use" in consents.PURPOSES
     assert consents.current_text("onboarding_use", "en").text
@@ -614,7 +682,8 @@ def test_the_models_hold_no_attrition_or_monitoring_fields():
         for column in model.__table__.columns:
             assert not any(word in column.name for word in FORBIDDEN), (model.__tablename__, column.name)
     assert {c.name for c in OnboardingItem.__table__.columns} == {
-        "id", "plan_id", "phase", "title", "source_node_id", "learning_resource_id", "owner_user_id", "done_at"}
+        "id", "plan_id", "phase", "title", "source_node_id", "learning_resource_id", "owner_user_id", "done_at",
+        "from_interview"}
     assert {c.name for c in OnboardingPlan.__table__.columns} == {
         "id", "company_id", "application_id", "employee_user_id", "used_interview_data", "status", "approved_by"}
 
@@ -709,7 +778,7 @@ def test_a_manager_opens_a_plan_only_by_the_request_rule(client, db):
     # The department manager is not assigned: no link, no plan, no probation.
     assert client.get(company_url(s, "/my-interviews"), headers=ENG_MANAGER).json() == []
     assert client.get(url, headers=ENG_MANAGER).status_code == 404
-    assert client.post(probation, headers=ENG_MANAGER, json={"result": "failed"}).status_code in (403, 404)
+    assert client.post(probation, headers=ENG_MANAGER, json={"result": "failed"}).status_code == 403
     # The assigned manager gets the link, and it opens.
     listed = client.get(company_url(s, "/my-interviews"), headers=SALES_MANAGER).json()
     assert [row["onboarding_plan_id"] for row in listed] == [plan["id"]]

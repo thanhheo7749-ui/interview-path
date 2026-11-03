@@ -206,7 +206,7 @@ def record_probation(company_id: int, app_id: int, body: ProbationIn,
 def my_onboarding(company_id: int, member: CompanyMember = Depends(require_member()), db: Session = Depends(get_db)):
     plans = (db.query(OnboardingPlan)
              .filter(OnboardingPlan.company_id == member.company_id, OnboardingPlan.employee_user_id == member.user_id,
-                     OnboardingPlan.status.in_(("active", "done")))
+                     OnboardingPlan.status == "active")
              .order_by(OnboardingPlan.id).all())
     return [_checklist_out(db, plan) for plan in plans]
 
@@ -217,7 +217,7 @@ def tick_item(company_id: int, item_id: int, member: CompanyMember = Depends(req
     item = db.get(OnboardingItem, item_id)
     plan = db.get(OnboardingPlan, item.plan_id) if item else None
     if (item is None or plan.company_id != member.company_id or item.owner_user_id != member.user_id
-            or plan.status not in ("active", "done")):
+            or plan.status != "active"):
         raise _not_found("Item")
     onboarding.mark_done(db, item, plan)
     db.commit()
@@ -260,6 +260,8 @@ def grant_onboarding_consent(application_id: int, body: ConsentIn, user: User = 
         raise HTTPException(status_code=409, detail={
             "message": "The consent text has changed. Please read it again.", "current_version": consents.VERSION})
     language = body.language or "en"
+    # Lock the application, as withdrawal does, so a double submit records one consent.
+    db.query(Application).filter_by(id=application.id).populate_existing().with_for_update().first()
     if not _consent_out(db, application, language)["granted"]:
         consents.record(db, user.id, application.company_id, application.id, onboarding.PURPOSE, consents.VERSION,
                         body.language)

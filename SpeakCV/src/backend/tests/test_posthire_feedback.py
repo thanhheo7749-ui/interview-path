@@ -1103,3 +1103,12 @@ def test_the_reapply_date_counts_from_the_newest_application_and_has_a_time_zone
     expected = (newer.created_at + timedelta(days=consents.REAPPLY_DAYS)).date().isoformat()
     assert listed["reapply_after"].startswith(expected)
     assert listed["reapply_after"].endswith("+00:00") or listed["reapply_after"].endswith("Z")
+
+
+def test_the_version_changes_with_the_language(db, world):
+    application = interviewed(db, world)
+    fake.enqueue("rejection_feedback", output(world, message=GOOD_MESSAGE))
+    row = draft_now(db, application)
+    before = feedback.version_of(db, world["company"].id, row)
+    row.language = "vi"
+    assert feedback.version_of(db, world["company"].id, row) != before
