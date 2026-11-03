@@ -74,11 +74,19 @@ function JobsPage() {
                   <td className="py-3 pr-3 text-slate-600">{t(`jobs.status.${job.status}`, { defaultValue: job.status })}</td>
                   <td className="py-3 pr-3 text-slate-600">{job.version}</td>
                   <td className="py-3 text-slate-600">{job.published_at ? new Date(job.published_at).toLocaleDateString() : ''}</td>
-                  <td className="py-3 pl-3">
+                  <td className="space-x-3 py-3 pl-3">
                     {job.status !== 'draft' && (
-                      <Link to={`/jobs/${job.id}/board`} className="font-semibold text-blue-600 underline-offset-2 hover:underline">
-                        {t('jobs.openBoard')}
-                      </Link>
+                      <>
+                        <Link to={`/jobs/${job.id}/board`} className="font-semibold text-blue-600 underline-offset-2 hover:underline">
+                          {t('jobs.openBoard')}
+                        </Link>
+                        <Link to={`/jobs/${job.id}/channels`} className="font-semibold text-blue-600 underline-offset-2 hover:underline">
+                          {t('jobs.insightsChannels')}
+                        </Link>
+                        <Link to={`/jobs/${job.id}/reality-check`} className="font-semibold text-blue-600 underline-offset-2 hover:underline">
+                          {t('jobs.insightsReality')}
+                        </Link>
+                      </>
                     )}
                   </td>
                 </tr>

@@ -15,6 +15,7 @@ export const INTAKE_USER = { email: 'intake-hr@e2e.test', passwordFile: 'portal_
 export const LOOP_USER = { email: 'loop-hr@e2e.test', passwordFile: 'portal_e2e_loop_password' };
 export const BOARD_USER = { email: 'board-hr@e2e.test', passwordFile: 'portal_e2e_board_password' };
 export const SWITCH_USER = { email: 'switch-hr@e2e.test', passwordFile: 'portal_e2e_switch_password' };
+export const INSIGHTS_USER = { email: 'insights-hr@e2e.test', passwordFile: 'portal_e2e_insights_password' };
 
 export const temporaryPassword = (user = LOGIN_USER) => readFileSync(join(process.env.E2E_TMP, user.passwordFile), 'utf8');
 

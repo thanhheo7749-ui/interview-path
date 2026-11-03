@@ -406,6 +406,76 @@
   "jobs": {
     "noPublicRequirement": "이 채용 공고에는 공개 요건이 없습니다. 면접에서 측정할 항목이 없어 모든 지원자의 근거 수준이 낮게 표시됩니다.",
     "descriptionInJdStudio": "이 공고는 JD Studio에서 만들었습니다. 검사와 매니저 승인이 적용되도록 설명은 그곳에서 수정하세요.",
-    "openJdStudio": "JD Studio에서 열기"
+    "openJdStudio": "JD Studio에서 열기",
+    "insightsChannels": "채널",
+    "insightsReality": "요건 점검"
+  },
+  "insights": {
+    "eyebrow": "성과 측정",
+    "simulated": "시뮬레이션 데이터",
+    "simulatedNote": "이 행들은 표시된 데모 데이터입니다. 페이지의 작동 방식을 보여줄 뿐 실제 효과가 아닙니다.",
+    "simulatedShort": "시뮬레이션 데이터",
+    "real": "실제 데이터",
+    "dataToggle": "표시할 데이터",
+    "notEntered": "미입력",
+    "channels": {
+      "title": "채널 인텔리전스",
+      "intro": "어떤 채널이 HR이 승인하는 사람을 데려오는지, 비용은 얼마인지 보여줍니다. 모든 수치는 코드가 계산합니다.",
+      "toReality": "요건 현실 점검",
+      "empty": "이 공고에는 아직 지원서나 비용이 없습니다.",
+      "smallSample": "표본이 너무 작아 참고용으로만 보세요",
+      "col": {
+        "channel": "채널",
+        "applications": "지원서",
+        "cv_meets": "CV 충족",
+        "sessions_completed": "완료된 세션",
+        "completion_rate": "완료율",
+        "hr_approved": "HR 승인",
+        "approval_rate": "승인율",
+        "hidden_gems": "히든 젬",
+        "interviews": "면접",
+        "hires": "채용",
+        "cost": "비용 (VND)",
+        "cost_per_approved": "승인 1명당 비용 (VND)"
+      },
+      "commentaryTitle": "해설",
+      "askCommentary": "해설 요청",
+      "commentaryHint": "위 표에 대한 AI 설명이며, 요청할 때만 표시됩니다. 표에 있는 수치만 사용할 수 있습니다.",
+      "noCommentary": "해설을 제공할 수 없습니다. 위 표만으로도 충분합니다.",
+      "costTitle": "채널 비용",
+      "costHint": "한 달 동안 채널에 쓴 금액을 입력하거나 channel, period_month, amount_vnd 열이 있는 CSV를 가져오세요. 비용이 없는 채널은 \"미입력\"으로 표시됩니다.",
+      "costChannel": "채널",
+      "costMonth": "월",
+      "costAmount": "금액 (VND)",
+      "costSave": "비용 저장",
+      "costCsv": "CSV에서 비용 가져오기"
+    },
+    "reality": {
+      "title": "요건 현실 점검",
+      "intro": "필수 요건마다 채용된 사람 중 몇 명이 그 요건을 갖췄는지 보여줍니다. 제안만 하며, 직접 공고를 수정하기 전에는 아무것도 바뀌지 않습니다.",
+      "toChannels": "채널 인텔리전스",
+      "probationNote": "수습은 결과가 \"통과\"일 때만 통과로 셉니다. 연장된 수습은 통과로 세지 않습니다.",
+      "empty": "이 공고에는 유효한 필수 요건이 없습니다.",
+      "suggestion": {
+        "not_enough_data": "데이터 부족",
+        "consider_nice_to_have": "우대 사항으로 바꾸는 것을 고려하세요",
+        "review": "이 요건을 검토하세요",
+        "keep": "이 요건 유지"
+      },
+      "notEnough": "지금까지 {{hired}}명 채용. 규칙에는 최소 {{min}}명이 필요합니다.",
+      "heldBy": "채용된 {{hired}}명 중 {{with}}명이 이 요건을 갖췄습니다.",
+      "cvMiss": "요건을 충족하지 못한 CV",
+      "corrections": "HR이 \"충족\"으로 정정한 수",
+      "probationPassed": "요건 없이 수습 통과",
+      "tooStrict": "HR이 이 판정을 \"충족\"으로 자주 정정했습니다. 요건이 너무 엄격하게 해석되고 있을 수 있습니다.",
+      "openStudio": "JD Studio 열기",
+      "openEditor": "공고 편집기 열기",
+      "thresholdsTitle": "규칙 기준값",
+      "thresholdsHint": "낮은 기준 미만이면 우대 사항을 제안하고, 높은 기준 초과이면 요건을 유지하며, 채용 인원이 최소 인원보다 적으면 데이터 부족으로 표시합니다.",
+      "low": "낮은 기준 (%)",
+      "high": "높은 기준 (%)",
+      "minHired": "최소 채용 인원",
+      "saved": "저장됨"
+    }
   }
 }

@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.auth.dependencies import require_member
 from app.database.database import get_db
+from app.database.models_bridges import JobDraft
 from app.database.sql_models import Company, CompanyMember, Job
 from app.insights import reality_check
 
@@ -22,8 +23,10 @@ def get_reality_check(company_id: int, job_id: int, data: Literal["real", "simul
         raise HTTPException(status_code=404, detail="Job not found")
     simulated = data == "simulated"
     rows = reality_check.report(db, company_id, job_id, simulated)
+    draft = (db.query(JobDraft.id).filter(JobDraft.company_id == company_id, JobDraft.job_id == job_id)
+             .order_by(JobDraft.id.desc()).first())
     return {
-        "simulated": simulated, "banner": SIMULATED_BANNER if simulated else None,
+        "draft_id": draft[0] if draft else None, "simulated": simulated, "banner": SIMULATED_BANNER if simulated else None,
         "thresholds": reality_check.thresholds(db.get(Company, company_id)),
         "rows": [row.as_dict() for row in rows],
     }

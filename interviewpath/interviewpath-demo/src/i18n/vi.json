@@ -478,7 +478,9 @@
     "openBoard": "Mở bảng",
     "noPublicRequirement": "Việc làm này không có yêu cầu công khai nào. Buổi phỏng vấn không có gì để đo, nên mức bằng chứng của mọi ứng viên sẽ ở mức thấp.",
     "descriptionInJdStudio": "Công việc này được tạo trong JD Studio. Hãy sửa mô tả tại đó để các bước kiểm tra và phê duyệt của quản lý được áp dụng.",
-    "openJdStudio": "Mở trong JD Studio"
+    "openJdStudio": "Mở trong JD Studio",
+    "insightsChannels": "Kênh",
+    "insightsReality": "Kiểm chứng yêu cầu"
   },
   "board": {
     "eyebrow": "Bảng ứng viên",
@@ -948,6 +950,74 @@
       "unsupported_numbers": "Dòng này nêu các số mà nguồn không có: {{numbers}}.",
       "unsupported_terms": "Dòng này nêu mức lương hoặc phúc lợi mà nguồn không đề cập.",
       "unknown": "Tri thức công ty không hỗ trợ dòng này."
+    }
+  },
+  "insights": {
+    "eyebrow": "Đo lường",
+    "simulated": "Dữ liệu mô phỏng",
+    "simulatedNote": "Các dòng này là dữ liệu demo có gắn nhãn. Chúng cho thấy cách trang hoạt động, không phải hiệu quả thật.",
+    "simulatedShort": "Dữ liệu mô phỏng",
+    "real": "Dữ liệu thật",
+    "dataToggle": "Dữ liệu đang xem",
+    "notEntered": "Chưa nhập",
+    "channels": {
+      "title": "Phân tích kênh tuyển dụng",
+      "intro": "Kênh nào mang về người được HR duyệt và với chi phí bao nhiêu. Mọi con số do mã nguồn tính.",
+      "toReality": "Kiểm chứng yêu cầu",
+      "empty": "Vị trí này chưa có đơn ứng tuyển hay chi phí.",
+      "smallSample": "Mẫu quá nhỏ, chỉ nên xem như gợi ý",
+      "col": {
+        "channel": "Kênh",
+        "applications": "Đơn ứng tuyển",
+        "cv_meets": "CV đạt",
+        "sessions_completed": "Phiên hoàn thành",
+        "completion_rate": "Tỷ lệ hoàn thành",
+        "hr_approved": "HR đã duyệt",
+        "approval_rate": "Tỷ lệ duyệt",
+        "hidden_gems": "Hidden Gem",
+        "interviews": "Phỏng vấn",
+        "hires": "Đã tuyển",
+        "cost": "Chi phí (VND)",
+        "cost_per_approved": "Chi phí mỗi người được duyệt (VND)"
+      },
+      "commentaryTitle": "Nhận xét",
+      "askCommentary": "Yêu cầu nhận xét",
+      "commentaryHint": "AI giải thích bảng trên, chỉ khi bạn yêu cầu. AI chỉ được dùng các con số có trong bảng.",
+      "noCommentary": "Chưa có nhận xét. Bảng trên vẫn đầy đủ khi không có nhận xét.",
+      "costTitle": "Chi phí theo kênh",
+      "costHint": "Nhập số tiền đã chi cho một kênh trong một tháng, hoặc nhập CSV có các cột channel, period_month, amount_vnd. Kênh chưa có chi phí hiện \"Chưa nhập\".",
+      "costChannel": "Kênh",
+      "costMonth": "Tháng",
+      "costAmount": "Số tiền (VND)",
+      "costSave": "Lưu chi phí",
+      "costCsv": "Nhập chi phí từ CSV"
+    },
+    "reality": {
+      "title": "Kiểm chứng yêu cầu",
+      "intro": "Với mỗi yêu cầu bắt buộc, bao nhiêu người bạn đã tuyển có yêu cầu đó. Trang chỉ gợi ý: không có gì thay đổi cho đến khi bạn tự sửa vị trí.",
+      "toChannels": "Phân tích kênh tuyển dụng",
+      "probationNote": "Thử việc chỉ tính là đạt khi kết quả là \"đạt\". Thử việc được gia hạn không tính là đạt.",
+      "empty": "Vị trí này không có yêu cầu bắt buộc nào đang hiệu lực.",
+      "suggestion": {
+        "not_enough_data": "Chưa đủ dữ liệu",
+        "consider_nice_to_have": "Cân nhắc chuyển thành điểm cộng",
+        "review": "Xem lại yêu cầu này",
+        "keep": "Giữ yêu cầu này"
+      },
+      "notEnough": "Hiện có {{hired}} người được tuyển. Quy tắc cần ít nhất {{min}}.",
+      "heldBy": "{{with}} trên {{hired}} người được tuyển có yêu cầu này.",
+      "cvMiss": "CV không đạt yêu cầu",
+      "corrections": "HR sửa nhãn thành \"đạt\"",
+      "probationPassed": "Đạt thử việc dù không có yêu cầu",
+      "tooStrict": "HR thường sửa nhãn này thành \"đạt\": yêu cầu có thể đang được hiểu quá chặt.",
+      "openStudio": "Mở JD Studio",
+      "openEditor": "Mở trình sửa vị trí",
+      "thresholdsTitle": "Ngưỡng của quy tắc",
+      "thresholdsHint": "Dưới ngưỡng thấp quy tắc gợi ý chuyển thành điểm cộng, trên ngưỡng cao thì giữ yêu cầu, và nếu số người tuyển ít hơn mức tối thiểu thì báo chưa đủ dữ liệu.",
+      "low": "Ngưỡng thấp (%)",
+      "high": "Ngưỡng cao (%)",
+      "minHired": "Số người tuyển tối thiểu",
+      "saved": "Đã lưu"
     }
   }
 }

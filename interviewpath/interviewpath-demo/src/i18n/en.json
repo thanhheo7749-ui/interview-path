@@ -479,7 +479,9 @@
     "openBoard": "Open board",
     "noPublicRequirement": "This job has no public requirement. The interview has nothing to measure, so every candidate's evidence band will be low.",
     "descriptionInJdStudio": "This job was made in JD Studio. Edit its description there, so the checks and the manager's approval apply.",
-    "openJdStudio": "Open it in JD Studio"
+    "openJdStudio": "Open it in JD Studio",
+    "insightsChannels": "Channels",
+    "insightsReality": "Reality Check"
   },
   "board": {
     "eyebrow": "Candidate board",
@@ -949,6 +951,74 @@
       "unsupported_numbers": "It states numbers that its sources do not contain: {{numbers}}.",
       "unsupported_terms": "It names a salary or benefit that its sources do not mention.",
       "unknown": "The company knowledge does not support it."
+    }
+  },
+  "insights": {
+    "eyebrow": "Measurement",
+    "simulated": "Simulated data",
+    "simulatedNote": "These rows are labelled demo data. They show how the page works, not a real effect.",
+    "simulatedShort": "Simulated data",
+    "real": "Real data",
+    "dataToggle": "Data shown",
+    "notEntered": "Not entered",
+    "channels": {
+      "title": "Channel Intelligence",
+      "intro": "Which channels bring people HR approves, and at what cost. Every figure is counted by code.",
+      "toReality": "Requirement Reality Check",
+      "empty": "No applications or costs for this job yet.",
+      "smallSample": "Sample too small, treat as a hint",
+      "col": {
+        "channel": "Channel",
+        "applications": "Applications",
+        "cv_meets": "CV meets",
+        "sessions_completed": "Sessions completed",
+        "completion_rate": "Completion rate",
+        "hr_approved": "HR approved",
+        "approval_rate": "Approval rate",
+        "hidden_gems": "Hidden Gems",
+        "interviews": "Interviews",
+        "hires": "Hires",
+        "cost": "Cost (VND)",
+        "cost_per_approved": "Cost per approved (VND)"
+      },
+      "commentaryTitle": "Commentary",
+      "askCommentary": "Ask for commentary",
+      "commentaryHint": "An AI explanation of the table above, only when you ask. It may only use figures in the table.",
+      "noCommentary": "No commentary is available. The table above is complete without it.",
+      "costTitle": "Channel costs",
+      "costHint": "Enter what you spent on a channel in a month, or import a CSV with the columns channel, period_month, amount_vnd. A channel with no cost shows \"Not entered\".",
+      "costChannel": "Channel",
+      "costMonth": "Month",
+      "costAmount": "Amount (VND)",
+      "costSave": "Save cost",
+      "costCsv": "Import costs from CSV"
+    },
+    "reality": {
+      "title": "Requirement Reality Check",
+      "intro": "For each must-have, how many of the people you hired held it. This only suggests: nothing changes until you edit the job yourself.",
+      "toChannels": "Channel Intelligence",
+      "probationNote": "Probation counts as passed only when the result is \"passed\". An extended probation does not count as passed.",
+      "empty": "This job has no active must-have requirements.",
+      "suggestion": {
+        "not_enough_data": "Not enough data",
+        "consider_nice_to_have": "Consider making this a nice-to-have",
+        "review": "Review this requirement",
+        "keep": "Keep this requirement"
+      },
+      "notEnough": "{{hired}} hired so far. The rule needs at least {{min}}.",
+      "heldBy": "{{with}} of {{hired}} hired people held this requirement.",
+      "cvMiss": "CVs that missed it",
+      "corrections": "HR corrections to \"meets\"",
+      "probationPassed": "Passed probation without it",
+      "tooStrict": "HR has corrected this label to \"meets\" often: the requirement may be read too strictly.",
+      "openStudio": "Open JD Studio",
+      "openEditor": "Open the job editor",
+      "thresholdsTitle": "Rule thresholds",
+      "thresholdsHint": "Below the low share the rule suggests a nice-to-have, above the high share it keeps the requirement, and with fewer hires than the minimum it says not enough data.",
+      "low": "Low share (%)",
+      "high": "High share (%)",
+      "minHired": "Minimum hired",
+      "saved": "Saved"
     }
   }
 }
