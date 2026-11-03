@@ -18,12 +18,18 @@ class CompanyOut(BaseModel):
     default_locale: str
     retention_days: int
     kb_version: int
+    reality_low_pct: int
+    reality_high_pct: int
+    reality_min_hired: int
 
 
 class CompanyPatch(BaseModel):
     name: Optional[Name] = None
     default_locale: Optional[Locale] = None
     retention_days: Optional[int] = Field(default=None, ge=1, le=3650)
+    reality_low_pct: Optional[int] = Field(default=None, ge=0, le=100)
+    reality_high_pct: Optional[int] = Field(default=None, ge=0, le=100)
+    reality_min_hired: Optional[int] = Field(default=None, ge=1)
 
 
 class DepartmentCreate(BaseModel):

@@ -161,7 +161,12 @@ def patch_company(
     db: Session = Depends(get_db),
 ):
     company = db.get(Company, company_id)
-    for field, value in body.model_dump(exclude_unset=True, exclude_none=True).items():
+    changes = body.model_dump(exclude_unset=True, exclude_none=True)
+    low = changes.get("reality_low_pct", company.reality_low_pct)
+    high = changes.get("reality_high_pct", company.reality_high_pct)
+    if not low < high:
+        raise HTTPException(status_code=422, detail="reality_low_pct must be below reality_high_pct")
+    for field, value in changes.items():
         setattr(company, field, value)
     db.commit()
     org_sync.sync_org_nodes(db, company_id)

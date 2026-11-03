@@ -297,3 +297,39 @@ def test_the_simulated_demo_tells_the_story_on_seed_42(db):
     assert rows[-1].probation_passed_without_requirement >= 5
     assert all(row.hr_label_corrections == 0 and row.too_strict_signal is False for row in rows)
     assert reality_check.report(db, company.id, job.id, simulated=False)[0].hired_total == 0
+
+
+# draft_id and the per-company thresholds
+
+
+def test_draft_id_is_the_newest_draft_of_the_job_in_this_company(client, db, world, job):
+    from app.database.models_bridges import JobDraft
+    headers = world["people"]["hr"]["headers"]
+    assert client.get(url(world), headers=headers).json()["draft_id"] is None
+    old = JobDraft(company_id=job.company_id, job_id=job.id)
+    new = JobDraft(company_id=job.company_id, job_id=job.id)
+    db.add_all([old, new])
+    db.commit()
+    foreign = JobDraft(company_id=world["other_job"].company_id, job_id=job.id)  # another company's: never shown
+    db.add(foreign)
+    db.commit()
+    assert client.get(url(world), headers=headers).json()["draft_id"] == new.id
+
+
+def test_hr_edits_the_thresholds_and_the_rule_follows(client, db, world, job, fixture):
+    headers = world["people"]["hr"]["headers"]
+    company_url = f"/api/companies/{world['company'].id}"
+    ok = client.patch(company_url, headers=headers, json={"reality_low_pct": 10, "reality_high_pct": 95, "reality_min_hired": 5})
+    assert ok.status_code == 200
+    assert (ok.json()["reality_low_pct"], ok.json()["reality_high_pct"], ok.json()["reality_min_hired"]) == (10, 95, 5)
+    assert client.get(url(world), headers=headers).json()["thresholds"] == {"low_pct": 10, "high_pct": 95, "min_hired": 5}
+    assert client.patch(company_url, headers=world["people"]["emp"]["headers"], json={"reality_min_hired": 3}).status_code == 403
+
+
+def test_threshold_validation(client, world):
+    headers = world["people"]["hr"]["headers"]
+    company_url = f"/api/companies/{world['company'].id}"
+    for body in ({"reality_low_pct": 70}, {"reality_high_pct": 30}, {"reality_low_pct": 50, "reality_high_pct": 50},
+                 {"reality_low_pct": -1}, {"reality_high_pct": 101}, {"reality_min_hired": 0}):
+        assert client.patch(company_url, headers=headers, json=body).status_code == 422, body
+    assert client.patch(company_url, headers=headers, json={"reality_low_pct": 0, "reality_high_pct": 100}).status_code == 200
