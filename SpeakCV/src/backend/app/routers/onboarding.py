@@ -260,6 +260,8 @@ def grant_onboarding_consent(application_id: int, body: ConsentIn, user: User = 
         raise HTTPException(status_code=409, detail={
             "message": "The consent text has changed. Please read it again.", "current_version": consents.VERSION})
     language = body.language or "en"
+    # Lock the application, as withdrawal does, so a double submit records one consent.
+    db.query(Application).filter_by(id=application.id).populate_existing().with_for_update().first()
     if not _consent_out(db, application, language)["granted"]:
         consents.record(db, user.id, application.company_id, application.id, onboarding.PURPOSE, consents.VERSION,
                         body.language)

@@ -157,5 +157,10 @@ def withdraw(db, consent_id, user_id) -> Consent:
         elif consent.purpose == "onboarding_use" and consent.application_id is not None:
             from app.posthire import onboarding  # Imported here: onboarding is built on this module.
 
+            # A double submit can leave a second active consent, and either would let the next plan use the gaps.
+            (db.query(Consent)
+             .filter(Consent.application_id == consent.application_id, Consent.purpose == consent.purpose,
+                     Consent.withdrawn_at.is_(None))
+             .update({Consent.withdrawn_at: consent.withdrawn_at}, synchronize_session=False))
             onboarding.drop_interview_items(db, consent, user_id)
     return consent
