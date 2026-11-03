@@ -5,7 +5,7 @@ import { isBulkSelectable, isUndecided } from '../../lib/board.js';
 import CandidateCard from '../CandidateCard.jsx';
 
 // `onBulkReject(ids)` resolves when the rejection is done. The count is confirmed before it runs.
-function BoardCell({ cellKey, cards, selectedId, onSelect, onBulkReject }) {
+function BoardCell({ cellKey, cards, selectedId, onSelect, onBulkReject, feedbackPending = 0 }) {
   const { t } = useTranslation();
   const [picked, setPicked] = useState([]);
   const [confirming, setConfirming] = useState(false);
@@ -54,6 +54,9 @@ function BoardCell({ cellKey, cards, selectedId, onSelect, onBulkReject }) {
           {t('board.toDecide', { count: undecided })}
         </span>
       </div>
+      {feedbackPending > 0 && (
+        <p data-testid={`feedback-pending-${cellKey}`} className="mt-2 text-xs font-bold text-amber-800">{t('posthire.pending', { count: feedbackPending })}</p>
+      )}
       {gem && <p className="mt-2 text-sm font-bold text-violet-800">{t('board.cells.hidden_gem.callout')}</p>}
       <p className="mt-2 text-sm text-slate-600">{t(`board.cells.${cellKey}.hint`)}</p>
 

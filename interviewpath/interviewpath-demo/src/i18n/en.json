@@ -26,7 +26,8 @@
     "signOut": "Sign out",
     "graph": "Knowledge graph",
     "copilot": "Copilot",
-    "jobs": "Jobs"
+    "jobs": "Jobs",
+    "learning": "Learning catalogue"
   },
   "auth": {
     "loadFailed": "We could not load your account. Check your connection and try again.",
@@ -1019,6 +1020,74 @@
       "high": "High share (%)",
       "minHired": "Minimum hired",
       "saved": "Saved"
+    }
+  },
+  "posthire": {
+    "pending": "Feedback to approve: {{count}}",
+    "feedback": {
+      "title": "Feedback to the candidate",
+      "intro": "Nothing is sent until you approve it. The message never mentions screening labels, confidential topics or other candidates.",
+      "none": "There is no draft yet.",
+      "write": "Write a draft",
+      "drafting": "Writing...",
+      "redraft": "Write it again",
+      "message": "Feedback message",
+      "status": {
+        "draft": "Waiting for your approval",
+        "sent": "Sent to the candidate"
+      },
+      "source": {
+        "ai": "AI draft, please read it",
+        "template_no_session": "Standard message (no interview)",
+        "template_ai_failed": "Standard message (the AI draft failed)",
+        "template_guard": "Standard message (the AI draft was not safe to send)"
+      },
+      "learning": "Suggested learning (from your catalogue)",
+      "noLearning": "No catalogue entry matches this message.",
+      "save": "Save changes",
+      "saveFirst": "Save your changes before approving.",
+      "approve": "Approve and send"
+    },
+    "queue": {
+      "title": "Feedback drafts waiting: {{count}}",
+      "intro": "Alias and the start of each message only. Open one to read and edit it.",
+      "selectAll": "Select all",
+      "clear": "Clear selection",
+      "select": "Select feedback for {{alias}}",
+      "approve": "Approve {{count}} selected",
+      "confirmTitle": "Confirm sending",
+      "confirm": "Send feedback to {{count}} candidates now?",
+      "confirmButton": "Send {{count}}"
+    },
+    "talent": {
+      "title": "Talent pool matches",
+      "intro": "People who agreed to be considered again. Aliases only. Finding matches uses the AI, so it runs when you ask.",
+      "find": "Find matches",
+      "none": "No one in the talent pool matches this job.",
+      "strength": {
+        "strong": "Strong match",
+        "partial": "Partial match",
+        "weak": "Weak match",
+        "unassessed": "Not assessed"
+      },
+      "mustHaves": "{{met}} of {{total}} must-haves met",
+      "invite": "Invite to apply",
+      "invited": "Invited as {{alias}}"
+    },
+    "learning": {
+      "eyebrow": "Post-hire",
+      "title": "Learning catalogue",
+      "intro": "Feedback links only to entries in this list. If no entry fits, no link is suggested.",
+      "add": "Add a learning resource",
+      "listTitle": "Catalogue",
+      "skill": "Skill",
+      "chooseSkill": "Choose a skill",
+      "name": "Title",
+      "url": "Link",
+      "provider": "Provider",
+      "language": "Language",
+      "addButton": "Add to catalogue",
+      "empty": "The catalogue is empty."
     }
   }
 }

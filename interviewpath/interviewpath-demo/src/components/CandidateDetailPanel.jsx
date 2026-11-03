@@ -6,6 +6,7 @@ import { BriefWorkflow } from './board/BriefEditor.jsx';
 import DecisionBar from './board/DecisionBar.jsx';
 import EvidenceTable from './board/EvidenceTable.jsx';
 import OutcomeControl from './board/OutcomeControl.jsx';
+import FeedbackEditor from './board/FeedbackEditor.jsx';
 import HrScorecard from './board/HrScorecard.jsx';
 import TranscriptPanel from './board/TranscriptPanel.jsx';
 import { ErrorAlert } from './KbFeedback.jsx';
@@ -95,6 +96,8 @@ function CandidateDetailPanel({ companyId, appId, onClose, onChanged }) {
           </section>
 
           <DecisionBar key={appId} companyId={companyId} detail={detail} onChanged={changed} />
+
+          {detail.hr_decision === 'rejected' && <FeedbackEditor key={`feedback-${appId}`} companyId={companyId} appId={appId} onChanged={onChanged} />}
 
           {detail.hr_decision === 'approved' && (
             <>

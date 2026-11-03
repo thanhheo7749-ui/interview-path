@@ -49,6 +49,12 @@ if [ "${E2E_SIMULATE:-}" = "1" ]; then
   $PY -m app.cli simulate-hiring --company insights --seed 42 > /dev/null
   PYTHONPATH=. $PY "$E2E_DIR/seed_insights.py" real "$E2E_TMP/insights_seed.json"
 fi
+if [ "${E2E_FEEDBACK:-}" = "1" ]; then
+  # A sample company for the feedback spec: undecided candidates, a skill, and one person in the talent pool.
+  FEEDBACK_PASSWORD=$($PY -m app.cli create-company --slug feedback --name "Feedback Company" --hr-email feedback-hr@e2e.test --hr-name "Feedback HR" --sample | awk '/Temporary password/ {print $NF}')
+  printf '%s' "$FEEDBACK_PASSWORD" > "$E2E_TMP/portal_e2e_feedback_password"
+  PYTHONPATH=. $PY "$E2E_DIR/seed_feedback.py" "$E2E_TMP/feedback_seed.json"
+fi
 # One user in two companies, to test that nothing from the previous company survives a switch.
 SWITCH_PASSWORD=$($PY -m app.cli create-company --slug switch-a --name "Switch Alpha" --hr-email switch-hr@e2e.test --hr-name "Switch HR" | awk '/Temporary password/ {print $NF}')
 printf '%s' "$SWITCH_PASSWORD" > "$E2E_TMP/portal_e2e_switch_password"

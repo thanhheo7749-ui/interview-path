@@ -45,7 +45,8 @@
     "signOut": "로그아웃",
     "graph": "지식 그래프",
     "copilot": "코파일럿",
-    "jobs": "채용공고"
+    "jobs": "채용공고",
+    "learning": "학습 카탈로그"
   },
   "auth": {
     "loadFailed": "계정을 불러오지 못했습니다. 연결을 확인하고 다시 시도해 주세요.",
@@ -476,6 +477,74 @@
       "high": "높은 기준 (%)",
       "minHired": "최소 채용 인원",
       "saved": "저장됨"
+    }
+  },
+  "posthire": {
+    "pending": "승인할 피드백: {{count}}",
+    "feedback": {
+      "title": "지원자에게 보내는 피드백",
+      "intro": "승인하기 전에는 아무것도 전송되지 않습니다. 메시지에는 심사 라벨, 비공개 주제, 다른 지원자에 대한 내용이 들어가지 않습니다.",
+      "none": "아직 초안이 없습니다.",
+      "write": "초안 작성",
+      "drafting": "작성 중...",
+      "redraft": "다시 작성",
+      "message": "피드백 메시지",
+      "status": {
+        "draft": "승인 대기 중",
+        "sent": "지원자에게 전송됨"
+      },
+      "source": {
+        "ai": "AI 초안, 꼭 읽어 보세요",
+        "template_no_session": "표준 메시지 (면접 없음)",
+        "template_ai_failed": "표준 메시지 (AI 초안 실패)",
+        "template_guard": "표준 메시지 (AI 초안이 전송하기에 안전하지 않음)"
+      },
+      "learning": "추천 학습 (귀사의 카탈로그에서)",
+      "noLearning": "이 메시지에 맞는 카탈로그 항목이 없습니다.",
+      "save": "변경 사항 저장",
+      "saveFirst": "승인하기 전에 변경 사항을 저장하세요.",
+      "approve": "승인 후 전송"
+    },
+    "queue": {
+      "title": "대기 중인 피드백 초안: {{count}}",
+      "intro": "별칭과 각 메시지의 첫 부분만 표시됩니다. 하나를 열어 읽고 수정하세요.",
+      "selectAll": "모두 선택",
+      "clear": "선택 해제",
+      "select": "{{alias}}의 피드백 선택",
+      "approve": "선택한 {{count}}건 승인",
+      "confirmTitle": "전송 확인",
+      "confirm": "지금 {{count}}명의 지원자에게 피드백을 보낼까요?",
+      "confirmButton": "{{count}}건 전송"
+    },
+    "talent": {
+      "title": "인재풀 매칭",
+      "intro": "다시 검토받는 데 동의한 사람들입니다. 별칭만 표시됩니다. 매칭에는 AI를 사용하므로 요청할 때만 실행됩니다.",
+      "find": "매칭 찾기",
+      "none": "이 공고에 맞는 인재풀 후보가 없습니다.",
+      "strength": {
+        "strong": "매우 적합",
+        "partial": "부분 적합",
+        "weak": "적합도 낮음",
+        "unassessed": "평가 안 됨"
+      },
+      "mustHaves": "필수 요건 {{total}}개 중 {{met}}개 충족",
+      "invite": "지원 초대",
+      "invited": "{{alias}}(으)로 초대됨"
+    },
+    "learning": {
+      "eyebrow": "채용 이후",
+      "title": "학습 카탈로그",
+      "intro": "피드백은 이 목록의 항목으로만 연결됩니다. 맞는 항목이 없으면 링크를 제안하지 않습니다.",
+      "add": "학습 자료 추가",
+      "listTitle": "카탈로그",
+      "skill": "스킬",
+      "chooseSkill": "스킬 선택",
+      "name": "제목",
+      "url": "링크",
+      "provider": "제공처",
+      "language": "언어",
+      "addButton": "카탈로그에 추가",
+      "empty": "카탈로그가 비어 있습니다."
     }
   }
 }
