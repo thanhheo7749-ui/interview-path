@@ -6,7 +6,10 @@ import BoardCell from '../components/board/BoardCell.jsx';
 import CandidateCard from '../components/CandidateCard.jsx';
 import CandidateDetailPanel from '../components/CandidateDetailPanel.jsx';
 import { ErrorAlert } from '../components/KbFeedback.jsx';
+import FeedbackQueue from '../components/board/FeedbackQueue.jsx';
+import TalentMatches from '../components/board/TalentMatches.jsx';
 import { LANES, bulkReject, getBoard } from '../lib/board.js';
+import { listFeedback } from '../lib/posthire.js';
 
 function BoardPage() {
   const { t } = useTranslation();
@@ -16,19 +19,25 @@ function BoardPage() {
   const [board, setBoard] = useState(null);
   const [error, setError] = useState('');
   const [selectedId, setSelectedId] = useState(null);
+  const [drafts, setDrafts] = useState([]);
 
   const reload = useCallback(async () => {
-    setBoard(await getBoard(companyId, jobId));
+    const [data, waiting] = await Promise.all([getBoard(companyId, jobId), listFeedback(companyId, jobId, 'draft')]);
+    setBoard(data);
+    setDrafts(waiting);
   }, [companyId, jobId]);
 
   useEffect(() => {
     if (companyId == null) return undefined;
     let cancelled = false;
-    getBoard(companyId, jobId)
-      .then((data) => { if (!cancelled) setBoard(data); })
+    Promise.all([getBoard(companyId, jobId), listFeedback(companyId, jobId, 'draft')])
+      .then(([data, waiting]) => { if (!cancelled) { setBoard(data); setDrafts(waiting); } })
       .catch((err) => { if (!cancelled) setError(err.message); });
     return () => { cancelled = true; };
   }, [companyId, jobId]);
+
+  const waiting = new Set(drafts.map((draft) => draft.application_id));
+  const pendingIn = (cell) => board.cells[cell].filter((card) => waiting.has(card.id)).length;
 
   const rejectMany = async (ids) => {
     setError('');
@@ -56,12 +65,15 @@ function BoardPage() {
             <p className="text-center text-xs font-bold uppercase tracking-wider text-slate-500">{t('board.axes.much')}</p>
             <p className="text-center text-xs font-bold uppercase tracking-wider text-slate-500">{t('board.axes.little')}</p>
             <p className="self-center text-xs font-bold uppercase tracking-wider text-slate-500 [writing-mode:vertical-rl] rotate-180">{t('board.axes.meets')}</p>
-            <BoardCell cellKey="priority" cards={board.cells.priority} selectedId={selectedId} onSelect={setSelectedId} onBulkReject={rejectMany} />
-            <BoardCell cellKey="strong_cv_unclear" cards={board.cells.strong_cv_unclear} selectedId={selectedId} onSelect={setSelectedId} onBulkReject={rejectMany} />
+            <BoardCell cellKey="priority" cards={board.cells.priority} selectedId={selectedId} onSelect={setSelectedId} onBulkReject={rejectMany} feedbackPending={pendingIn('priority')} />
+            <BoardCell cellKey="strong_cv_unclear" cards={board.cells.strong_cv_unclear} selectedId={selectedId} onSelect={setSelectedId} onBulkReject={rejectMany} feedbackPending={pendingIn('strong_cv_unclear')} />
             <p className="self-center text-xs font-bold uppercase tracking-wider text-slate-500 [writing-mode:vertical-rl] rotate-180">{t('board.axes.notMet')}</p>
-            <BoardCell cellKey="hidden_gem" cards={board.cells.hidden_gem} selectedId={selectedId} onSelect={setSelectedId} onBulkReject={rejectMany} />
-            <BoardCell cellKey="not_enough_evidence" cards={board.cells.not_enough_evidence} selectedId={selectedId} onSelect={setSelectedId} onBulkReject={rejectMany} />
+            <BoardCell cellKey="hidden_gem" cards={board.cells.hidden_gem} selectedId={selectedId} onSelect={setSelectedId} onBulkReject={rejectMany} feedbackPending={pendingIn('hidden_gem')} />
+            <BoardCell cellKey="not_enough_evidence" cards={board.cells.not_enough_evidence} selectedId={selectedId} onSelect={setSelectedId} onBulkReject={rejectMany} feedbackPending={pendingIn('not_enough_evidence')} />
           </div>
+
+          <FeedbackQueue companyId={companyId} drafts={drafts} onOpen={setSelectedId} onChanged={reload} />
+          <TalentMatches companyId={companyId} jobId={jobId} onInvited={reload} />
 
           <section aria-label={t('board.lanes.title')} className="space-y-3">
             <h2 className="text-base font-extrabold text-slate-950">{t('board.lanes.title')}</h2>

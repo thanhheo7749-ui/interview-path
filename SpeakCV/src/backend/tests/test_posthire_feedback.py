@@ -104,8 +104,14 @@ def edit(api, world, application_id, text):
     return api.patch(url(world, f"/applications/{application_id}/feedback"), headers=hr(world), json={"draft": text})
 
 
-def approve(api, world, *ids):
-    return api.post(url(world, "/feedback/approve"), headers=hr(world), json={"application_ids": list(ids)})
+def version(api, world, application_id):
+    """The version HR reads now. An id with no draft gets a made-up one, so the route's own 404 and 409 show."""
+    return api.get(url(world, f"/applications/{application_id}/feedback"), headers=hr(world)).json().get("version", "x")
+
+
+def approve(api, world, *ids, versions=None):
+    items = [{"application_id": i, "version": (versions or {}).get(i) or version(api, world, i)} for i in ids]
+    return api.post(url(world, "/feedback/approve"), headers=hr(world), json={"items": items})
 
 
 # 1. Rejecting creates a draft, not the generic notification
@@ -884,7 +890,7 @@ def test_feedback_routes_are_hr_only_and_company_scoped(db, world, api):
     tail = f"/applications/{application.id}/feedback"
     for method, path, body in (
         ("get", tail, None), ("patch", tail, {"draft": "Hello."}), ("post", tail + "/draft", None),
-        ("post", "/feedback/approve", {"application_ids": [application.id]}),
+        ("post", "/feedback/approve", {"items": [{"application_id": application.id, "version": "x"}]}),
     ):
         kwargs = {} if body is None else {"json": body}
         employee = world["people"]["emp"]["headers"]
@@ -903,9 +909,9 @@ def test_a_simulated_application_has_no_feedback_routes(db, world, api):
 
 
 def test_approve_limits_the_batch(db, world, api):
-    too_many = list(range(1, 202))
-    assert api.post(url(world, "/feedback/approve"), headers=hr(world), json={"application_ids": too_many}).status_code == 422
-    assert api.post(url(world, "/feedback/approve"), headers=hr(world), json={"application_ids": []}).status_code == 422
+    too_many = [{"application_id": i, "version": "x"} for i in range(1, 202)]
+    assert api.post(url(world, "/feedback/approve"), headers=hr(world), json={"items": too_many}).status_code == 422
+    assert api.post(url(world, "/feedback/approve"), headers=hr(world), json={"items": []}).status_code == 422
 
 
 def test_an_overlong_edit_is_refused(db, world, api):
@@ -1031,3 +1037,42 @@ def test_anonymizing_strips_the_decision_reason_and_keeps_feedback_audit_rows(db
     assert rows["feedback_drafted"] == {"source": "ai", "guard_failures": ["unverified_quote"], "language": "en"}
     assert db.query(RejectionFeedback).one().draft == ""
 
+
+def test_job_draft_list_shows_alias_status_whole_message_and_version_only(db, world, api):
+    first, second = rejected(db, world, "#A1"), rejected(db, world, "#A2")
+    draft_now(db, first)
+    draft_now(db, second)
+    approve(api, world, second.id)
+    gone = rejected(db, world, "#A3")
+    draft_now(db, gone)
+    gone.anonymized_at = datetime.now(timezone.utc)
+    simulated = make_application(db, world["job"], alias="#S9", hr_decision="rejected", is_simulated=True)
+    db.add(RejectionFeedback(company_id=world["company"].id, application_id=simulated.id, language="en", draft="x",
+                             status="draft"))
+    foreign = make_application(db, world["other_job"], alias="#F1", hr_decision="rejected")
+    draft_now(db, foreign)
+    db.commit()
+    path = url(world, f"/jobs/{world['job'].id}/feedback")
+    rows = api.get(path + "?status=draft", headers=hr(world)).json()
+    assert [(r["application_id"], r["alias"], r["status"]) for r in rows] == [(first.id, "#A1", "draft")]
+    assert set(rows[0]) == {"application_id", "alias", "status", "message", "version"}
+    assert rows[0]["message"] == row_for(db, first.id).draft and rows[0]["version"] == version(api, world, first.id)
+    assert [r["alias"] for r in api.get(path + "?status=sent", headers=hr(world)).json()] == ["#A2"]
+    assert sorted(r["alias"] for r in api.get(path, headers=hr(world)).json()) == ["#A1", "#A2"]
+    assert api.get(path + "?status=bogus", headers=hr(world)).status_code == 422
+    assert api.get(path, headers=world["people"]["emp"]["headers"]).status_code == 403
+    foreign_path = f"/api/companies/{world['other'].id}/jobs/{world['job'].id}/feedback"
+    assert api.get(foreign_path, headers=world["people"]["hr2"]["headers"]).status_code == 404
+
+
+def test_approve_refuses_text_that_changed_after_hr_read_it(db, world, api):
+    first, second = rejected(db, world, "#A1"), rejected(db, world, "#A2")
+    draft_now(db, first)
+    draft_now(db, second)
+    seen = {first.id: version(api, world, first.id), second.id: version(api, world, second.id)}
+    assert edit(api, world, first.id, "A different message nobody reviewed.").status_code == 200
+    reply = approve(api, world, first.id, second.id, versions=seen)
+    assert reply.status_code == 409 and "#A1" in reply.json()["detail"]["message"]
+    assert row_for(db, first.id).status == "draft" and row_for(db, second.id).status == "draft"
+    assert db.query(Notification).count() == 0
+    assert approve(api, world, first.id, second.id).json() == {"sent": 2}

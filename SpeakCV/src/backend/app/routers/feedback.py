@@ -1,7 +1,7 @@
 """HR routes for rejection feedback and the learning catalogue. HR only; every lookup filters on company_id."""
 import json
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session
@@ -11,7 +11,7 @@ from app.auth.dependencies import require_member
 from app.core.settings import max_upload_bytes
 from app.core.uploads import read_upload
 from app.database.database import get_db
-from app.database.sql_models import Application, CompanyMember, KbNode, LearningResource, RejectionFeedback
+from app.database.sql_models import Application, CompanyMember, Job, KbNode, LearningResource, RejectionFeedback
 from app.posthire import feedback, learning
 
 router = APIRouter()
@@ -25,8 +25,13 @@ class DraftEditIn(BaseModel):
     draft: str = Field(max_length=feedback.MAX_DRAFT_CHARS)
 
 
+class ApproveItem(BaseModel):
+    application_id: int
+    version: str = Field(max_length=64)
+
+
 class ApproveIn(BaseModel):
-    application_ids: list[int] = Field(min_length=1, max_length=MAX_BULK)
+    items: list[ApproveItem] = Field(min_length=1, max_length=MAX_BULK)
 
 
 class ResourcePatchIn(BaseModel):
@@ -64,6 +69,7 @@ def _out(db: Session, application: Application, row: RejectionFeedback) -> dict:
         "language": row.language,
         "draft": row.draft,
         "status": row.status,
+        "version": feedback.version_of(db, application.company_id, row),
         "source": feedback.source_of(db, application.id),
         "approved_by": row.approved_by,
         "sent_at": row.sent_at.isoformat() if row.sent_at else None,
@@ -85,6 +91,22 @@ def post_draft(company_id: int, app_id: int, member: CompanyMember = Depends(req
         db.rollback()
         raise _translate(error)
     return {**_out(db, application, row), "regenerated": row.draft != before}
+
+
+@router.get(BASE + "/jobs/{job_id}/feedback")
+def list_feedback(company_id: int, job_id: int, status: str | None = Query(None, pattern="^(draft|sent)$"),
+                  member: CompanyMember = Depends(require_member("hr")), db: Session = Depends(get_db)):
+    """The bulk-approval list: alias, status, the whole message and its version, nothing else about the person."""
+    if db.query(Job.id).filter(Job.id == job_id, Job.company_id == company_id).first() is None:
+        raise HTTPException(status_code=404, detail="Job not found")
+    query = (db.query(RejectionFeedback, Application.alias).join(Application, Application.id == RejectionFeedback.application_id)
+             .filter(Application.job_id == job_id, Application.company_id == company_id, Application.is_simulated.is_(False),
+                     Application.anonymized_at.is_(None)))
+    if status:
+        query = query.filter(RejectionFeedback.status == status)
+    return [{"application_id": row.application_id, "alias": alias, "status": row.status, "message": row.draft,
+             "version": feedback.version_of(db, company_id, row)}
+            for row, alias in query.order_by(RejectionFeedback.application_id).all()]
 
 
 @router.get(BASE + "/applications/{app_id}/feedback")
@@ -114,7 +136,7 @@ def patch_feedback(company_id: int, app_id: int, body: DraftEditIn, member: Comp
 def post_approve(company_id: int, body: ApproveIn, member: CompanyMember = Depends(require_member("hr")),
                  db: Session = Depends(get_db)):
     try:
-        sent = feedback.approve(db, company_id, body.application_ids, member.user_id)
+        sent = feedback.approve(db, company_id, [(i.application_id, i.version) for i in body.items], member.user_id)
     except feedback.FeedbackError as error:
         db.rollback()
         raise _translate(error)

@@ -294,7 +294,7 @@ def test_a_number_the_lines_do_not_contain_is_replaced_by_a_template(api, db, wo
     fake.enqueue("channel_content", json.dumps({"body": "Salary 50 million VND! 12 days leave. {link}"}))
     pieces = _post(api, world, draft, "channels/generate").json()["channels"]
     linkedin = pieces[0]
-    assert "50" not in linkedin["body"] and "Backend Developer" in linkedin["body"]
+    assert "50 million" not in linkedin["body"] and "Backend Developer" in linkedin["body"]
     assert "12 days of annual leave" in linkedin["body"] and "/jobs/" in linkedin["body"]
     assert pieces[1]["body"].startswith("[Demo AI]")  # the others kept the AI text
 

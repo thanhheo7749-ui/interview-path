@@ -26,7 +26,8 @@
     "signOut": "Đăng xuất",
     "graph": "Đồ thị tri thức",
     "copilot": "Copilot",
-    "jobs": "Việc làm"
+    "jobs": "Việc làm",
+    "learning": "Danh mục học tập"
   },
   "auth": {
     "loadFailed": "Không thể tải tài khoản của bạn. Hãy kiểm tra kết nối rồi thử lại.",
@@ -1018,6 +1019,91 @@
       "high": "Ngưỡng cao (%)",
       "minHired": "Số người tuyển tối thiểu",
       "saved": "Đã lưu"
+    }
+  },
+  "posthire": {
+    "pending": "Phản hồi chờ duyệt: {{count}}",
+    "feedback": {
+      "title": "Phản hồi gửi ứng viên",
+      "intro": "Không có gì được gửi cho đến khi bạn duyệt. Nội dung không bao giờ nhắc đến nhãn sàng lọc, chủ đề bảo mật hay ứng viên khác.",
+      "none": "Chưa có bản nháp.",
+      "write": "Viết bản nháp",
+      "drafting": "Đang viết...",
+      "redraft": "Viết lại",
+      "message": "Nội dung phản hồi",
+      "status": {
+        "draft": "Đang chờ bạn duyệt",
+        "sent": "Đã gửi cho ứng viên"
+      },
+      "source": {
+        "ai": "Bản nháp do AI viết, hãy đọc kỹ",
+        "template_no_session": "Thư mẫu (không có phỏng vấn)",
+        "template_ai_failed": "Thư mẫu (bản nháp AI thất bại)",
+        "template_guard": "Thư mẫu (bản nháp AI không an toàn để gửi)"
+      },
+      "learning": "Gợi ý học tập (từ danh mục của bạn)",
+      "noLearning": "Không có mục nào trong danh mục phù hợp với nội dung này.",
+      "save": "Lưu thay đổi",
+      "saveFirst": "Hãy lưu thay đổi trước khi duyệt.",
+      "approve": "Duyệt và gửi",
+      "redraftConfirm": "Thay nội dung bên trên, kể cả phần bạn đã sửa, bằng một bản nháp mới?",
+      "redraftYes": "Có, viết bản nháp mới"
+    },
+    "queue": {
+      "title": "Bản nháp phản hồi đang chờ: {{count}}",
+      "intro": "Chỉ hiện bí danh và phần đầu của mỗi thư. Mở một thư để đọc và chỉnh sửa.",
+      "selectAll": "Chọn tất cả",
+      "clear": "Bỏ chọn",
+      "select": "Chọn phản hồi cho {{alias}}",
+      "approve": "Duyệt {{count}} thư đã chọn",
+      "confirmTitle": "Xác nhận gửi",
+      "confirmButton": "Gửi {{count}}",
+      "confirm_other": "Gửi phản hồi cho {{count}} ứng viên ngay bây giờ?",
+      "expand": "Đọc toàn bộ",
+      "collapse": "Thu gọn",
+      "blocked": "{{alias}} chặn cả lô, chưa có gì được gửi: {{reasons}}"
+    },
+    "talent": {
+      "title": "Ứng viên phù hợp trong kho nhân tài",
+      "intro": "Những người đã đồng ý được xem xét lại. Chỉ hiện bí danh. Tìm ứng viên dùng AI nên chỉ chạy khi bạn yêu cầu.",
+      "find": "Tìm ứng viên phù hợp",
+      "none": "Không có ai trong kho nhân tài phù hợp với việc làm này.",
+      "strength": {
+        "strong": "Rất phù hợp",
+        "partial": "Phù hợp một phần",
+        "weak": "Ít phù hợp",
+        "unassessed": "Chưa đánh giá"
+      },
+      "mustHaves": "Đáp ứng {{met}}/{{total}} yêu cầu bắt buộc",
+      "invite": "Mời ứng tuyển",
+      "invited": "Đã mời với bí danh {{alias}}"
+    },
+    "learning": {
+      "eyebrow": "Sau tuyển dụng",
+      "title": "Danh mục học tập",
+      "intro": "Phản hồi chỉ dẫn đến các mục trong danh sách này. Nếu không có mục nào phù hợp, sẽ không có liên kết nào được gợi ý.",
+      "add": "Thêm tài nguyên học tập",
+      "listTitle": "Danh mục",
+      "skill": "Kỹ năng",
+      "chooseSkill": "Chọn một kỹ năng",
+      "name": "Tiêu đề",
+      "url": "Liên kết",
+      "provider": "Nhà cung cấp",
+      "language": "Ngôn ngữ",
+      "addButton": "Thêm vào danh mục",
+      "empty": "Danh mục đang trống."
+    },
+    "problems": {
+      "empty": "Nội dung đang trống",
+      "label_wording": "Có nhắc đến nhãn hoặc kết quả sàng lọc",
+      "comparison": "So sánh ứng viên với người khác",
+      "confidential": "Nhắc đến chủ đề bảo mật",
+      "unverified_quote": "Trích lời mà ứng viên không nói",
+      "unknown_link": "Liên kết đến trang không có trong danh mục học tập của bạn",
+      "candidate_gone": "Dữ liệu của ứng viên đã bị xóa",
+      "not_rejected": "Ứng viên chưa bị từ chối",
+      "no_draft": "Chưa có bản nháp",
+      "changed": "Nội dung đã thay đổi sau khi bạn đọc"
     }
   }
 }

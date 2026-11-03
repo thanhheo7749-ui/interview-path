@@ -24,6 +24,7 @@ import HiringRequestsPage from './routes/HiringRequestsPage.jsx';
 import IntakePage from './routes/IntakePage.jsx';
 import InterviewBriefPage from './routes/InterviewBriefPage.jsx';
 import MyInterviewsPage from './routes/MyInterviewsPage.jsx';
+import LearningPage from './routes/LearningPage.jsx';
 import JdStudioPage from './routes/JdStudioPage.jsx';
 import DemoAiNotice from './components/DemoAiNotice.jsx';
 import { useCompany } from './company/CompanyContext.jsx';
@@ -93,6 +94,7 @@ function App() {
           <Route path="/gaps" element={<GapsPage />} />
           <Route path="/graph" element={<GraphPage />} />
           <Route path="/trust" element={<TrustPage />} />
+          <Route path="/learning" element={<LearningPage />} />
           <Route path="/jobs" element={<JobsPage />} />
           <Route path="/jobs/new" element={<JobEditorPage />} />
           <Route path="/jobs/:jobId" element={<JobEditorPage />} />

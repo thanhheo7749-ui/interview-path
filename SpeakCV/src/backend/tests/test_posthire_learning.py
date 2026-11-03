@@ -271,7 +271,7 @@ def test_the_prompt_receives_ids_and_code_resolves_title_and_url(db, world, api)
     assert feedback.guard(draft.draft, application) == []
 
     reply = api.post(f"/api/companies/{world['company'].id}/feedback/approve", headers=hr(world),
-                     json={"application_ids": [application.id]})
+                     json={"items": [{"application_id": application.id, "version": read_version(api, world, application.id)}]})
     assert reply.status_code == 200, reply.text
     body = api.get(f"/api/applications/{application.id}/feedback", headers=auth_header(CANDIDATE_EMAIL)).json()
     assert body["learning"] == [{"id": row.id, "title": "Docker Foundations", "url": LINK, "provider": "Acme Academy",
@@ -406,7 +406,7 @@ def test_a_catalogue_row_deleted_after_drafting_stops_the_send(db, world, api):
     db.delete(db.get(LearningResource, row.id))
     db.commit()
     reply = api.post(f"/api/companies/{world['company'].id}/feedback/approve", headers=hr(world),
-                     json={"application_ids": [application.id]})
+                     json={"items": [{"application_id": application.id, "version": read_version(api, world, application.id)}]})
     assert reply.status_code == 422
 
 
@@ -447,3 +447,8 @@ def test_a_template_has_no_learning_section(db, world):
     fake.register("rejection_feedback", boom)
     draft = feedback.draft(db, application, None)
     assert LINK not in draft.draft
+
+
+def read_version(api, world, application_id):
+    reply = api.get(f"/api/companies/{world['company'].id}/applications/{application_id}/feedback", headers=hr(world))
+    return reply.json()["version"]
