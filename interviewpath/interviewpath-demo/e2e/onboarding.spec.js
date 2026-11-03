@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { expect, test } from '@playwright/test';
-import { API_URL, NEW_PASSWORD, ONBOARDING_USER, ensurePasswordChanged, fillLogin, hrSession, signIn } from './helpers.js';
+import { API_URL, NEW_PASSWORD, ONBOARDING_USER, ensurePasswordChanged, fillLogin, hrSession, publishInternalNote, signIn } from './helpers.js';
 
 // HR approves the candidate and records "hired", then drafts a 30-60-90 plan from the team's knowledge. The department's
 // manager edits it, HR approves it, and the hire signs in as an employee, ticks an item and asks Copilot. The manager
@@ -20,36 +20,10 @@ const EDITED_TITLE = 'Day 30: read the lantern guide';
 let seed;
 let planId;
 
-// HR publishes one internal note, so the plan has knowledge to draw from and the Copilot has something to answer with.
-async function publishInternalNote(request, { headers, companyId }) {
-  const kb = `${API_URL}/api/companies/${companyId}/kb`;
-  const upload = await request.post(`${kb}/documents`, {
-    headers,
-    multipart: {
-      title: INTERNAL_TITLE,
-      visibility: 'internal',
-      language: 'en',
-      file: { name: 'note.txt', mimeType: 'text/plain', buffer: Buffer.from(`${INTERNAL_LINE}\n\nThis note was written for the end-to-end test.`) },
-    },
-  });
-  expect(upload.status()).toBe(201);
-  const { document } = await upload.json();
-  await expect
-    .poll(async () => (await (await request.get(`${kb}/documents`, { headers })).json()).find((d) => d.id === document.id)?.status, { timeout: 30000 })
-    .toBe('review');
-  const review = await (await request.get(`${kb}/review?document_id=${document.id}`, { headers })).json();
-  expect(review.nodes.length).toBeGreaterThan(0);
-  const decided = await request.post(`${kb}/review/decide`, {
-    headers,
-    data: { items: review.nodes.map((n) => ({ action: 'accept', node_id: n.id, visibility: 'internal' })) },
-  });
-  expect(decided.ok()).toBe(true);
-}
-
 test.beforeAll(async ({ request }) => {
   seed = JSON.parse(readFileSync(join(process.env.E2E_TMP, 'onboarding_seed.json'), 'utf8'));
   await ensurePasswordChanged(request, ONBOARDING_USER);
-  await publishInternalNote(request, await hrSession(request, ONBOARDING_USER.email, NEW_PASSWORD));
+  await publishInternalNote(request, await hrSession(request, ONBOARDING_USER.email, NEW_PASSWORD), { title: INTERNAL_TITLE, line: INTERNAL_LINE });
 });
 
 // A second browser session for someone who signs in with a known password. English is chosen so a manager does not get Korean.
