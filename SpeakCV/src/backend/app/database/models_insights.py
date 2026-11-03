@@ -11,7 +11,7 @@ CHANNEL_COST_SOURCES = ("manual", "csv", "simulated")
 SIMULATED_COST_SOURCE = "simulated"
 FEEDBACK_STATUSES = ("draft", "approved", "sent")
 TALENT_POOL_STATUSES = ("active", "expired", "left")
-ONBOARDING_STATUSES = ("draft", "approved", "active")
+ONBOARDING_STATUSES = ("draft", "active")
 ONBOARDING_PHASES = (30, 60, 90)
 PROBATION_RESULTS = ("passed", "failed", "extended")
 
