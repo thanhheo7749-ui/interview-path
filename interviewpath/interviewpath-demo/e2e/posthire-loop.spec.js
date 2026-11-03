@@ -254,7 +254,8 @@ test('5. ticking the talent pool is a separate consent that the company can then
   expect(JSON.stringify(found)).not.toContain(EMAIL_A);
 });
 
-test('6. leaving the talent pool deletes the CV the company kept', async ({ page }) => {
+test('6. after leaving the talent pool the company can no longer find the person, and an invite gets 409', async ({ page }) => {
+  // That the kept CV text is deleted is proved by test_leaving_deletes_the_cv_withdraws_the_consent_and_is_idempotent in tests/test_posthire_talent_pool.py.
   const candidate = state.pageA;
   await candidate.goto('/my-data');
   await expect(candidate.getByTestId('pool-status-active')).toBeVisible();
