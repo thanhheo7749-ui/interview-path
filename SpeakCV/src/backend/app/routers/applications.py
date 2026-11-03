@@ -1,5 +1,6 @@
 """Candidate routes. Every lookup filters on the signed-in user. No response schema here holds the CV label or text."""
 import os
+from datetime import timedelta
 
 from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, Query, Request, UploadFile
 from fastapi.concurrency import run_in_threadpool
@@ -60,6 +61,7 @@ class ApplicationOut(BaseModel):
     email_enabled: bool = False  # whether this deployment can send email at all
     contact_email: str | None = None  # the candidate's own account email, only once they are approved
     feedback: "FeedbackOut | None" = None  # only what HR approved and sent
+    reapply_after: str | None = None  # once rejected: the first day the same job takes a new application
 
 
 class LearningItem(BaseModel):
@@ -132,6 +134,8 @@ def _out(db: Session, application: Application, **overrides) -> ApplicationOut:
             owner = db.get(User, application.candidate_user_id)
             fields["contact_email"] = owner.email if owner is not None else None
         fields["feedback"] = rejection_feedback.candidate_view(db, application)
+        if decision == "rejected" and application.created_at is not None:
+            fields["reapply_after"] = (application.created_at + timedelta(days=consents.REAPPLY_DAYS)).isoformat()
     return ApplicationOut(**{**fields, **overrides})
 
 

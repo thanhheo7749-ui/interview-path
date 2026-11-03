@@ -14,7 +14,7 @@ from app.brain import audience
 from app.bridges import brief
 from app.database.database import get_db
 from app.database.sql_models import (
-    Application, CandidateBrief, CompanyMember, HiringRequest, InterviewScorecard, Job, JobRequirement, User,
+    Application, CandidateBrief, CompanyMember, HiringRequest, InterviewScorecard, Job, JobRequirement, OnboardingPlan, User,
 )
 from app.hiring import decisions
 from app.schemas.bridges import BriefIn, BriefPatch, OutcomeIn, ScorecardIn
@@ -180,10 +180,12 @@ def list_my_interviews(company_id: int, member: CompanyMember = Depends(require_
         application_id for (application_id,) in db.query(InterviewScorecard.application_id).filter(
             InterviewScorecard.company_id == company_id, InterviewScorecard.manager_user_id == member.user_id).all()
     }
+    plans = dict(db.query(OnboardingPlan.application_id, OnboardingPlan.id).filter(
+        OnboardingPlan.company_id == company_id, OnboardingPlan.application_id.in_([a.id for a, _, _ in rows])))
     return [
         {"application_id": application.id, "alias": application.alias, "job_id": job.id, "job_title": job.title,
          "language": row.language, "sent_at": brief.utc_iso(row.sent_at),
-         "scored": application.id in scored}
+         "scored": application.id in scored, "onboarding_plan_id": plans.get(application.id)}
         for application, job, row in rows
     ]
 

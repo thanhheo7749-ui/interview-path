@@ -5,17 +5,19 @@ import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
 import { format, useLang } from "@/lib/i18n";
 import {
-  Application, deleteMyApplication, listMyApplications, listMyConsents, MyConsent, withdrawConsent,
+  Application, deleteMyApplication, HiringError, leaveTalentPool, listMyApplications, listMyConsents, listMyTalentEntries, MyConsent,
+  TalentEntry, withdrawConsent,
 } from "@/services/hiring";
 import { ConfirmDialog, LangToggle } from "@/components/Hiring/SampleNotice";
 
-type Pending = { kind: "consent"; id: number; purpose: string } | { kind: "application"; id: number } | null;
+type Pending = { kind: "consent"; id: number; purpose: string } | { kind: "application"; id: number } | { kind: "pool"; id: number } | null;
 
 export default function MyDataPage() {
   const { t, lang } = useLang();
   const { user, isLoading } = useAuth();
   const [apps, setApps] = useState<Application[] | null>(null);
   const [consents, setConsents] = useState<MyConsent[] | null>(null);
+  const [pool, setPool] = useState<TalentEntry[]>([]);
   const [error, setError] = useState("");
   const [pending, setPending] = useState<Pending>(null);
   const [busy, setBusy] = useState(false);
@@ -32,6 +34,11 @@ export default function MyDataPage() {
     } catch {
       setError(t.genericError);
     }
+    try {
+      setPool(await listMyTalentEntries());
+    } catch {
+      setError(t.genericError);
+    }
   }, [t.genericError]);
 
   useEffect(() => {
@@ -44,6 +51,10 @@ export default function MyDataPage() {
     setDialogError("");
     try {
       if (pending.kind === "consent") await withdrawConsent(pending.id);
+      else if (pending.kind === "pool") await leaveTalentPool(pending.id).catch((err) => {
+        // After the application was anonymized the entry has no row left to find: it is already gone.
+        if (!(err instanceof HiringError && err.status === 404)) throw err;
+      });
       else await deleteMyApplication(pending.id);
       setPending(null);
       await load();
@@ -84,20 +95,31 @@ export default function MyDataPage() {
           <h2 className="text-lg font-bold text-theme-text">{t.consentsHeading}</h2>
           {consents && consents.length === 0 && <p className="text-sm text-theme-muted">{t.consentsEmpty}</p>}
           <ul className="space-y-2">
-            {consents?.map((c) => (
+            {consents?.map((c) => {
+              const entry = c.purpose === "talent_pool" ? pool.find((e) => e.consent_id === c.id) : undefined;
+              return (
               <li key={c.id} className="rounded-xl border border-theme-border bg-theme-surface p-3">
                 <p className="text-sm font-bold text-theme-text">{c.purpose}{c.job_title ? `: ${c.job_title}` : ""}</p>
                 <p className="text-xs text-theme-muted">
                   {format(t.consentGranted, { date: date(c.granted_at) })}
                   {c.withdrawn_at ? `. ${format(t.consentWithdrawnOn, { date: date(c.withdrawn_at) })}` : ""}
                 </p>
-                {!c.withdrawn_at && (
-                  <button onClick={() => setPending({ kind: "consent", id: c.id, purpose: c.purpose })} className="mt-2 text-sm text-red-400 underline">
-                    {t.withdrawConsent}
+                {entry && (
+                  <p className="text-xs text-theme-text-secondary" data-testid={`pool-status-${entry.status}`}>
+                    {entry.status === "active" ? format(t.poolActive, { date: date(entry.expires_at) }) : entry.status === "expired" ? t.poolExpired : t.poolLeft}
+                  </p>
+                )}
+                {!c.withdrawn_at && (entry ? entry.status === "active" : true) && (
+                  <button
+                    onClick={() => setPending(entry ? { kind: "pool", id: entry.id } : { kind: "consent", id: c.id, purpose: c.purpose })}
+                    className="mt-2 text-sm text-red-400 underline"
+                  >
+                    {entry ? t.leavePool : t.withdrawConsent}
                   </button>
                 )}
               </li>
-            ))}
+              );
+            })}
           </ul>
         </section>
 
@@ -119,9 +141,18 @@ export default function MyDataPage() {
 
         {pending && (
           <ConfirmDialog
-            title={pending.kind === "application" ? t.deleteTitle : t.withdrawConsentTitle}
-            body={pending.kind === "application" ? t.deleteBody : pending.purpose === "recording_screening" ? t.withdrawRecordingBody : t.withdrawCvBody}
-            confirmLabel={busy ? (pending.kind === "application" ? t.deleting : t.sending) : pending.kind === "application" ? t.deleteApplication : t.withdrawConsent}
+            title={pending.kind === "application" ? t.deleteTitle : pending.kind === "pool" ? t.leavePoolTitle : t.withdrawConsentTitle}
+            body={
+              pending.kind === "application" ? t.deleteBody
+                : pending.kind === "pool" ? t.leavePoolBody
+                : pending.purpose === "recording_screening" ? t.withdrawRecordingBody
+                : pending.purpose === "onboarding_use" ? t.withdrawOnboardingBody
+                : t.withdrawCvBody
+            }
+            confirmLabel={
+              busy ? (pending.kind === "application" ? t.deleting : pending.kind === "pool" ? t.leaving : t.sending)
+                : pending.kind === "application" ? t.deleteApplication : pending.kind === "pool" ? t.leavePool : t.withdrawConsent
+            }
             busy={busy}
             error={dialogError}
             onConfirm={confirm}

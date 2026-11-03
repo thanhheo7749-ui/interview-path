@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { useCompany } from '../company/CompanyContext.jsx';
-import { EmptyState, ErrorAlert, cardClass, primaryButton } from '../components/KbFeedback.jsx';
+import { EmptyState, ErrorAlert, cardClass, primaryButton, secondaryButton } from '../components/KbFeedback.jsx';
 import { listMyInterviews } from '../lib/bridges.js';
 
 // The manager's interviews: briefs HR approved and sent. The list shows the candidate's alias only.
@@ -41,9 +41,16 @@ function MyInterviewsPage() {
                   {item.scored ? t('bridges.interviews.scored') : t('bridges.interviews.notScored')}
                 </p>
               </div>
-              <Link to={`/my-interviews/${item.application_id}`} className={primaryButton}>
-                {t('bridges.interviews.open')}
-              </Link>
+              <div className="flex items-center gap-2">
+                {item.onboarding_plan_id && (
+                  <Link to={`/onboarding/${item.onboarding_plan_id}`} className={secondaryButton}>
+                    {t('onboarding.start.open')}
+                  </Link>
+                )}
+                <Link to={`/my-interviews/${item.application_id}`} className={primaryButton}>
+                  {t('bridges.interviews.open')}
+                </Link>
+              </div>
             </li>
           ))}
         </ul>

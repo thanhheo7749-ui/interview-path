@@ -657,3 +657,33 @@ def test_hr_reads_the_plan(client, s):
     assert read.json()["used_interview_data"] is True
     assert client.get(company_url(s, "/onboarding/999999"), headers=HR).status_code == 404
     assert client.get(company_url(s, f"/onboarding/{plan['id']}"), headers=auth_header("hr@other.test")).status_code == 403
+
+
+# --- 11. what the pages need ------------------------------------------------------------------------------------------
+
+def test_the_plan_names_the_alias_the_job_and_the_probation_result(client, s):
+    plan = create(client, s).json()
+    assert (plan["alias"], plan["job_title"], plan["probation_result"]) == ("#A1", "Backend Developer", None)
+    client.post(probation_url(s), headers=ENG_MANAGER, json={"result": "extended"})
+    shown = client.get(company_url(s, f"/onboarding/{plan['id']}"), headers=ENG_MANAGER).json()
+    assert shown["probation_result"] == "extended"
+
+
+def test_the_board_and_the_managers_list_point_at_the_plan(client, db, s):
+    from app.database.sql_models import CandidateBrief
+
+    board_url = company_url(s, f"/applications/{s.application.id}")
+    assert client.get(board_url, headers=HR).json()["onboarding_plan_id"] is None
+    plan = create(client, s).json()
+    assert client.get(board_url, headers=HR).json()["onboarding_plan_id"] == plan["id"]
+    db.add(CandidateBrief(company_id=s.w.company.id, application_id=s.application.id, language="en", status="sent"))
+    db.commit()
+    listed = client.get(company_url(s, "/my-interviews"), headers=ENG_MANAGER).json()
+    assert [row["onboarding_plan_id"] for row in listed] == [plan["id"]]
+
+
+def test_the_consent_text_says_which_language_it_is_in(client, db):
+    s = build(db, consent=False)
+    url = f"/api/applications/{s.application.id}/onboarding-consent"
+    assert client.get(url + "?language=ko", headers=s.hire).json()["language"] == "en"
+    assert client.get(url + "?language=vi", headers=s.hire).json()["language"] == "vi"

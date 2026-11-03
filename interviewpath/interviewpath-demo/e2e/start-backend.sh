@@ -55,6 +55,10 @@ if [ "${E2E_FEEDBACK:-}" = "1" ]; then
   printf '%s' "$FEEDBACK_PASSWORD" > "$E2E_TMP/portal_e2e_feedback_password"
   PYTHONPATH=. $PY "$E2E_DIR/seed_feedback.py" "$E2E_TMP/feedback_seed.json"
 fi
+# A company for the onboarding spec: a hire, a manager and a job, written by seed_onboarding.py.
+ONBOARDING_PASSWORD=$($PY -m app.cli create-company --slug onboarding --name "Onboarding Company" --hr-email onboarding-hr@e2e.test --hr-name "Onboarding HR" | awk '/Temporary password/ {print $NF}')
+printf '%s' "$ONBOARDING_PASSWORD" > "$E2E_TMP/portal_e2e_onboarding_password"
+PYTHONPATH=. $PY "$E2E_DIR/seed_onboarding.py" "$E2E_TMP/onboarding_seed.json"
 # One user in two companies, to test that nothing from the previous company survives a switch.
 SWITCH_PASSWORD=$($PY -m app.cli create-company --slug switch-a --name "Switch Alpha" --hr-email switch-hr@e2e.test --hr-name "Switch HR" | awk '/Temporary password/ {print $NF}')
 printf '%s' "$SWITCH_PASSWORD" > "$E2E_TMP/portal_e2e_switch_password"

@@ -121,7 +121,11 @@ def _items_out(db: Session, plan: OnboardingPlan) -> list[dict]:
 
 def _plan_out(db: Session, plan: OnboardingPlan) -> dict:
     """For HR and managers."""
-    return {"id": plan.id, "application_id": plan.application_id, "status": plan.status,
+    application = db.get(Application, plan.application_id)
+    job = db.get(Job, application.job_id)
+    probation = db.query(ProbationOutcome.result).filter_by(application_id=application.id).scalar()
+    return {"id": plan.id, "application_id": plan.application_id, "alias": application.alias, "job_title": job.title,
+            "probation_result": probation, "status": plan.status,
             "used_interview_data": plan.used_interview_data, "employee_user_id": plan.employee_user_id,
             "approved_by": plan.approved_by, "items": _items_out(db, plan)}
 
@@ -238,7 +242,7 @@ def _consent_out(db: Session, application: Application, language: str) -> dict:
         Consent.user_id == application.candidate_user_id, Consent.application_id == application.id,
         Consent.purpose == onboarding.PURPOSE, Consent.withdrawn_at.is_(None)).first()
     return {"purpose": onboarding.PURPOSE, "version": current.version, "text": current.text,
-            "granted": active is not None, "consent_id": active.id if active else None}
+            "language": current.language, "granted": active is not None, "consent_id": active.id if active else None}
 
 
 @router.get("/api/applications/{application_id}/onboarding-consent")

@@ -56,6 +56,40 @@ export interface Application {
   email_enabled: boolean;
   /** The candidate's own account email, only once approved. */
   contact_email: string | null;
+  /** Only what HR approved and sent. */
+  feedback?: Feedback | null;
+  /** Once rejected: the first day this job takes a new application. */
+  reapply_after?: string | null;
+}
+
+export interface LearningItem { id: number; title: string; url: string; provider: string; language: string }
+export interface Feedback {
+  application_id: number;
+  language: string;
+  message: string;
+  learning: LearningItem[];
+  sent_at: string | null;
+}
+
+export type TalentStatus = "active" | "expired" | "left";
+export interface TalentEntry {
+  id: number;
+  application_id: number;
+  consent_id: number;
+  status: TalentStatus;
+  expires_at: string;
+  job_title: string;
+  company_name: string;
+}
+
+/** `language` is the language of `text`, which may not be the one asked for. */
+export interface OnboardingConsent {
+  purpose: string;
+  version: string;
+  language: string;
+  text: string;
+  granted: boolean;
+  consent_id: number | null;
 }
 
 export interface FitItem { requirement_id: number; text: string; fit: "matches" | "partly" | "not_seen" | "not_assessed" }
@@ -222,3 +256,17 @@ export async function fetchQuestionAudio(sessionId: number, position: number): P
     return null;
   }
 }
+
+// ---------- after the decision: talent pool and onboarding consent ----------
+
+export const listMyTalentEntries = () => request<TalentEntry[]>("/me/talent-pool");
+export const joinTalentPool = (applicationId: number, consent: ConsentText) =>
+  request<TalentEntry>(`/applications/${applicationId}/talent-pool`, json({ consent_version: consent.version, consent_language: consent.language }));
+/** A second call after the entry was anonymized returns 404: the caller treats that as done. */
+export const leaveTalentPool = (entryId: number) => request<{ id: number; status: string }>(`/talent-pool/${entryId}/leave`, { method: "POST" });
+
+/** 409 means this application is not a hire, so there is nothing to ask. */
+export const getOnboardingConsent = (applicationId: number, language: string) =>
+  request<OnboardingConsent>(`/applications/${applicationId}/onboarding-consent?language=${encodeURIComponent(language)}`);
+export const grantOnboardingConsent = (applicationId: number, consent: OnboardingConsent, language: string) =>
+  request<OnboardingConsent>(`/applications/${applicationId}/onboarding-consent`, json({ version: consent.version, language }));
