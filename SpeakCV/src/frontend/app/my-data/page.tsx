@@ -65,6 +65,11 @@ export default function MyDataPage() {
     }
   };
 
+  const purposeName = (purpose: string) =>
+    ({ cv_processing: t.purposeCv, recording_screening: t.purposeRecording, onboarding_use: t.purposeOnboarding, talent_pool: t.purposePool } as Record<string, string>)[purpose] ?? t.purposeOther;
+  // A talent-pool consent is always left as a pool entry is: the kept CV is deleted now, even if the pool list did not load.
+  const leavesPool = pending?.kind === "pool" || (pending?.kind === "consent" && pending.purpose === "talent_pool");
+
   const date = (iso: string | null) =>
     iso ? new Date(iso).toLocaleDateString(lang === "vi" ? "vi-VN" : "en-GB") : "";
 
@@ -99,7 +104,7 @@ export default function MyDataPage() {
               const entry = c.purpose === "talent_pool" ? pool.find((e) => e.consent_id === c.id) : undefined;
               return (
               <li key={c.id} className="rounded-xl border border-theme-border bg-theme-surface p-3">
-                <p className="text-sm font-bold text-theme-text">{c.purpose}{c.job_title ? `: ${c.job_title}` : ""}</p>
+                <p className="text-sm font-bold text-theme-text">{purposeName(c.purpose)}{c.job_title ? `: ${c.job_title}` : ""}</p>
                 <p className="text-xs text-theme-muted">
                   {format(t.consentGranted, { date: date(c.granted_at) })}
                   {c.withdrawn_at ? `. ${format(t.consentWithdrawnOn, { date: date(c.withdrawn_at) })}` : ""}
@@ -114,7 +119,7 @@ export default function MyDataPage() {
                     onClick={() => setPending(entry ? { kind: "pool", id: entry.id } : { kind: "consent", id: c.id, purpose: c.purpose })}
                     className="mt-2 text-sm text-red-400 underline"
                   >
-                    {entry ? t.leavePool : t.withdrawConsent}
+                    {c.purpose === "talent_pool" ? t.leavePool : t.withdrawConsent}
                   </button>
                 )}
               </li>
@@ -141,17 +146,17 @@ export default function MyDataPage() {
 
         {pending && (
           <ConfirmDialog
-            title={pending.kind === "application" ? t.deleteTitle : pending.kind === "pool" ? t.leavePoolTitle : t.withdrawConsentTitle}
+            title={pending.kind === "application" ? t.deleteTitle : leavesPool ? t.leavePoolTitle : t.withdrawConsentTitle}
             body={
               pending.kind === "application" ? t.deleteBody
-                : pending.kind === "pool" ? t.leavePoolBody
+                : leavesPool ? t.leavePoolBody
                 : pending.purpose === "recording_screening" ? t.withdrawRecordingBody
                 : pending.purpose === "onboarding_use" ? t.withdrawOnboardingBody
                 : t.withdrawCvBody
             }
             confirmLabel={
-              busy ? (pending.kind === "application" ? t.deleting : pending.kind === "pool" ? t.leaving : t.sending)
-                : pending.kind === "application" ? t.deleteApplication : pending.kind === "pool" ? t.leavePool : t.withdrawConsent
+              busy ? (pending.kind === "application" ? t.deleting : leavesPool ? t.leaving : t.sending)
+                : pending.kind === "application" ? t.deleteApplication : leavesPool ? t.leavePool : t.withdrawConsent
             }
             busy={busy}
             error={dialogError}

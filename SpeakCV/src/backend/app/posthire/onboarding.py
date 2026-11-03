@@ -326,12 +326,7 @@ def mark_done(db: Session, item: OnboardingItem, plan: OnboardingPlan) -> Onboar
     if item.done_at is None:
         item.done_at = datetime.now(timezone.utc)
         db.flush()
-    remaining = db.query(OnboardingItem.id).filter(OnboardingItem.plan_id == plan.id,
-                                                   OnboardingItem.done_at.is_(None)).first()
-    if remaining is None and plan.status == "active":
-        plan.status = "done"
-        db.flush()
-    return item
+    return item  # the plan stays active: HR and managers must not learn that the hire finished
 
 
 # --- probation ------------------------------------------------------------------------------------------------------

@@ -18,6 +18,7 @@ from app.database.sql_models import (
 )
 from app.hiring import audit, consents
 from app.posthire import onboarding
+from app.routers.interviews import job_scope
 
 router = APIRouter()
 
@@ -64,12 +65,12 @@ def _not_found(what: str) -> HTTPException:
 # --- lookups --------------------------------------------------------------------------------------------------------
 
 def _may_manage(db: Session, member: CompanyMember, job: Job | None) -> bool:
-    """HR for any job. A manager for a job in their own department subtree."""
+    """HR for any job. A manager by the same rule as their interviews (see interviews.job_scope)."""
     if member.role == "hr":
         return True
-    if job is None or job.department_id is None:
+    if job is None:
         return False
-    return job.department_id in aud.department_subtree(db, member.company_id, member.department_id)
+    return db.query(Job.id).filter(Job.id == job.id, Job.company_id == member.company_id, job_scope(db, member)).first() is not None
 
 
 def _application(db: Session, company_id: int, application_id: int) -> Application:
@@ -93,7 +94,7 @@ def _managed_plan(db: Session, member: CompanyMember, plan_id: int) -> Onboardin
 
 # --- output ---------------------------------------------------------------------------------------------------------
 
-def _items_out(db: Session, plan: OnboardingPlan) -> list[dict]:
+def _items_out(db: Session, plan: OnboardingPlan, progress: bool = False) -> list[dict]:
     rows = (db.query(OnboardingItem).filter(OnboardingItem.plan_id == plan.id)
             .order_by(OnboardingItem.phase, OnboardingItem.id).all())
     node_ids = {row.source_node_id for row in rows if row.source_node_id}
@@ -114,13 +115,13 @@ def _items_out(db: Session, plan: OnboardingPlan) -> list[dict]:
             "source_node_id": row.source_node_id, "source_title": titles.get(row.source_node_id),
             "learning_resource": {"id": resource.id, "title": resource.title, "url": resource.url,
                                   "provider": resource.provider} if resource else None,
-            "done_at": row.done_at.isoformat() if row.done_at else None,
+            **({"done_at": row.done_at.isoformat() if row.done_at else None} if progress else {}),
         })
     return out
 
 
 def _plan_out(db: Session, plan: OnboardingPlan) -> dict:
-    """For HR and managers."""
+    """For HR and managers: never the hire's ticks, which are the hire's own."""
     application = db.get(Application, plan.application_id)
     job = db.get(Job, application.job_id)
     probation = db.query(ProbationOutcome.result).filter_by(application_id=application.id).scalar()
@@ -132,7 +133,7 @@ def _plan_out(db: Session, plan: OnboardingPlan) -> dict:
 
 def _checklist_out(db: Session, plan: OnboardingPlan) -> dict:
     """For the hire: no approval or consent details."""
-    return {"id": plan.id, "status": plan.status, "items": _items_out(db, plan)}
+    return {"id": plan.id, "status": plan.status, "items": _items_out(db, plan, progress=True)}
 
 
 # --- HR and managers ------------------------------------------------------------------------------------------------

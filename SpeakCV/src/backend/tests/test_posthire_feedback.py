@@ -1091,3 +1091,15 @@ def test_nobody_else_gets_a_reapply_date(db, world, api):
     db.commit()
     listed = api.get(f"/api/applications/{application.id}", headers=auth_header(CANDIDATE_EMAIL)).json()
     assert listed["decision"] == "approved" and listed["reapply_after"] is None
+
+
+def test_the_reapply_date_counts_from_the_newest_application_and_has_a_time_zone(db, world, api):
+    older = rejected(db, world)
+    newer = rejected(db, world, alias="#A2")
+    newer.candidate_user_id = older.candidate_user_id
+    older.created_at = newer.created_at - timedelta(days=30)
+    db.commit()
+    listed = api.get(f"/api/applications/{older.id}", headers=auth_header(CANDIDATE_EMAIL)).json()
+    expected = (newer.created_at + timedelta(days=consents.REAPPLY_DAYS)).date().isoformat()
+    assert listed["reapply_after"].startswith(expected)
+    assert listed["reapply_after"].endswith("+00:00") or listed["reapply_after"].endswith("Z")

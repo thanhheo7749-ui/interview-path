@@ -36,12 +36,17 @@ def _application(db: Session, company_id: int, application_id: int) -> Applicati
     return application
 
 
-def _managed_query(db: Session, member: CompanyMember):
-    """Sent briefs on live, approved applications this manager reads: of a job from a request assigned to them, or of a
-    job with no request in their department subtree."""
+def job_scope(db: Session, member: CompanyMember):
+    """The jobs a manager reads: those from a request assigned to them, or those with no request in their department
+    subtree. Onboarding uses this too, so one rule decides who opens an interview and who opens its plan."""
     departments = audience.for_member(db, member).department_ids
     from_request = exists().where(HiringRequest.job_id == Job.id, HiringRequest.company_id == member.company_id)
     assigned = from_request.where(HiringRequest.manager_user_id == member.user_id)
+    return or_(assigned, and_(~from_request, Job.department_id.in_(departments)))
+
+
+def _managed_query(db: Session, member: CompanyMember):
+    """Sent briefs on live, approved applications this manager reads."""
     return (
         db.query(Application, Job, CandidateBrief)
         .join(Job, Job.id == Application.job_id)
@@ -49,7 +54,7 @@ def _managed_query(db: Session, member: CompanyMember):
         .filter(Application.company_id == member.company_id, Job.company_id == member.company_id,
                 CandidateBrief.company_id == member.company_id, CandidateBrief.status == "sent",
                 Application.hr_decision == "approved", Application.anonymized_at.is_(None),
-                or_(assigned, and_(~from_request, Job.department_id.in_(departments))))
+                job_scope(db, member))
     )
 
 

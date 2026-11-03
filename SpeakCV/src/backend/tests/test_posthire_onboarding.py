@@ -148,7 +148,7 @@ def test_a_plan_is_built_across_three_phases(client, db, s):
     assert body["status"] == "draft" and body["application_id"] == s.application.id
     assert [item["phase"] for item in body["items"]] == [30, 60, 90]
     assert all(item["title"].startswith("[Demo AI]") for item in body["items"])
-    assert all(item["done_at"] is None for item in body["items"])
+    assert all("done_at" not in item for item in body["items"])
     assert db.query(OnboardingPlan).filter_by(application_id=s.application.id).count() == 1
 
 
@@ -499,11 +499,17 @@ def test_the_hire_sees_the_checklist_and_marks_items_done(client, db, s):
     assert [bool(item["done_at"]) for item in refreshed["items"]] == [True, False, False]
 
 
-def test_finishing_every_item_closes_the_plan(client, db, s):
-    approved(client, s)
+def test_ticks_stay_private_to_the_hire(client, db, s):
+    plan = approved(client, s)
     for item in client.get(company_url(s, "/my-onboarding"), headers=s.hire).json()[0]["items"]:
-        client.post(company_url(s, f"/onboarding/items/{item['id']}/done"), headers=s.hire)
-    assert client.get(company_url(s, "/my-onboarding"), headers=s.hire).json()[0]["status"] == "done"
+        assert client.post(company_url(s, f"/onboarding/items/{item['id']}/done"), headers=s.hire).status_code == 200
+    mine = client.get(company_url(s, "/my-onboarding"), headers=s.hire).json()[0]
+    assert all(item["done_at"] for item in mine["items"]) and mine["status"] == "active"
+    for headers in (HR, ENG_MANAGER):
+        shown = client.get(company_url(s, f"/onboarding/{plan['id']}"), headers=headers)
+        assert shown.status_code == 200 and "done_at" not in shown.text
+        assert shown.json()["status"] == "active"
+    assert db.get(OnboardingPlan, plan["id"]).status == "active"
 
 
 def test_the_hire_can_ask_the_policy_copilot(client, s):
@@ -687,3 +693,25 @@ def test_the_consent_text_says_which_language_it_is_in(client, db):
     url = f"/api/applications/{s.application.id}/onboarding-consent"
     assert client.get(url + "?language=ko", headers=s.hire).json()["language"] == "en"
     assert client.get(url + "?language=vi", headers=s.hire).json()["language"] == "vi"
+
+
+def test_a_manager_opens_a_plan_only_by_the_request_rule(client, db):
+    from app.database.sql_models import CandidateBrief
+
+    s = build(db)
+    s.w.request.job_id = s.job.id
+    s.w.request.manager_user_id = s.w.other_manager.id  # the request is assigned to the sales manager
+    db.add(CandidateBrief(company_id=s.w.company.id, application_id=s.application.id, language="en", status="sent"))
+    db.commit()
+    plan = create(client, s).json()
+    url = company_url(s, f"/onboarding/{plan['id']}")
+    probation = company_url(s, f"/applications/{s.application.id}/probation")
+    # The department manager is not assigned: no link, no plan, no probation.
+    assert client.get(company_url(s, "/my-interviews"), headers=ENG_MANAGER).json() == []
+    assert client.get(url, headers=ENG_MANAGER).status_code == 404
+    assert client.post(probation, headers=ENG_MANAGER, json={"result": "failed"}).status_code in (403, 404)
+    # The assigned manager gets the link, and it opens.
+    listed = client.get(company_url(s, "/my-interviews"), headers=SALES_MANAGER).json()
+    assert [row["onboarding_plan_id"] for row in listed] == [plan["id"]]
+    assert client.get(url, headers=SALES_MANAGER).status_code == 200
+    assert client.post(probation, headers=SALES_MANAGER, json={"result": "passed"}).status_code == 200

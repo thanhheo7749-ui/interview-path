@@ -143,6 +143,11 @@ test('the hire signs in as an employee, ticks an item and asks Copilot', async (
   await expect(phase(page, 30)).toContainText('Done on');
   await page.reload();
   await expect(page.getByRole('checkbox', { name: EDITED_TITLE })).toBeChecked();
+  // Tick every item: the plan must still look unfinished to HR and the manager.
+  for (const box of await page.getByRole('checkbox').all()) {
+    if (!(await box.isChecked())) await box.click();
+  }
+  await expect(page.getByRole('checkbox', { checked: true })).toHaveCount(3);
 
   // The plan page is for HR and managers: the employee is sent to the Copilot instead.
   await page.goto(`/onboarding/${planId}`);
@@ -156,8 +161,14 @@ test('the hire signs in as an employee, ticks an item and asks Copilot', async (
 
 test('the manager records probation and sees nothing about what the hire ticked', async ({ browser }) => {
   const page = await signInAs(browser, MANAGER);
+  // The server's answer to the page, after the hire ticked every item, holds no progress and no "finished" status.
+  const answered = page.waitForResponse((r) => r.url().includes('/api/companies/') && r.url().endsWith(`/onboarding/${planId}`) && r.request().method() === 'GET');
   await page.goto(`/onboarding/${planId}`);
-  await expect(page.getByText('Done on')).toHaveCount(0);
+  const plan = await (await answered).json();
+  expect(plan.items).toHaveLength(3);
+  expect(JSON.stringify(plan)).not.toContain('done_at');
+  expect(plan.status).toBe('active');
+  await expect(page.getByTestId('plan-status')).toHaveText('Approved');
   const control = page.getByTestId('probation-control');
   await control.getByRole('button', { name: 'Passed', exact: true }).click();
   await expect(control.getByRole('alertdialog')).toContainText('Record the probation result as "Passed"?');

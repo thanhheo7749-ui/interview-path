@@ -91,7 +91,7 @@ test('an answer sent after the withdrawal gets a specific message and no way to 
 test('My data says what withdrawing CV consent does and points to deletion', async ({ browser }) => {
   const page = await candidatePage(browser);
   await page.goto('/my-data');
-  const row = page.getByRole('listitem').filter({ hasText: 'cv_processing' });
+  const row = page.getByRole('listitem').filter({ hasText: 'CV processing' });
   await row.getByRole('button', { name: 'Withdraw consent' }).click();
   await expect(page.getByText('We will stop all further AI work on your CV.')).toBeVisible();
   await expect(page.getByText('To erase everything, use Delete my application below.')).toBeVisible();
