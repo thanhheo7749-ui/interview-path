@@ -10,8 +10,18 @@ export const getFeedback = (companyId, appId) => api(`${base(companyId)}/applica
 export const draftFeedback = (companyId, appId) => api(`${base(companyId)}/applications/${appId}/feedback/draft`, { method: 'POST' });
 export const saveFeedback = (companyId, appId, draft) =>
   api(`${base(companyId)}/applications/${appId}/feedback`, { method: 'PATCH', body: { draft } });
-export const approveFeedback = (companyId, applicationIds) =>
-  api(`${base(companyId)}/feedback/approve`, { method: 'POST', body: { application_ids: applicationIds } });
+// `items` are { application_id, version }: the version names the text HR read, and a changed text is refused.
+export const approveFeedback = (companyId, items) =>
+  api(`${base(companyId)}/feedback/approve`, { method: 'POST', body: { items } });
+
+// The guard sends codes, such as "comparison: other candidates". A list, or a map of lists by application.
+export const reasonList = (problems) => {
+  const flat = Array.isArray(problems) ? problems : Object.values(problems ?? {}).flat();
+  return flat.map((problem) => {
+    const [code, ...rest] = String(problem).split(': ');
+    return { code, detail: rest.join(': ') };
+  });
+};
 
 // The learning catalogue: the only source of links in feedback.
 export const listResources = (companyId) => api(`${base(companyId)}/learning-resources`);

@@ -1037,7 +1037,7 @@
         "sent": "Sent to the candidate"
       },
       "source": {
-        "ai": "AI draft, please read it",
+        "ai": "AI-written draft, please read it",
         "template_no_session": "Standard message (no interview)",
         "template_ai_failed": "Standard message (the AI draft failed)",
         "template_guard": "Standard message (the AI draft was not safe to send)"
@@ -1046,7 +1046,9 @@
       "noLearning": "No catalogue entry matches this message.",
       "save": "Save changes",
       "saveFirst": "Save your changes before approving.",
-      "approve": "Approve and send"
+      "approve": "Approve and send",
+      "redraftConfirm": "Replace the text above, including anything you changed, with a new draft?",
+      "redraftYes": "Yes, write a new draft"
     },
     "queue": {
       "title": "Feedback drafts waiting: {{count}}",
@@ -1056,8 +1058,12 @@
       "select": "Select feedback for {{alias}}",
       "approve": "Approve {{count}} selected",
       "confirmTitle": "Confirm sending",
-      "confirm": "Send feedback to {{count}} candidates now?",
-      "confirmButton": "Send {{count}}"
+      "confirmButton": "Send {{count}}",
+      "confirm_one": "Send feedback to {{count}} candidate now?",
+      "confirm_other": "Send feedback to {{count}} candidates now?",
+      "expand": "Read all",
+      "collapse": "Show less",
+      "blocked": "{{alias}} blocks the batch, and nothing was sent: {{reasons}}"
     },
     "talent": {
       "title": "Talent pool matches",
@@ -1088,6 +1094,18 @@
       "language": "Language",
       "addButton": "Add to catalogue",
       "empty": "The catalogue is empty."
+    },
+    "problems": {
+      "empty": "The message is empty",
+      "label_wording": "It mentions a screening label or result",
+      "comparison": "It compares the candidate with others",
+      "confidential": "It names a confidential topic",
+      "unverified_quote": "It quotes words the candidate did not say",
+      "unknown_link": "It links to a page that is not in your learning catalogue",
+      "candidate_gone": "The candidate's data has been deleted",
+      "not_rejected": "The candidate was not rejected",
+      "no_draft": "There is no draft yet",
+      "changed": "The text changed after you read it"
     }
   }
 }

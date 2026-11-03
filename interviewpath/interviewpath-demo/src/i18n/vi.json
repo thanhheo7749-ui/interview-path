@@ -1036,7 +1036,7 @@
         "sent": "Đã gửi cho ứng viên"
       },
       "source": {
-        "ai": "Bản nháp AI, hãy đọc kỹ",
+        "ai": "Bản nháp do AI viết, hãy đọc kỹ",
         "template_no_session": "Thư mẫu (không có phỏng vấn)",
         "template_ai_failed": "Thư mẫu (bản nháp AI thất bại)",
         "template_guard": "Thư mẫu (bản nháp AI không an toàn để gửi)"
@@ -1045,7 +1045,9 @@
       "noLearning": "Không có mục nào trong danh mục phù hợp với nội dung này.",
       "save": "Lưu thay đổi",
       "saveFirst": "Hãy lưu thay đổi trước khi duyệt.",
-      "approve": "Duyệt và gửi"
+      "approve": "Duyệt và gửi",
+      "redraftConfirm": "Thay nội dung bên trên, kể cả phần bạn đã sửa, bằng một bản nháp mới?",
+      "redraftYes": "Có, viết bản nháp mới"
     },
     "queue": {
       "title": "Bản nháp phản hồi đang chờ: {{count}}",
@@ -1055,8 +1057,11 @@
       "select": "Chọn phản hồi cho {{alias}}",
       "approve": "Duyệt {{count}} thư đã chọn",
       "confirmTitle": "Xác nhận gửi",
-      "confirm": "Gửi phản hồi cho {{count}} ứng viên ngay bây giờ?",
-      "confirmButton": "Gửi {{count}}"
+      "confirmButton": "Gửi {{count}}",
+      "confirm_other": "Gửi phản hồi cho {{count}} ứng viên ngay bây giờ?",
+      "expand": "Đọc toàn bộ",
+      "collapse": "Thu gọn",
+      "blocked": "{{alias}} chặn cả lô, chưa có gì được gửi: {{reasons}}"
     },
     "talent": {
       "title": "Ứng viên phù hợp trong kho nhân tài",
@@ -1087,6 +1092,18 @@
       "language": "Ngôn ngữ",
       "addButton": "Thêm vào danh mục",
       "empty": "Danh mục đang trống."
+    },
+    "problems": {
+      "empty": "Nội dung đang trống",
+      "label_wording": "Có nhắc đến nhãn hoặc kết quả sàng lọc",
+      "comparison": "So sánh ứng viên với người khác",
+      "confidential": "Nhắc đến chủ đề bảo mật",
+      "unverified_quote": "Trích lời mà ứng viên không nói",
+      "unknown_link": "Liên kết đến trang không có trong danh mục học tập của bạn",
+      "candidate_gone": "Dữ liệu của ứng viên đã bị xóa",
+      "not_rejected": "Ứng viên chưa bị từ chối",
+      "no_draft": "Chưa có bản nháp",
+      "changed": "Nội dung đã thay đổi sau khi bạn đọc"
     }
   }
 }

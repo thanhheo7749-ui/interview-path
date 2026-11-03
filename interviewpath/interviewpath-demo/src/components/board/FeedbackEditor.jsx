@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { approveFeedback, draftFeedback, getFeedback, saveFeedback } from '../../lib/posthire.js';
+import { approveFeedback, draftFeedback, getFeedback, reasonList, saveFeedback } from '../../lib/posthire.js';
 import { ErrorAlert, inputClass, primaryButton, secondaryButton } from '../KbFeedback.jsx';
 
 // The message a rejected candidate may receive. Nothing is sent until HR approves it here or in the bulk list.
@@ -11,6 +11,8 @@ function FeedbackEditor({ companyId, appId, onChanged }) {
   const [text, setText] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [reasons, setReasons] = useState([]);
+  const [confirmRedraft, setConfirmRedraft] = useState(false);
   const changed = useRef(onChanged);
   useEffect(() => { changed.current = onChanged; });
 
@@ -43,17 +45,22 @@ function FeedbackEditor({ companyId, appId, onChanged }) {
   const run = async (action) => {
     setBusy(true);
     setError('');
+    setReasons([]);
+    setConfirmRedraft(false);
     try {
       show(await action());
       await onChanged?.();
     } catch (err) {
       setError(err.message);
+      setReasons(reasonList(err.data?.problems));
+      // The text changed since it was read: show the current one, so the next approval is of what HR sees.
+      if (err.status === 409) getFeedback(companyId, appId).then(show, () => {});
     } finally {
       setBusy(false);
     }
   };
   const approve = () => run(async () => {
-    await approveFeedback(companyId, [appId]);
+    await approveFeedback(companyId, [{ application_id: appId, version: row.version }]);
     return getFeedback(companyId, appId);
   });
 
@@ -65,6 +72,13 @@ function FeedbackEditor({ companyId, appId, onChanged }) {
       <h3 id="feedback-title" className="text-sm font-extrabold text-slate-950">{t('posthire.feedback.title')}</h3>
       <p className="text-xs text-slate-600">{t('posthire.feedback.intro')}</p>
       <ErrorAlert message={error} />
+      {reasons.length > 0 && (
+        <ul data-testid="feedback-refusal" className="list-disc pl-5 text-xs font-semibold text-red-800">
+          {reasons.map(({ code, detail }) => (
+            <li key={`${code}${detail}`}>{t(`posthire.problems.${code}`, { defaultValue: code })}{detail && `: ${detail}`}</li>
+          ))}
+        </ul>
+      )}
       {!row && !missing && !error && <p className="text-sm text-slate-500">{t('common.loading')}</p>}
       {missing && (
         <>
@@ -78,8 +92,12 @@ function FeedbackEditor({ companyId, appId, onChanged }) {
         <>
           <p data-testid="feedback-status" className="text-xs font-bold text-slate-600">
             {t(`posthire.feedback.status.${row.status}`)}
-            {row.source && ` · ${t(`posthire.feedback.source.${row.source}`, { defaultValue: row.source })}`}
           </p>
+          {row.source && (
+            <p data-testid={row.source === 'ai' ? 'feedback-ai-marker' : 'feedback-source'} className={row.source === 'ai' ? 'inline-block rounded-full bg-violet-50 px-2.5 py-1 text-xs font-bold text-violet-800' : 'text-xs text-slate-500'}>
+              {t(`posthire.feedback.source.${row.source}`, { defaultValue: row.source })}
+            </p>
+          )}
           <textarea
             aria-label={t('posthire.feedback.message')}
             value={text}
@@ -90,7 +108,9 @@ function FeedbackEditor({ companyId, appId, onChanged }) {
           />
           {!sent && row.problems.length > 0 && (
             <ul data-testid="feedback-problems" className="list-disc pl-5 text-xs font-semibold text-amber-800">
-              {row.problems.map((problem) => <li key={problem}>{problem}</li>)}
+              {reasonList(row.problems).map(({ code, detail }) => (
+                <li key={`${code}${detail}`}>{t(`posthire.problems.${code}`, { defaultValue: code })}{detail && `: ${detail}`}</li>
+              ))}
             </ul>
           )}
           <div data-testid="feedback-learning">
@@ -116,9 +136,18 @@ function FeedbackEditor({ companyId, appId, onChanged }) {
               <button type="button" disabled={busy || dirty} onClick={approve} className={primaryButton}>
                 {t('posthire.feedback.approve')}
               </button>
-              <button type="button" disabled={busy} onClick={() => run(() => draftFeedback(companyId, appId))} className={secondaryButton}>
+              <button type="button" disabled={busy} onClick={() => setConfirmRedraft(true)} className={secondaryButton}>
                 {t('posthire.feedback.redraft')}
               </button>
+              {confirmRedraft && (
+                <div role="alertdialog" aria-label={t('posthire.feedback.redraft')} className="basis-full space-y-2 rounded-xl border border-amber-200 bg-amber-50 p-3">
+                  <p className="text-sm font-semibold text-amber-900">{t('posthire.feedback.redraftConfirm')}</p>
+                  <div className="flex gap-2">
+                    <button type="button" disabled={busy} onClick={() => run(() => draftFeedback(companyId, appId))} className={primaryButton}>{t('posthire.feedback.redraftYes')}</button>
+                    <button type="button" onClick={() => setConfirmRedraft(false)} className={secondaryButton}>{t('common.cancel')}</button>
+                  </div>
+                </div>
+              )}
               {dirty && <span className="text-xs text-slate-500">{t('posthire.feedback.saveFirst')}</span>}
             </div>
           )}

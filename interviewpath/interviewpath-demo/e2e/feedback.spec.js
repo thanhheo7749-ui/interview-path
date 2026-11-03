@@ -36,10 +36,12 @@ async function reject(page, alias) {
   await expect(editor(page).getByTestId('feedback-status')).toContainText('Waiting for your approval');
 }
 
-test('rejecting makes a draft that waits for HR, with the demo AI notice', async ({ page }) => {
+test('rejecting makes a draft that waits for HR', async ({ page }) => {
   await openBoard(page);
   await reject(page, '#F1');
-  await expect(page.getByTestId('demo-ai-notice')).toContainText('Demo AI');
+  // A candidate with no interview gets the standard message: no AI marker.
+  await expect(editor(page).getByTestId('feedback-ai-marker')).toHaveCount(0);
+  await expect(editor(page).getByTestId('feedback-source')).toContainText('Standard message');
   await expect(editor(page).getByRole('textbox', { name: 'Feedback message' })).toHaveValue(/Thank you for your time/);
   await expect(editor(page).getByTestId('feedback-learning')).toContainText('No catalogue entry matches');
   await panel(page).getByRole('button', { name: 'Close' }).click();
@@ -55,6 +57,7 @@ test('the editor shows why a phrase is refused, and approving sends the saved te
   await message.fill('Thank you for applying. Other candidates were stronger than you.');
   await editor(page).getByRole('button', { name: 'Save changes' }).click();
   await expect(editor(page).getByRole('alert')).toContainText('This text cannot be sent to a candidate');
+  await expect(editor(page).getByTestId('feedback-refusal')).toContainText('It compares the candidate with others: other candidates');
   // Unsaved text cannot be approved.
   await expect(editor(page).getByRole('button', { name: 'Approve and send' })).toBeDisabled();
 
@@ -65,6 +68,22 @@ test('the editor shows why a phrase is refused, and approving sends the saved te
   await expect(editor(page).getByTestId('feedback-status')).toContainText('Sent to the candidate');
   await expect(message).toHaveAttribute('readonly', '');
   await expect(page.getByTestId('feedback-queue')).toHaveCount(0);
+});
+
+test('an AI-written draft carries its own marker, and writing again asks first', async ({ page }) => {
+  await openBoard(page);
+  await reject(page, '#F5');
+  await expect(editor(page).getByTestId('feedback-ai-marker')).toHaveText('AI-written draft, please read it');
+  const message = editor(page).getByRole('textbox', { name: 'Feedback message' });
+  await expect(message).toHaveValue(/\[Demo AI\]/);
+  await message.fill('Thank you for talking with us. My own words.');
+  await editor(page).getByRole('button', { name: 'Write it again' }).click();
+  await expect(editor(page).getByRole('alertdialog')).toContainText('Replace the text above');
+  await editor(page).getByRole('button', { name: 'Cancel' }).click();
+  await expect(message).toHaveValue('Thank you for talking with us. My own words.');
+  await editor(page).getByRole('button', { name: 'Save changes' }).click();
+  await editor(page).getByRole('button', { name: 'Approve and send' }).click();
+  await expect(editor(page).getByTestId('feedback-status')).toContainText('Sent to the candidate');
 });
 
 test('bulk approval lists aliases and previews, and sends only what was picked', async ({ page }) => {
@@ -78,10 +97,12 @@ test('bulk approval lists aliases and previews, and sends only what was picked',
   const queue = page.getByTestId('feedback-queue');
   await expect(queue).toContainText('Feedback drafts waiting: 2');
   await expect(queue.getByTestId('draft-#F2')).toContainText('Thank you for your time');
+  await queue.getByTestId('draft-#F2').getByRole('button', { name: 'Read all' }).click();
+  await expect(queue.getByTestId('draft-#F2').getByRole('button', { name: 'Show less' })).toBeVisible();
   await expect(queue).not.toContainText('Sample Person');
   await queue.getByRole('checkbox', { name: 'Select feedback for #F2' }).check();
   await queue.getByRole('button', { name: 'Approve 1 selected' }).click();
-  await expect(queue.getByRole('alertdialog')).toContainText('Send feedback to 1 candidates now?');
+  await expect(queue.getByRole('alertdialog')).toContainText('Send feedback to 1 candidate now?');
   await queue.getByRole('button', { name: 'Send 1', exact: true }).click();
   await expect(queue).toContainText('Feedback drafts waiting: 1');
   await queue.getByRole('button', { name: 'Select all' }).click();

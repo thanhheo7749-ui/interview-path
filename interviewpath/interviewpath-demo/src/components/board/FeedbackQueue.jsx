@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { approveFeedback } from '../../lib/posthire.js';
+import { approveFeedback, reasonList } from '../../lib/posthire.js';
 import { ErrorAlert, primaryButton, secondaryButton } from '../KbFeedback.jsx';
 
 // Drafts waiting for HR on this job: an alias and a short preview each. Approving sends them to the candidates.
@@ -10,6 +10,7 @@ function FeedbackQueue({ companyId, drafts, onOpen, onChanged }) {
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [open, setOpen] = useState([]);
   const chosen = picked.filter((id) => drafts.some((draft) => draft.application_id === id));
 
   if (drafts.length === 0) return null;
@@ -22,12 +23,17 @@ function FeedbackQueue({ companyId, drafts, onOpen, onChanged }) {
     setBusy(true);
     setError('');
     try {
-      await approveFeedback(companyId, chosen);
+      await approveFeedback(companyId, drafts.filter((d) => chosen.includes(d.application_id)).map((d) => ({ application_id: d.application_id, version: d.version })));
       setPicked([]);
       setConfirming(false);
       await onChanged();
     } catch (err) {
-      setError(err.message);
+      const blocking = Object.keys(err.data?.problems ?? {}).map((id) => drafts.find((d) => d.application_id === Number(id))?.alias).filter(Boolean);
+      const why = reasonList(err.data?.problems).map(({ code }) => t(`posthire.problems.${code}`, { defaultValue: code }));
+      setError(blocking.length ? t('posthire.queue.blocked', { alias: blocking.join(', '), reasons: [...new Set(why)].join('; ') }) : err.message);
+      setConfirming(false);
+      // A changed text means the list is out of date: read it again before anything is sent.
+      if (err.status === 409) await onChanged().catch(() => {});
     } finally {
       setBusy(false);
     }
@@ -57,7 +63,10 @@ function FeedbackQueue({ companyId, drafts, onOpen, onChanged }) {
             />
             <div className="min-w-0 flex-1">
               <button type="button" onClick={() => onOpen(draft.application_id)} className="text-sm font-extrabold text-slate-950 underline">{draft.alias}</button>
-              <p className="mt-1 line-clamp-2 text-xs text-slate-600">{draft.preview}</p>
+              <p className={`mt-1 whitespace-pre-wrap text-xs text-slate-600 ${open.includes(draft.application_id) ? '' : 'line-clamp-2'}`}>{draft.message}</p>
+              <button type="button" aria-expanded={open.includes(draft.application_id)} onClick={() => setOpen((cur) => (cur.includes(draft.application_id) ? cur.filter((x) => x !== draft.application_id) : [...cur, draft.application_id]))} className="mt-1 text-xs font-bold text-blue-700 underline">
+                {open.includes(draft.application_id) ? t('posthire.queue.collapse') : t('posthire.queue.expand')}
+              </button>
             </div>
           </li>
         ))}

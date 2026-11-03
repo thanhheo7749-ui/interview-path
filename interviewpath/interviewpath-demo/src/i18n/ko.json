@@ -494,7 +494,7 @@
         "sent": "지원자에게 전송됨"
       },
       "source": {
-        "ai": "AI 초안, 꼭 읽어 보세요",
+        "ai": "AI가 작성한 초안, 꼭 읽어 보세요",
         "template_no_session": "표준 메시지 (면접 없음)",
         "template_ai_failed": "표준 메시지 (AI 초안 실패)",
         "template_guard": "표준 메시지 (AI 초안이 전송하기에 안전하지 않음)"
@@ -503,7 +503,9 @@
       "noLearning": "이 메시지에 맞는 카탈로그 항목이 없습니다.",
       "save": "변경 사항 저장",
       "saveFirst": "승인하기 전에 변경 사항을 저장하세요.",
-      "approve": "승인 후 전송"
+      "approve": "승인 후 전송",
+      "redraftConfirm": "위 내용(직접 수정한 부분 포함)을 새 초안으로 바꿀까요?",
+      "redraftYes": "네, 새 초안 작성"
     },
     "queue": {
       "title": "대기 중인 피드백 초안: {{count}}",
@@ -513,8 +515,11 @@
       "select": "{{alias}}의 피드백 선택",
       "approve": "선택한 {{count}}건 승인",
       "confirmTitle": "전송 확인",
-      "confirm": "지금 {{count}}명의 지원자에게 피드백을 보낼까요?",
-      "confirmButton": "{{count}}건 전송"
+      "confirmButton": "{{count}}건 전송",
+      "confirm_other": "지금 {{count}}명의 지원자에게 피드백을 보낼까요?",
+      "expand": "전체 보기",
+      "collapse": "접기",
+      "blocked": "{{alias}} 때문에 전체가 보류되어 아무것도 전송되지 않았습니다: {{reasons}}"
     },
     "talent": {
       "title": "인재풀 매칭",
@@ -545,6 +550,18 @@
       "language": "언어",
       "addButton": "카탈로그에 추가",
       "empty": "카탈로그가 비어 있습니다."
+    },
+    "problems": {
+      "empty": "메시지가 비어 있습니다",
+      "label_wording": "심사 라벨이나 결과를 언급합니다",
+      "comparison": "지원자를 다른 사람과 비교합니다",
+      "confidential": "비공개 주제를 언급합니다",
+      "unverified_quote": "지원자가 말하지 않은 내용을 인용합니다",
+      "unknown_link": "학습 카탈로그에 없는 페이지로 연결합니다",
+      "candidate_gone": "지원자의 데이터가 삭제되었습니다",
+      "not_rejected": "지원자가 불합격 처리되지 않았습니다",
+      "no_draft": "아직 초안이 없습니다",
+      "changed": "읽은 뒤에 내용이 바뀌었습니다"
     }
   }
 }
