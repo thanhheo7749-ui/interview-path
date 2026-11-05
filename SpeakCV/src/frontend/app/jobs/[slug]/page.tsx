@@ -79,8 +79,8 @@ function ApplyForm({ job, src }: { job: PublicJob; src: string | null }) {
     setBusy(true);
     setError("");
     try {
-      await applyToJob(job.slug, file, consent.version, consent.language, src);
-      router.push("/applications");
+      const application = await applyToJob(job.slug, file, consent.version, consent.language, src);
+      router.push(`/applications/${application.id}/fit`);
     } catch (err) {
       setError(applyErrorText(err, t, lang));
       if (err instanceof HiringError && err.status === 409 && typeof err.detail === "object") {

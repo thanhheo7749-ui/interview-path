@@ -6,8 +6,10 @@
 
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useState, useEffect, useCallback } from "react";
+import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
+import { safeRedirect } from "@/lib/safeRedirect";
 
 import {
   SettingsModal,
@@ -64,7 +66,17 @@ const structuredCvToInterviewText = (cv: any) => {
 };
 
 export default function InterviewRoom() {
+  return (
+    <Suspense fallback={null}>
+      <InterviewRoomInner />
+    </Suspense>
+  );
+}
+
+function InterviewRoomInner() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const nextHref = safeRedirect(searchParams.get("next"), "", typeof window !== "undefined" ? window.location.origin : "");
   const { user, logout, isLoading } = useAuth();
   const { upgradeToPro } = useSubscription();
   const [showSubscription, setShowSubscription] = useState(false);
@@ -313,6 +325,14 @@ export default function InterviewRoom() {
 
   return (
     <div className="flex h-screen w-screen bg-slate-950 text-slate-100 overflow-hidden font-sans">
+      {nextHref && (
+        <Link
+          href={nextHref}
+          className="fixed top-3 left-1/2 z-50 -translate-x-1/2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-bold text-white shadow-lg"
+        >
+          Vào phỏng vấn tuyển dụng thật →
+        </Link>
+      )}
       <Sidebar
         user={user}
         myProfileData={myProfileData}

@@ -4,6 +4,7 @@ import { use, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
+import { LEGACY_B2C } from "@/lib/features";
 import { format, useLang } from "@/lib/i18n";
 import { formatWindowTime, windowState } from "@/lib/interviewWindow";
 import { Application, Fit, getApplication, getFit, HiringError, withdrawApplication } from "@/services/hiring";
@@ -149,9 +150,19 @@ export default function FitPage({ params }: { params: Promise<{ id: string }> })
         {fit && application?.status === "invited" && (
           <div className="flex flex-wrap gap-3">
             {state === "open" ? (
-              <Link href={`/applications/${applicationId}/screening`} className="rounded-lg bg-blue-600 px-5 py-2 font-bold text-white">
-                {t.startInterview}
-              </Link>
+              <>
+                {LEGACY_B2C && (
+                  <Link
+                    href={`/interview?next=${encodeURIComponent(`/applications/${applicationId}/screening`)}`}
+                    className="rounded-lg bg-theme-surface px-5 py-2 font-bold text-theme-text"
+                  >
+                    {t.practiceFirst}
+                  </Link>
+                )}
+                <Link href={`/applications/${applicationId}/screening`} className="rounded-lg bg-blue-600 px-5 py-2 font-bold text-white">
+                  {t.startInterview}
+                </Link>
+              </>
             ) : (
               <button disabled aria-disabled="true" className="rounded-lg bg-theme-surface px-5 py-2 text-theme-muted opacity-50">
                 {state === "before" ? t.windowNotOpen : t.windowClosed}
