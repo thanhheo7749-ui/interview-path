@@ -1,4 +1,6 @@
 """HR job management under a company. Every lookup by ID also filters on company_id."""
+from datetime import datetime
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -8,7 +10,7 @@ from app.brain import audience
 from app.database.database import get_db
 from app.bridges import discrimination
 from app.database.sql_models import Company, CompanyMember, Department, Job, JobChannelLink, JobDraft, KbNode
-from app.hiring import audit, jobs
+from app.hiring import audit, interview_window, jobs
 from app.schemas.jobs import (
     ChannelOut, ChannelsIn, JobCreate, JobOut, JobPatch, JobSummary, Prefill, RoleOption,
 )
@@ -50,11 +52,32 @@ def _out(db: Session, job: Job, warnings: list[str] | None = None, requirements:
         "requirements": jobs.active_requirements(db, job.id) if requirements is None else requirements,
         "channels": [ChannelOut.model_validate(c, from_attributes=True) for c in channels],
         "warnings": list(warnings or []),
+        "scheduling_enabled": bool(job.scheduling_enabled),
+        "interview_window_start": interview_window.as_aware(job.interview_window_start),
+        "interview_window_end": interview_window.as_aware(job.interview_window_end),
+        "interview_window_timezone": job.interview_window_timezone,
     }
 
 
 def _translate(error: jobs.JobError):
     return HTTPException(status_code=error.status_code, detail=error.detail)
+
+
+def _merged_window(job: Job, body: JobPatch) -> tuple[bool, datetime | None, datetime | None, str | None]:
+    """This job's scheduling window after the patch, in storage form (naive UTC), without writing it yet.
+    A field not set on the patch keeps the job's stored value."""
+    fields = body.model_fields_set
+    enabled = body.scheduling_enabled if body.scheduling_enabled is not None else job.scheduling_enabled
+    start = (
+        interview_window.to_utc(body.interview_window_start) if "interview_window_start" in fields
+        else job.interview_window_start
+    )
+    end = (
+        interview_window.to_utc(body.interview_window_end) if "interview_window_end" in fields
+        else job.interview_window_end
+    )
+    tz = body.interview_window_timezone if "interview_window_timezone" in fields else job.interview_window_timezone
+    return enabled, start, end, tz
 
 
 @router.get(JOBS + "/role-options", response_model=list[RoleOption])
@@ -86,6 +109,9 @@ def prefill(company_id: int, role_node_id: int, member: CompanyMember = Depends(
 def create_job(company_id: int, body: JobCreate, member: CompanyMember = Depends(require_member("hr")),
                db: Session = Depends(get_db)):
     _check_department(db, company_id, body.department_id)
+    interview_window.check(
+        body.scheduling_enabled, body.interview_window_start, body.interview_window_end, body.interview_window_timezone,
+    )  # cheap: before anything that writes or calls AI
     node_ids = {r.node_id for r in body.requirements if r.node_id is not None}
     if body.role_node_id is not None:
         node_ids.add(body.role_node_id)
@@ -98,7 +124,10 @@ def create_job(company_id: int, body: JobCreate, member: CompanyMember = Depends
     job = Job(
         company_id=company_id, department_id=body.department_id, role_node_id=body.role_node_id, title=body.title,
         description=body.description, status="draft", version=1, interview_languages=list(body.interview_languages),
-        created_by=member.user_id,
+        created_by=member.user_id, scheduling_enabled=body.scheduling_enabled,
+        interview_window_start=interview_window.to_utc(body.interview_window_start),
+        interview_window_end=interview_window.to_utc(body.interview_window_end),
+        interview_window_timezone=body.interview_window_timezone,
     )
     db.add(job)
     db.flush()
@@ -133,6 +162,7 @@ def patch_job(company_id: int, job_id: int, body: JobPatch, member: CompanyMembe
     fields = body.model_fields_set
     if "department_id" in fields:
         _check_department(db, company_id, body.department_id)
+    interview_window.check(*_merged_window(job, body))  # cheap: before anything that writes or calls AI
     warnings: list[str] = []
     checked = None
     description = body.description if body.description is not None and body.description != job.description else None
@@ -152,8 +182,22 @@ def patch_job(company_id: int, job_id: int, body: JobPatch, member: CompanyMembe
     if job.status == "closed":
         db.rollback()
         raise HTTPException(status_code=409, detail="A closed job cannot be edited")
+    enabled, window_start, window_end, tz = _merged_window(job, body)
+    try:
+        interview_window.check(enabled, window_start, window_end, tz)
+    except HTTPException:
+        db.rollback()
+        raise
     if "department_id" in fields:
         job.department_id = body.department_id
+    if body.scheduling_enabled is not None:
+        job.scheduling_enabled = body.scheduling_enabled
+    if "interview_window_start" in fields:
+        job.interview_window_start = window_start
+    if "interview_window_end" in fields:
+        job.interview_window_end = window_end
+    if "interview_window_timezone" in fields:
+        job.interview_window_timezone = tz
     if checked is not None:
         try:
             warnings += jobs.update_requirements(db, job, body.requirements, checked)

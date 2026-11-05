@@ -870,3 +870,68 @@ def test_routes_are_registered(app):
         "/api/screening/{application_id}/start", "/api/screening/{session_id}/state",
         "/api/screening/{session_id}/turns/{position}/answer", "/api/screening/{session_id}/turns/{position}/question-audio",
     } <= paths
+
+
+# 16. Interview scheduling window
+
+
+def _set_window(db, world, **delta_bounds):
+    """Sets the job's window relative to now. `start=` and `end=` are timedelta kwargs prefixed `start_`/`end_`."""
+    job = db.get(Job, world.job_id)
+    job.scheduling_enabled = True
+    job.interview_window_start = datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(**delta_bounds["start"])
+    job.interview_window_end = datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(**delta_bounds["end"])
+    job.interview_window_timezone = "UTC"
+    db.commit()
+
+
+def test_start_unchanged_when_scheduling_is_off(client, world, db):
+    job = db.get(Job, world.job_id)
+    job.scheduling_enabled = False
+    job.interview_window_start = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(hours=2)
+    job.interview_window_end = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(hours=1)
+    db.commit()
+    assert start(client, world).status_code == 200
+
+
+def test_start_inside_the_window_starts_the_session(client, world, db):
+    _set_window(db, world, start={"hours": -1}, end={"hours": 1})
+    response = start(client, world)
+    assert response.status_code == 200
+    assert db.query(VoiceSession).count() == 1
+
+
+def test_start_before_the_window_gets_409_with_the_window(client, world, db):
+    _set_window(db, world, start={"hours": 1}, end={"hours": 2})
+    response = start(client, world)
+    assert response.status_code == 409
+    detail = response.json()["detail"]
+    assert detail["code"] == "OUTSIDE_INTERVIEW_WINDOW"
+    assert detail["window_start"] and detail["window_end"] and detail["timezone"] == "UTC"
+    assert db.query(VoiceSession).count() == 0
+    assert db.get(Application, world.application_id).start_claimed_at is None
+
+
+def test_start_after_the_window_gets_409(client, world, db):
+    _set_window(db, world, start={"hours": -2}, end={"hours": -1})
+    response = start(client, world)
+    assert response.status_code == 409
+    assert response.json()["detail"]["code"] == "OUTSIDE_INTERVIEW_WINDOW"
+    assert db.query(VoiceSession).count() == 0
+
+
+def test_a_running_session_resumes_after_the_window_closes(client, world, db, started):
+    _set_window(db, world, start={"hours": -2}, end={"hours": -1})
+    response = start(client, world)
+    assert response.status_code == 200
+    assert response.json()["session_id"] == started["session_id"]
+
+
+def test_application_shows_the_window_only_when_scheduling_is_on(client, world, db):
+    response = client.get(f"/api/applications/{world.application_id}", headers=auth_header(CANDIDATE))
+    assert response.json()["interview_window"] is None
+
+    _set_window(db, world, start={"hours": -1}, end={"hours": 1})
+    response = client.get(f"/api/applications/{world.application_id}", headers=auth_header(CANDIDATE))
+    window = response.json()["interview_window"]
+    assert window["timezone"] == "UTC" and window["start"] and window["end"]

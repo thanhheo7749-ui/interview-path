@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useCompany } from '../company/CompanyContext.jsx';
 import ChannelLinks from '../components/ChannelLinks.jsx';
+import InterviewWindowFields, { isoToLocalInput, localInputToIso } from '../components/InterviewWindowFields.jsx';
 import { ErrorAlert, WarningList, cardClass, inputClass, primaryButton, secondaryButton } from '../components/KbFeedback.jsx';
 import { api } from '../lib/api.js';
 import {
@@ -50,6 +51,9 @@ function JobEditor() {
   const [departmentId, setDepartmentId] = useState('');
   const [roleNodeId, setRoleNodeId] = useState('');
   const [languages, setLanguages] = useState(['en']);
+  const [schedulingEnabled, setSchedulingEnabled] = useState(false);
+  const [windowStart, setWindowStart] = useState('');
+  const [windowEnd, setWindowEnd] = useState('');
   const [rows, setRows] = useState([]);
   const [loadedSignature, setLoadedSignature] = useState(signature([]));
 
@@ -62,6 +66,9 @@ function JobEditor() {
     setDepartmentId(data.department_id == null ? '' : String(data.department_id));
     setRoleNodeId(data.role_node_id == null ? '' : String(data.role_node_id));
     setLanguages(data.interview_languages);
+    setSchedulingEnabled(Boolean(data.scheduling_enabled));
+    setWindowStart(isoToLocalInput(data.interview_window_start));
+    setWindowEnd(isoToLocalInput(data.interview_window_end));
     setRows(loaded);
   }, []);
 
@@ -135,14 +142,21 @@ function JobEditor() {
   // Saves the form and returns the stored job. Creating navigates to the new job's page once everything is done.
   const persist = async () => {
     const department = departmentId === '' ? null : Number(departmentId);
+    const windowFields = {
+      scheduling_enabled: schedulingEnabled,
+      interview_window_start: localInputToIso(windowStart),
+      interview_window_end: localInputToIso(windowEnd),
+      interview_window_timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    };
     if (isNew) {
       return createJob(companyId, {
         title: title.trim(), description, department_id: department, role_node_id: roleNodeId === '' ? null : Number(roleNodeId),
-        interview_languages: languages, requirements: toPayload(rows),
+        interview_languages: languages, requirements: toPayload(rows), ...windowFields,
       });
     }
     return patchJob(companyId, job.id, {
       title: title.trim(), description, department_id: department, interview_languages: languages, requirements: toPayload(rows),
+      ...windowFields,
     });
   };
 
@@ -153,6 +167,10 @@ function JobEditor() {
     }
     if (languages.length === 0) {
       setError(t('jobs.languageRequired'));
+      return;
+    }
+    if (schedulingEnabled && (!windowStart || !windowEnd || new Date(windowStart) >= new Date(windowEnd))) {
+      setError(t('jobs.windowInvalid'));
       return;
     }
     setError('');
@@ -296,6 +314,16 @@ function JobEditor() {
             ))}
           </div>
         </fieldset>
+
+        <InterviewWindowFields
+          enabled={schedulingEnabled}
+          start={windowStart}
+          end={windowEnd}
+          readOnly={readOnly}
+          onEnabled={setSchedulingEnabled}
+          onStart={setWindowStart}
+          onEnd={setWindowEnd}
+        />
       </section>
 
       <section className={`${cardClass} space-y-3`}>

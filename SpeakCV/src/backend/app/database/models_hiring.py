@@ -1,7 +1,7 @@
 from sqlalchemy import (
     JSON, Boolean, Column, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint,
 )
-from sqlalchemy.sql import func
+from sqlalchemy.sql import false, func
 
 from .database import Base
 
@@ -31,6 +31,12 @@ class Job(Base):
     created_by = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     published_at = Column(DateTime(timezone=True), nullable=True)
     created_at = _created_at()
+    scheduling_enabled = Column(Boolean, nullable=False, default=False, server_default=false())
+    # Window stored as UTC, may come back aware or naive depending on the DB backend;
+    # interview_window.to_utc/as_aware handle both. timezone below is display only.
+    interview_window_start = Column(DateTime(timezone=True), nullable=True)
+    interview_window_end = Column(DateTime(timezone=True), nullable=True)
+    interview_window_timezone = Column(String(64), nullable=True)
 
 
 class JobRequirement(Base):

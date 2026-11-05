@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Annotated, Literal, Optional
 
-from pydantic import BaseModel, Field, StringConstraints
+from pydantic import AwareDatetime, BaseModel, Field, StringConstraints
 
 Language = Literal["vi", "en", "ko"]
 Title = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=255)]
@@ -32,6 +32,10 @@ class JobCreate(BaseModel):
     role_node_id: Optional[int] = None
     interview_languages: list[Language] = Field(min_length=1, max_length=3)
     requirements: list[RequirementIn] = Field(default_factory=list, max_length=100)
+    scheduling_enabled: bool = False
+    interview_window_start: Optional[AwareDatetime] = None
+    interview_window_end: Optional[AwareDatetime] = None
+    interview_window_timezone: Optional[Annotated[str, StringConstraints(max_length=64)]] = None
 
 
 class JobPatch(BaseModel):
@@ -40,6 +44,10 @@ class JobPatch(BaseModel):
     department_id: Optional[int] = None
     interview_languages: Optional[list[Language]] = Field(default=None, min_length=1, max_length=3)
     requirements: Optional[list[RequirementIn]] = Field(default=None, max_length=100)
+    scheduling_enabled: Optional[bool] = None
+    interview_window_start: Optional[AwareDatetime] = None
+    interview_window_end: Optional[AwareDatetime] = None
+    interview_window_timezone: Optional[Annotated[str, StringConstraints(max_length=64)]] = None
 
 
 class ChannelsIn(BaseModel):
@@ -70,6 +78,10 @@ class JobOut(JobSummary):
     requirements: list[RequirementOut]
     channels: list[ChannelOut]
     warnings: list[str] = []
+    scheduling_enabled: bool = False
+    interview_window_start: Optional[datetime] = None
+    interview_window_end: Optional[datetime] = None
+    interview_window_timezone: Optional[str] = None
 
 
 class RoleOption(BaseModel):

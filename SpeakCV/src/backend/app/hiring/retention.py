@@ -61,7 +61,10 @@ ERASED = {
 DELETED_ROWS = ("screening_cache", "notifications")
 # Stay, because they hold no personal content once the columns above are cleared.
 KEPT = {
-    "jobs": ("title", "slug", "description", "status", "interview_languages", "created_by"),  # the company's own
+    "jobs": (
+        "title", "slug", "description", "status", "interview_languages", "created_by",
+        "interview_window_timezone",  # the company's own scheduling setting, not candidate content
+    ),
     "job_requirements": ("text", "visibility"),  # the company's own
     "job_channel_links": ("channel", "token"),  # the company's own
     "applications": (

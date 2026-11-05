@@ -16,7 +16,7 @@ from app.core.rate_limit import VOICE_ANSWER_LIMIT, VOICE_QUESTION_AUDIO_LIMIT, 
 from app.core.uploads import CHUNK_SIZE
 from app.database.database import get_db
 from app.database.sql_models import Application, Company, CompanyMember, Job, User, VoiceSession, VoiceTurn
-from app.hiring import audit, consents, planner, voice
+from app.hiring import audit, consents, interview_window, planner, voice
 from app.hiring.state import advance
 
 router = APIRouter()
@@ -107,12 +107,22 @@ def _resume(db: Session, session: VoiceSession) -> StateOut | None:
 
 
 def _check_can_start(db: Session, application: Application) -> None:
+    """Consent, stage, then the interview window: a non-invited candidate still gets today's stage error first."""
     if consents.was_withdrawn(db, application.id, CV_CONSENT_PURPOSE):  # planning runs AI over the CV
         raise HTTPException(status_code=409, detail={
             "code": consents.CV_CONSENT_WITHDRAWN, "message": "You withdrew consent to CV processing for this application.",
         })
     if application.stage != "invited":
         raise HTTPException(status_code=409, detail="This interview cannot be started now")
+    job = db.get(Job, application.job_id)  # expired after rollback/commit; next attribute read refreshes it
+    if not interview_window.is_open(job, datetime.now(timezone.utc)):
+        window = interview_window.payload(job)
+        raise HTTPException(status_code=409, detail={
+            "code": interview_window.OUTSIDE_INTERVIEW_WINDOW,
+            "message": "The interview window for this job is not open now.",
+            "window_start": window["start"].isoformat(), "window_end": window["end"].isoformat(),
+            "timezone": window["timezone"],
+        })
 
 
 def _release_start_claim(db: Session, application_id: int, claim: datetime) -> None:

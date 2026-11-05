@@ -4,7 +4,8 @@ import { use, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
-import { useLang } from "@/lib/i18n";
+import { format, useLang } from "@/lib/i18n";
+import { formatWindowTime, windowState } from "@/lib/interviewWindow";
 import { Application, Fit, getApplication, getFit, HiringError, withdrawApplication } from "@/services/hiring";
 import AskCompanyWidget from "@/components/Hiring/AskCompanyWidget";
 import SampleNotice, { ConfirmDialog, LangToggle } from "@/components/Hiring/SampleNotice";
@@ -19,7 +20,7 @@ const FIT_STYLE: Record<string, string> = {
 export default function FitPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const applicationId = Number(id);
-  const { t } = useLang();
+  const { t, lang } = useLang();
   const router = useRouter();
   const { user, isLoading } = useAuth();
   const [application, setApplication] = useState<Application | null>(null);
@@ -30,6 +31,8 @@ export default function FitPage({ params }: { params: Promise<{ id: string }> })
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
   const [dialogError, setDialogError] = useState("");
+  // Read once per mount: display only, server is the real gate, no need to tick.
+  const [now] = useState(() => Date.now());
 
   useEffect(() => {
     if (!user) return;
@@ -87,6 +90,9 @@ export default function FitPage({ params }: { params: Promise<{ id: string }> })
     value === "matches" ? t.fitMatches : value === "partly" ? t.fitPartly : value === "not_assessed" ? t.fitNotAssessed : t.fitNotSeen
   );
 
+  const win = application?.interview_window ?? null;
+  const state = win ? windowState(win, now) : "open";
+
   return (
     <main className="min-h-screen bg-theme-secondary px-4 py-10">
       <div className="mx-auto max-w-2xl space-y-6">
@@ -132,11 +138,25 @@ export default function FitPage({ params }: { params: Promise<{ id: string }> })
           </>
         )}
         {application && <AskCompanyWidget companySlug={application.company_slug} />}
+        {win && (
+          <p className="text-sm text-theme-text-secondary">
+            {format(t.interviewWindow, {
+              start: formatWindowTime(win.start, win.timezone, lang),
+              end: formatWindowTime(win.end, win.timezone, lang),
+            })}
+          </p>
+        )}
         {fit && application?.status === "invited" && (
           <div className="flex flex-wrap gap-3">
-            <Link href={`/applications/${applicationId}/screening`} className="rounded-lg bg-blue-600 px-5 py-2 font-bold text-white">
-              {t.startInterview}
-            </Link>
+            {state === "open" ? (
+              <Link href={`/applications/${applicationId}/screening`} className="rounded-lg bg-blue-600 px-5 py-2 font-bold text-white">
+                {t.startInterview}
+              </Link>
+            ) : (
+              <button disabled aria-disabled="true" className="rounded-lg bg-theme-surface px-5 py-2 text-theme-muted opacity-50">
+                {state === "before" ? t.windowNotOpen : t.windowClosed}
+              </button>
+            )}
             <button onClick={() => setDialog(true)} className="rounded-lg bg-theme-surface px-5 py-2 text-theme-text">
               {t.withdraw}
             </button>

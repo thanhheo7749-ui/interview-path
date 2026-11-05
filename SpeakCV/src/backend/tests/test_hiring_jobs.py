@@ -1,3 +1,5 @@
+from datetime import datetime, timedelta, timezone
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -288,6 +290,84 @@ def test_a_description_the_check_cannot_look_at_is_saved_with_a_warning(api, wor
     response = api.patch(url(world, f"/{job['id']}"), json={"description": "A friendly team."},
                          headers=world["people"]["hr"])
     assert response.status_code == 200 and response.json()["warnings"]
+
+
+# Interview scheduling window
+
+
+def test_default_job_has_no_scheduling_window(api, world):
+    job = make_job(api, world)
+    assert job["scheduling_enabled"] is False
+    assert job["interview_window_start"] is None and job["interview_window_end"] is None
+    assert job["interview_window_timezone"] is None
+
+
+def test_create_with_start_after_end_is_422(api, world):
+    now = datetime.now(timezone.utc)
+    response = api.post(url(world), json={
+        "title": "T", "interview_languages": ["en"], "scheduling_enabled": True,
+        "interview_window_start": (now + timedelta(hours=2)).isoformat(),
+        "interview_window_end": (now + timedelta(hours=1)).isoformat(),
+    }, headers=world["people"]["hr"])
+    assert response.status_code == 422
+
+
+def test_create_enabled_missing_end_is_422(api, world):
+    now = datetime.now(timezone.utc)
+    response = api.post(url(world), json={
+        "title": "T", "interview_languages": ["en"], "scheduling_enabled": True,
+        "interview_window_start": now.isoformat(),
+    }, headers=world["people"]["hr"])
+    assert response.status_code == 422
+
+
+def test_create_with_a_naive_datetime_is_422(api, world):
+    response = api.post(url(world), json={
+        "title": "T", "interview_languages": ["en"], "scheduling_enabled": True,
+        "interview_window_start": "2026-01-01T00:00:00", "interview_window_end": "2026-01-02T00:00:00",
+    }, headers=world["people"]["hr"])
+    assert response.status_code == 422
+
+
+def test_create_with_an_offset_stores_the_same_instant_in_utc(api, world):
+    start = datetime(2026, 1, 1, 10, 0, tzinfo=timezone(timedelta(hours=7)))
+    end = datetime(2026, 1, 2, 10, 0, tzinfo=timezone(timedelta(hours=7)))
+    job = make_job(api, world, scheduling_enabled=True, interview_window_start=start.isoformat(),
+                   interview_window_end=end.isoformat(), interview_window_timezone="Asia/Ho_Chi_Minh")
+    assert job["scheduling_enabled"] is True
+    assert datetime.fromisoformat(job["interview_window_start"]) == start.astimezone(timezone.utc)
+    assert datetime.fromisoformat(job["interview_window_end"]) == end.astimezone(timezone.utc)
+    assert job["interview_window_timezone"] == "Asia/Ho_Chi_Minh"
+
+
+def test_patch_enabling_scheduling_on_a_job_with_no_bounds_is_422(api, world):
+    job = make_job(api, world)
+    response = api.patch(url(world, f"/{job['id']}"), json={"scheduling_enabled": True}, headers=world["people"]["hr"])
+    assert response.status_code == 422
+
+
+def test_patch_only_end_earlier_than_the_stored_start_is_422(api, world):
+    now = datetime.now(timezone.utc)
+    job = make_job(api, world, scheduling_enabled=True, interview_window_start=now.isoformat(),
+                   interview_window_end=(now + timedelta(hours=2)).isoformat())
+    response = api.patch(url(world, f"/{job['id']}"), json={
+        "interview_window_end": (now - timedelta(hours=1)).isoformat(),
+    }, headers=world["people"]["hr"])
+    assert response.status_code == 422
+
+
+def test_patch_disabling_scheduling_keeps_the_bounds(api, world):
+    now = datetime.now(timezone.utc)
+    start, end = now, now + timedelta(hours=2)
+    job = make_job(api, world, scheduling_enabled=True, interview_window_start=start.isoformat(),
+                   interview_window_end=end.isoformat(), interview_window_timezone="UTC")
+    response = api.patch(url(world, f"/{job['id']}"), json={"scheduling_enabled": False}, headers=world["people"]["hr"])
+    assert response.status_code == 200
+    body = response.json()
+    assert body["scheduling_enabled"] is False
+    assert datetime.fromisoformat(body["interview_window_start"]) == start.astimezone(timezone.utc)
+    assert datetime.fromisoformat(body["interview_window_end"]) == end.astimezone(timezone.utc)
+    assert body["interview_window_timezone"] == "UTC"
 
 
 def test_a_job_made_from_a_draft_refuses_description_edits(api, db, world):

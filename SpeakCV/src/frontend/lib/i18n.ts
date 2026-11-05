@@ -73,6 +73,9 @@ const en = {
   teamStyle: "How the team works",
   teamStyleEmpty: "The company has not shared its working style yet.",
   startInterview: "Continue to the interview",
+  interviewWindow: "Interview window: {start} -> {end}",
+  windowNotOpen: "The interview window has not opened yet",
+  windowClosed: "The interview window has closed",
   withdraw: "Withdraw application",
   withdrawTitle: "Withdraw your application?",
   withdrawBody: "HR will see that you withdrew. You can add a reason if you like.",
@@ -209,6 +212,9 @@ const vi: Strings = {
   teamStyle: "Cách đội ngũ làm việc",
   teamStyleEmpty: "Công ty chưa chia sẻ phong cách làm việc.",
   startInterview: "Tiếp tục tới buổi phỏng vấn",
+  interviewWindow: "Cửa sổ thi: {start} → {end}",
+  windowNotOpen: "Cửa sổ thi chưa mở",
+  windowClosed: "Cửa sổ thi đã đóng",
   withdraw: "Rút hồ sơ",
   withdrawTitle: "Rút hồ sơ ứng tuyển?",
   withdrawBody: "Nhân sự sẽ thấy bạn đã rút hồ sơ. Bạn có thể ghi lý do nếu muốn.",
@@ -371,6 +377,7 @@ const screeningEn = {
     "You withdrew consent to recording, so this interview has ended and this answer was not kept. Your application is with HR.",
   cvConsentWithdrawn:
     "You withdrew consent to CV processing for this application, so this interview cannot start. Your application stays where it is. To erase your data, use Delete my application in My data.",
+  outsideWindow: "The interview window for this job is not open right now. Please come back during the scheduled window.",
 };
 
 const screeningVi: typeof screeningEn = {
@@ -427,6 +434,7 @@ const screeningVi: typeof screeningEn = {
     "Bạn đã rút đồng ý ghi âm nên buổi phỏng vấn đã kết thúc và câu trả lời này không được giữ lại. Hồ sơ của bạn đang ở chỗ HR.",
   cvConsentWithdrawn:
     "Bạn đã rút đồng ý xử lý CV cho hồ sơ này nên không thể bắt đầu buổi phỏng vấn. Hồ sơ của bạn vẫn giữ nguyên. Để xóa dữ liệu, hãy dùng Xóa hồ sơ của tôi trong mục Dữ liệu của tôi.",
+  outsideWindow: "Cửa sổ phỏng vấn cho vị trí này hiện chưa mở. Vui lòng quay lại trong thời gian đã lên lịch.",
 };
 
 export const screeningText = { en: screeningEn, vi: screeningVi };

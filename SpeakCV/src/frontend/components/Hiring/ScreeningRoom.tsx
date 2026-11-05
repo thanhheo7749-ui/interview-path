@@ -8,6 +8,7 @@ import { detectLocale, screeningText, type Locale } from "@/lib/i18n";
 import {
   CV_CONSENT_WITHDRAWN,
   HiringError,
+  OUTSIDE_INTERVIEW_WINDOW,
   RECORDING_CONSENT_WITHDRAWN,
   declineRecording,
   errorCode,
@@ -165,6 +166,10 @@ export function ScreeningRoom({ applicationId }: { applicationId: number }) {
     } catch (e) {
       if (errorCode(e) === CV_CONSENT_WITHDRAWN) {
         endWith(text.cvConsentWithdrawn);
+        return;
+      }
+      if (errorCode(e) === OUTSIDE_INTERVIEW_WINDOW) {
+        endWith(text.outsideWindow);
         return;
       }
       if (e instanceof HiringError && e.status === 409 && typeof e.detail === "object") {

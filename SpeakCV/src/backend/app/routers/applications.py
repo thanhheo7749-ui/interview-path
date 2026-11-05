@@ -16,7 +16,7 @@ from app.core.rate_limit import limiter, user_key
 from app.core.uploads import CV_UPLOAD_TYPES, read_upload
 from app.database.database import get_db
 from app.database.sql_models import Application, Company, Job, RequirementResult, User
-from app.hiring import applications, audit, consents, cv_processing, decisions, jobs, notify
+from app.hiring import applications, audit, consents, cv_processing, decisions, interview_window, jobs, notify
 from app.hiring import retention
 from app.hiring.state import InvalidTransition, advance
 from app.posthire import feedback as rejection_feedback
@@ -63,6 +63,7 @@ class ApplicationOut(BaseModel):
     contact_email: str | None = None  # the candidate's own account email, only once they are approved
     feedback: "FeedbackOut | None" = None  # only what HR approved and sent
     reapply_after: str | None = None  # once rejected: the first day the same job takes a new application
+    interview_window: dict | None = None  # start/end/timezone when the job schedules interviews, else None
 
 
 class LearningItem(BaseModel):
@@ -126,6 +127,7 @@ def _out(db: Session, application: Application, **overrides) -> ApplicationOut:
         "processing_error": application.processing_error,
         "failure_reason": cv_processing.failure_reason(application.processing_error),
         "email_enabled": notify.is_configured(),
+        "interview_window": interview_window.payload(job),
     }
     decision = decisions.visible_to_candidate(application)
     if decision is not None:

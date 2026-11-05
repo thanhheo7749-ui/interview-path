@@ -13,6 +13,7 @@ export class HiringError extends Error {
 
 export const RECORDING_CONSENT_WITHDRAWN = "recording_consent_withdrawn";
 export const CV_CONSENT_WITHDRAWN = "cv_consent_withdrawn";
+export const OUTSIDE_INTERVIEW_WINDOW = "OUTSIDE_INTERVIEW_WINDOW";
 
 /** The code a 409 carries when retrying can never work, because the candidate withdrew a consent. */
 export function errorCode(error: unknown): string | null {
@@ -60,6 +61,8 @@ export interface Application {
   feedback?: Feedback | null;
   /** Once rejected: the first day this job takes a new application. */
   reapply_after?: string | null;
+  /** The job's interview scheduling window, or null when the job does not schedule interviews. */
+  interview_window?: { start: string; end: string; timezone: string | null } | null;
 }
 
 export interface LearningItem { id: number; title: string; url: string; provider: string; language: string }
