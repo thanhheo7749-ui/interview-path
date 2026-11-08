@@ -8,8 +8,10 @@ import CandidateDetailPanel from '../components/CandidateDetailPanel.jsx';
 import { ErrorAlert } from '../components/KbFeedback.jsx';
 import FeedbackQueue from '../components/board/FeedbackQueue.jsx';
 import TalentMatches from '../components/board/TalentMatches.jsx';
-import { LANES, bulkReject, getBoard } from '../lib/board.js';
+import { LANES, bulkReject, getBoard, importCvs } from '../lib/board.js';
 import { listFeedback } from '../lib/posthire.js';
+
+const IMPORT_CHANNELS = ['topcv', 'itviec', 'linkedin', 'referral', 'direct'];
 
 function BoardPage() {
   const { t } = useTranslation();
@@ -20,6 +22,9 @@ function BoardPage() {
   const [error, setError] = useState('');
   const [selectedId, setSelectedId] = useState(null);
   const [drafts, setDrafts] = useState([]);
+  const [importChannel, setImportChannel] = useState('topcv');
+  const [importing, setImporting] = useState(false);
+  const [importResult, setImportResult] = useState(null);
 
   const reload = useCallback(async () => {
     const [data, waiting] = await Promise.all([getBoard(companyId, jobId), listFeedback(companyId, jobId, 'draft')]);
@@ -49,13 +54,68 @@ function BoardPage() {
     }
   };
 
+  const handleBulkImport = async (e) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+    setImporting(true);
+    setError('');
+    setImportResult(null);
+    try {
+      const res = await importCvs(companyId, jobId, importChannel, files);
+      setImportResult(res);
+      await reload();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setImporting(false);
+      e.target.value = '';
+    }
+  };
+
   return (
     <div className="space-y-8 p-8">
-      <header>
-        <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">{t('board.eyebrow')}</p>
-        <h1 className="text-2xl font-extrabold text-slate-950">{board?.job?.title ?? t('board.title')}</h1>
-        <p className="mt-1 text-sm text-slate-600">{t('board.intro')}</p>
+      <header className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">{t('board.eyebrow')}</p>
+          <h1 className="text-2xl font-extrabold text-slate-950">{board?.job?.title ?? t('board.title')}</h1>
+          <p className="mt-1 text-sm text-slate-600">{t('board.intro')}</p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-slate-200 bg-white p-3 shadow-card">
+          <select
+            value={importChannel}
+            onChange={(e) => setImportChannel(e.target.value)}
+            aria-label={t('board.import.channel', { defaultValue: 'Source channel' })}
+            className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-bold uppercase text-slate-700"
+          >
+            {IMPORT_CHANNELS.map((ch) => (
+              <option key={ch} value={ch}>{ch.toUpperCase()}</option>
+            ))}
+          </select>
+          <label className="cursor-pointer rounded-xl bg-blue-600 px-3.5 py-1.5 text-xs font-bold text-white hover:bg-blue-700">
+            {importing
+              ? t('common.loading')
+              : t('board.import.button', { defaultValue: 'Import CVs (.pdf / .docx / .zip)' })}
+            <input
+              type="file"
+              multiple
+              accept=".pdf,.docx,.zip"
+              disabled={importing}
+              onChange={handleBulkImport}
+              className="sr-only"
+            />
+          </label>
+        </div>
       </header>
+      {importResult && (
+        <p role="status" className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-xs font-bold text-emerald-900">
+          {t('board.import.summary', {
+            imported: importResult.imported,
+            duplicates: importResult.duplicates,
+            missing: importResult.missing_contact,
+            defaultValue: `Imported ${importResult.imported} CV(s), ${importResult.duplicates} duplicate(s) merged, ${importResult.missing_contact} missing contact.`,
+          })}
+        </p>
+      )}
       <ErrorAlert message={error} />
       {!board && !error && <p className="text-sm text-slate-500">{t('common.loading')}</p>}
       {board && (

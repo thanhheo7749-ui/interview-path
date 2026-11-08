@@ -1,4 +1,5 @@
 """Public job page. No login. Returns only public requirements and stores nothing about the visitor."""
+from datetime import datetime, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -7,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.database.database import get_db
 from app.database.sql_models import Company, Job, JobChannelLink
-from app.hiring import jobs
+from app.hiring import interview_window, jobs
 from app.schemas.jobs import PublicJob
 
 router = APIRouter()
@@ -19,8 +20,8 @@ def public_job(slug: str, src: Optional[str] = None, db: Session = Depends(get_d
     if job is None:
         raise HTTPException(status_code=404, detail="Job not found")
     company = db.get(Company, job.company_id)
-    is_open = job.status == "published"
-    if src and is_open:
+    is_open = interview_window.can_apply_now(job, datetime.now(timezone.utc))
+    if src and job.status == "published":
         # Atomic increment; an unknown token matches nothing and is ignored.
         db.execute(
             update(JobChannelLink)

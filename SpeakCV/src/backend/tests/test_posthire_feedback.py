@@ -206,7 +206,7 @@ def test_the_demo_responder_writes_one_verified_point_and_passes_the_guard(db, w
     fake_demo.install()
     application = interviewed(db, world)
     row = draft_now(db, application)
-    assert "[Demo AI]" in row.draft and QUOTE in row.draft
+    assert QUOTE in row.draft
     assert feedback.guard(row.draft, application) == []
     assert db.query(AuditLog).filter_by(action="feedback_drafted").one().payload["source"] == "ai"
 
@@ -1112,3 +1112,16 @@ def test_the_version_changes_with_the_language(db, world):
     before = feedback.version_of(db, world["company"].id, row)
     row.language = "vi"
     assert feedback.version_of(db, world["company"].id, row) != before
+
+
+def test_not_hired_after_manager_round_allows_feedback_and_shows_rejected_to_candidate(db, world, api):
+    application = make_application(
+        db, world["job"], alias="#A1", hr_decision="approved", final_outcome="not_hired",
+        cv_status="meets", band="most"
+    )
+    row = draft_now(db, application)
+    assert row.status == "draft"
+    assert approve(api, world, application.id).json() == {"sent": 1}
+    listed = api.get(f"/api/applications/{application.id}", headers=auth_header(CANDIDATE_EMAIL)).json()
+    assert listed["decision"] == "rejected"
+    assert listed["final_outcome"] == "not_hired"

@@ -153,7 +153,7 @@ export default function FitPage({ params }: { params: Promise<{ id: string }> })
               <>
                 {LEGACY_B2C && (
                   <Link
-                    href={`/interview?next=${encodeURIComponent(`/applications/${applicationId}/screening`)}`}
+                    href={`/interview?next=${encodeURIComponent(`/applications/${applicationId}/screening`)}&applicationId=${applicationId}`}
                     className="rounded-lg bg-theme-surface px-5 py-2 font-bold text-theme-text"
                   >
                     {t.practiceFirst}

@@ -86,14 +86,25 @@ def _claim(db, application_id: int, keep_text: bool = False) -> bool:
 
 
 def _assess_and_label(db, application, application_id: int) -> Application:
-    """Leaves the application invited, with the transaction open for the caller to finish and commit."""
+    """Assess CV against requirements. Moves to cv_hold if 0% of must-haves are met/partial, else invited."""
+    from datetime import datetime, timezone
+
     result = screening.assess(db, application)
     status, reasons = screening.label(result.requirements, result.assessed_requirements)
+
+    must_ids = {r.id for r in result.assessed_requirements if r.must_have}
+    matched_must = any(
+        item.requirement_id in must_ids and item.status in ("met", "partial")
+        for item in result.requirements
+    )
+    target_stage = "cv_hold" if (must_ids and not matched_must) else "invited"
 
     application = _locked_processing(db, application_id)
     application.cv_status = status
     application.cv_status_reason = reasons
-    advance(application, "invited")
+    advance(application, target_stage)
+    if target_stage == "invited":
+        application.invited_at = datetime.now(timezone.utc)
     return application
 
 
@@ -101,10 +112,13 @@ def _process(db, application_id: int) -> None:
     application = db.get(Application, application_id)
     path, suffix, company_id = application.cv_file_path, application.cv_suffix, application.company_id
     user = db.get(User, application.candidate_user_id) if application.candidate_user_id is not None else None
-    known_terms = identity.registered_terms(user.full_name, user.email) if user is not None else []
+    fallback_name = application.candidate_name or (user.full_name if user is not None else None)
+    fallback_email = application.candidate_email or (user.email if user is not None else None)
+    known_terms = identity.registered_terms(fallback_name, fallback_email)
     db.commit()  # hold no snapshot or lock while reading the file or calling AI
 
     cv = extract_cv(storage.read_bytes(path), suffix)
+    contact = identity.extract_contact_info(cv.text, fallback_name=fallback_name, fallback_email=fallback_email)
     masked = identity.mask(cv.text, company_id=company_id, known_terms=known_terms)
 
     application = _locked_processing(db, application_id)
@@ -112,12 +126,16 @@ def _process(db, application_id: int) -> None:
     application.cv_text_blind = masked.blind_text
     application.cv_blind_hash = masked.blind_hash
     application.hidden_text_detected = cv.hidden_detected
+    application.candidate_name = contact.name or application.candidate_name
+    application.candidate_email = contact.email or application.candidate_email
+    application.candidate_phone = contact.phone or application.candidate_phone
+    application.contact_hash = contact.contact_hash or application.contact_hash
     db.commit()
 
     application = _assess_and_label(db, application, application_id)
     job = db.get(Job, application.job_id)
     company = db.get(Company, application.company_id)
-    if application.candidate_user_id is not None:
+    if application.stage == "invited" and application.candidate_user_id is not None:
         language = company.default_locale if company.default_locale in INVITATION else "en"
         subject, body = INVITATION[language]
         notify.enqueue(db, application.company_id, application.candidate_user_id, "invited", language,

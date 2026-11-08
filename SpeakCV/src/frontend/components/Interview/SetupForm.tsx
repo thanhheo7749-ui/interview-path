@@ -6,8 +6,10 @@
 
 "use client";
 
-import { Briefcase, Play, Building2 } from "lucide-react";
+import { Briefcase, Play } from "lucide-react";
 import toast from "react-hot-toast";
+import { JdTemplatePicker } from "@/components/Interview/JdTemplatePicker";
+import { SetupFormatFields } from "@/components/Interview/SetupFormatFields";
 
 interface SetupFormProps {
   config: any;
@@ -15,6 +17,9 @@ interface SetupFormProps {
   onStart: () => void;
   masterCvAvailable: boolean;
   masterCvStatus: string;
+  children?: React.ReactNode;
+  prefillNotice?: { label: string } | null;
+  onClearPrefill?: () => void;
 }
 
 export function SetupForm({
@@ -23,6 +28,9 @@ export function SetupForm({
   onStart,
   masterCvAvailable,
   masterCvStatus,
+  children,
+  prefillNotice,
+  onClearPrefill,
 }: SetupFormProps) {
   const handleStart = () => {
     if (config.interviewType === "timed" && !config.position.trim()) {
@@ -35,16 +43,24 @@ export function SetupForm({
   return (
     <div className="mt-4 bg-theme-primary/90 p-6 md:p-8 rounded-2xl border border-theme-border w-full max-w-3xl shadow-xl animate-in zoom-in flex flex-col gap-5 z-20">
       <div className="text-center">
-        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/30 text-xs font-bold text-blue-400 mb-2">
-          <Building2 size={13} /> B2B AI Pre-Screening &amp; Candidate Readiness Setup
-        </div>
-        <h2 className="text-2xl font-black text-white flex items-center justify-center gap-2">
-          <Briefcase className="text-blue-400" /> Interview Context Setup
+        <h2 className="text-2xl font-black text-theme-text flex items-center justify-center gap-2">
+          <Briefcase className="text-blue-400" /> Set Up Your Practice Interview
         </h2>
-        <p className="text-slate-400 text-sm mt-1">
-          Ground the AI Question Planner with CV, Job Description, and Enterprise Culture Fit criteria
+        <p className="text-theme-text-secondary text-sm mt-1">
+          Add the role, JD and format you want to practice for
         </p>
       </div>
+
+      {prefillNotice && (
+        <div className="flex items-center justify-between gap-3 text-xs rounded-xl bg-blue-500/10 border border-blue-500/30 px-4 py-2 text-blue-400">
+          <span>{prefillNotice.label}</span>
+          {onClearPrefill && (
+            <button type="button" onClick={onClearPrefill} className="font-bold underline shrink-0">
+              Clear
+            </button>
+          )}
+        </div>
+      )}
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div>
@@ -88,10 +104,18 @@ export function SetupForm({
         </div>
       </div>
 
+      <SetupFormatFields config={config} setConfig={setConfig} />
+
       <div>
-        <label className="text-xs font-bold text-slate-400 uppercase block mb-2">
-          Job Description (JD) &amp; Core Competencies
-        </label>
+        <div className="flex items-center justify-between mb-2">
+          <label className="text-xs font-bold text-slate-400 uppercase">
+            Job Description (JD) &amp; Core Competencies
+          </label>
+          <JdTemplatePicker
+            onPick={(description) => setConfig({ ...config, jd: description })}
+            className="bg-theme-secondary border border-theme-border p-1.5 rounded-lg text-xs text-theme-text-secondary outline-none focus:border-blue-600 cursor-pointer"
+          />
+        </div>
         <textarea
           className="w-full bg-theme-secondary border border-theme-border p-3 rounded-xl text-theme-text h-20 focus:border-blue-600 outline-none custom-scrollbar text-sm leading-relaxed"
           placeholder="Paste the JD content and cultural expectations here..."
@@ -109,12 +133,15 @@ export function SetupForm({
         </div>
       </div>
 
+      {children}
+
       <button
         id="tour-step-start"
+        data-testid="start-practice"
         onClick={handleStart}
         className="mt-1 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white font-black py-4 px-8 rounded-xl text-lg shadow-lg shadow-blue-900/30 active:scale-95 transition-all flex items-center justify-center gap-3"
       >
-        <Play fill="currentColor" size={20} /> START CONTEXT-AWARE INTERVIEW
+        <Play fill="currentColor" size={20} /> Start practice
       </button>
     </div>
   );

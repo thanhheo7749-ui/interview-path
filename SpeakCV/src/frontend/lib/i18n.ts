@@ -142,6 +142,13 @@ const en = {
   leavePoolBody: "The CV this company kept for you is deleted now, and the company can no longer find you for other jobs.",
   leaving: "Leaving...",
   withdrawOnboardingBody: "We will stop using your interview for your onboarding plan. A plan that is already approved stays as it is.",
+  candidateName: "Full name",
+  candidateEmail: "Email address",
+  statusManagerRound: "Passed AI screening — in hiring manager round",
+  statusHired: "Congratulations! You have been selected for this role.",
+  claimTitle: "Confirm your application & start AI screening",
+  claimBody: "HR imported your CV for {job} at {company}. Confirm below to view your Fit Compass and start the recorded interview.",
+  claimSubmit: "Confirm & Continue",
 } as const;
 
 export type Strings = { [K in keyof typeof en]: string };
@@ -282,6 +289,13 @@ const vi: Strings = {
   leavePoolBody: "CV mà công ty đã lưu cho bạn sẽ bị xóa ngay bây giờ, và công ty không còn tìm thấy bạn cho các công việc khác.",
   leaving: "Đang rời...",
   withdrawOnboardingBody: "Chúng tôi sẽ ngừng dùng buổi phỏng vấn của bạn cho kế hoạch hội nhập. Kế hoạch đã được duyệt vẫn giữ nguyên.",
+  candidateName: "Họ và tên",
+  candidateEmail: "Địa chỉ Email",
+  statusManagerRound: "Đã qua vòng AI — đang chờ vòng phỏng vấn Quản lý",
+  statusHired: "Chúc mừng! Bạn đã trúng tuyển vị trí này.",
+  claimTitle: "Xác nhận hồ sơ & bắt đầu phỏng vấn AI",
+  claimBody: "HR đã tiếp nhận CV của bạn cho vị trí {job} tại {company}. Xác nhận bên dưới để xem độ hợp việc và bắt đầu phỏng vấn.",
+  claimSubmit: "Xác nhận & Tiếp tục",
 };
 
 export const STRINGS: Record<Lang, Strings> = { en, vi };

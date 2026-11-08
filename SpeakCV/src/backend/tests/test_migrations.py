@@ -37,6 +37,10 @@ def test_existing_database_is_stamped_and_keeps_its_data(tmp_path):
         # A database from before this column was added, as on a live server.
         connection.execute(text("ALTER TABLE users DROP COLUMN must_change_password"))
         connection.execute(text("ALTER TABLE users DROP COLUMN password_changed_at"))
+        connection.execute(text("ALTER TABLE interview_history DROP COLUMN company"))
+        connection.execute(text("ALTER TABLE interview_history DROP COLUMN jd_text"))
+        connection.execute(text("ALTER TABLE interview_history DROP COLUMN voice"))
+        connection.execute(text("ALTER TABLE interview_history DROP COLUMN mode"))
         connection.execute(text("INSERT INTO users (email, full_name, hashed_password) VALUES ('keep@example.test', 'K', 'h')"))
 
     with engine.begin() as connection:
@@ -89,3 +93,25 @@ def test_there_is_one_head_and_it_is_the_bridges_migration():
     from app.database.migrate import alembic_config
 
     assert len(ScriptDirectory.from_config(alembic_config()).get_heads()) == 1
+
+
+def test_omni_channel_columns_and_stages_exist(tmp_path):
+    from app.hiring.state import STAGES, TRANSITIONS
+
+    engine = _new_engine(tmp_path)
+    with engine.begin() as connection:
+        run_migrations(connection)
+    inspector = inspect(engine)
+    app_cols = {c["name"] for c in inspector.get_columns("applications")}
+    job_cols = {c["name"] for c in inspector.get_columns("jobs")}
+    assert {
+        "candidate_name", "candidate_email", "candidate_phone",
+        "contact_hash", "claim_token_hash", "invited_at",
+    } <= app_cols
+    assert "interview_sla_hours" in job_cols
+    assert "cv_hold" in STAGES
+    assert "missing_contact" in STAGES
+    assert "cv_hold" in TRANSITIONS["cv_processing"]
+    assert "invited" in TRANSITIONS["cv_hold"]
+    assert "cv_processing" in TRANSITIONS["missing_contact"]
+

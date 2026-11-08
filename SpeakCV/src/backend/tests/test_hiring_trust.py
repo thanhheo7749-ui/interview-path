@@ -266,7 +266,7 @@ def spy(monkeypatch):
 def screened(db, world, alias="#A1", responder=handles_both):
     """An application masked and assessed the way cv_processing does it, leaving the cache row in place."""
     fake.register("cv_mask", responder)
-    masked = identity.mask(RAW, company_id=world.company_id)
+    masked = identity.mask_with_ai(RAW, company_id=world.company_id)
     application = application_row(db, world, alias, cv_text_raw=RAW, cv_text_blind=masked.blind_text,
                                   cv_blind_hash=masked.blind_hash, cv_status="meets")
     fake.enqueue("cv_assess", json.dumps({
@@ -404,7 +404,7 @@ def test_different_blind_texts_compare_their_cached_results(db, world, same_payl
 
     application = screened(db, world, responder=misses_the_swapped_name)
     cached = db.query(ScreeningCache).filter_by(blind_hash=application.cv_blind_hash).one()
-    swapped_hash = identity.mask(
+    swapped_hash = identity.mask_with_ai(
         fairness.swap_identity(RAW, fairness.found_terms(RAW, application.cv_text_blind)), company_id=world.company_id,
     ).blind_hash
     db.add(ScreeningCache(blind_hash=swapped_hash, job_id=world.job_id, job_version=application.job_version,
@@ -434,7 +434,7 @@ def test_an_application_with_no_cv_text_gets_409(client, db, world):
 def test_a_cv_with_no_identity_found_gets_409_not_a_hollow_pass(client, db, world, spy):
     """With nothing swapped, the two texts match trivially, and reporting that as a pass would be false."""
     fake.register("cv_mask", lambda *_: masker([], []))
-    masked = identity.mask("Built a FastAPI service.", company_id=world.company_id)
+    masked = identity.mask_with_ai("Built a FastAPI service.", company_id=world.company_id)
     application = application_row(db, world, cv_text_raw="Built a FastAPI service.", cv_text_blind=masked.blind_text,
                                   cv_blind_hash=masked.blind_hash)
     spy.clear()
@@ -446,7 +446,7 @@ def test_a_cv_with_no_identity_found_gets_409_not_a_hollow_pass(client, db, worl
 def test_a_label_as_the_only_identity_gets_409_because_its_value_was_masked_either_way(client, db, world, spy):
     fake.register("cv_mask", lambda *_: masker([], []))
     raw = "Gender: Male\nBuilt a FastAPI service."
-    masked = identity.mask(raw, company_id=world.company_id)
+    masked = identity.mask_with_ai(raw, company_id=world.company_id)
     application = application_row(db, world, cv_text_raw=raw, cv_text_blind=masked.blind_text, cv_blind_hash=masked.blind_hash)
     spy.clear()
     response = client.post(url(world, "fairness-check"), json={"application_id": application.id}, headers=hr())

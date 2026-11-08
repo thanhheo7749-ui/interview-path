@@ -228,6 +228,7 @@ export function useInterviewActions(params: UseInterviewActionsParams) {
         config.interviewType,
         config.questionLimit,
         config.timeLimit,
+        { company: config.company, voice: config.voice, mode: config.mode },
       );
       setReportData(d.report);
       if (d.history_id) setCurrentHistoryId(d.history_id);
@@ -269,6 +270,11 @@ export function useInterviewActions(params: UseInterviewActionsParams) {
     sendMessage(prompt, config.jd, config.voice, config.mode, (blob) =>
       playAudio(blob),
     );
+  };
+
+  const startFreeInterview = () => {
+    setHasStarted(true);
+    resetTimer();
   };
 
   const onMicClick = () => {
@@ -450,6 +456,7 @@ export function useInterviewActions(params: UseInterviewActionsParams) {
     handleOpenReport,
     handleRetry,
     startTimedInterview,
+    startFreeInterview,
     onMicClick,
     handleLoadOldInterview,
     handleConfirmResume,

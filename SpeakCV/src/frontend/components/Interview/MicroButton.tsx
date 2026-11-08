@@ -12,6 +12,8 @@ interface MicroButtonProps {
   onClick: () => void;
   langLabel: string;
   isCompact?: boolean;
+  testId?: string;
+  disabled?: boolean;
 }
 
 export const MicroButton = ({
@@ -19,6 +21,8 @@ export const MicroButton = ({
   onClick,
   langLabel,
   isCompact = false,
+  testId,
+  disabled = false,
 }: MicroButtonProps) => {
   const isActive = status === "Processing" || status === "AI Speaking";
   const isListening = status === "Listening";
@@ -32,8 +36,10 @@ export const MicroButton = ({
 
       <button
         id="tour-step-mic"
+        data-testid={testId}
         onClick={onClick}
-        className={`${isCompact ? "w-32 h-32" : "w-52 h-52"} rounded-full bg-theme-surface/80 backdrop-blur-sm border-2 flex flex-col items-center justify-center cursor-pointer transition-all duration-300 shadow-2xl relative z-10 hover:scale-105 active:scale-95 
+        disabled={disabled}
+        className={`${isCompact ? "w-32 h-32" : "w-52 h-52"} rounded-full bg-theme-surface/80 backdrop-blur-sm border-2 flex flex-col items-center justify-center cursor-pointer transition-all duration-300 shadow-2xl relative z-10 hover:scale-105 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50
           ${isListening ? "border-red-500 shadow-red-900/40" : isActive ? "border-yellow-500 shadow-yellow-900/40" : "border-theme-border hover:border-blue-500 shadow-blue-900/20"}
         `}
       >

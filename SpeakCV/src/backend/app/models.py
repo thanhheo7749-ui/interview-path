@@ -67,6 +67,9 @@ class ReportRequest(BaseModel):
     interview_type: str = "free"
     question_limit: int = 0
     time_limit: int = 0
+    company: Optional[str] = Field(None, max_length=255)
+    voice: Optional[str] = Field(None, max_length=64)
+    mode: Optional[str] = Field(None, max_length=32)
 
 # ── CV Features ──────────────────────────────
 
@@ -2510,6 +2513,9 @@ class ReportRequest(BaseModel):
     interview_type: str = "free"
     question_limit: int = 0
     time_limit: int = 0
+    company: Optional[str] = Field(None, max_length=255)
+    voice: Optional[str] = Field(None, max_length=64)
+    mode: Optional[str] = Field(None, max_length=32)
 
 # ── CV Features ──────────────────────────────
 

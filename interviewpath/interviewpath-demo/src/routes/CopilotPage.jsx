@@ -38,7 +38,7 @@ function Exchange({ item }) {
   const { question, status, response, error } = item;
   return (
     <li className="space-y-3" data-testid="copilot-exchange">
-      <div className="ml-auto max-w-[85%] rounded-2xl bg-slate-950 px-4 py-3 text-sm font-semibold text-white shadow-card">
+      <div className="ml-auto max-w-[85%] rounded-2xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white shadow-card">
         <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.12em] text-slate-400">{t('copilot.you')}</p>
         <p className="whitespace-pre-wrap break-words">{question}</p>
       </div>
@@ -152,7 +152,7 @@ function CopilotPage() {
           <button
             type="submit"
             disabled={!text.trim() || companyId == null}
-            className="rounded-xl bg-slate-950 px-5 py-2.5 text-sm font-bold text-white shadow-card transition hover:bg-slate-800 disabled:opacity-50"
+            className="rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-bold text-white shadow-card transition hover:bg-blue-700 disabled:opacity-50"
           >
             {t('copilot.send')}
           </button>

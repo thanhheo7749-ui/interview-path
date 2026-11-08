@@ -47,7 +47,7 @@ function ChannelContent({ channels, busy, error, onGenerate }) {
                 type="button"
                 aria-selected={active?.channel === item.channel}
                 onClick={() => setSelected(item.channel)}
-                className={`rounded-xl px-3 py-2 text-sm font-bold ${active?.channel === item.channel ? 'bg-slate-950 text-white' : 'bg-slate-100 text-slate-700'}`}
+                className={`rounded-xl px-3 py-2 text-sm font-bold ${active?.channel === item.channel ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-700'}`}
               >
                 {t(`jd.channels.names.${item.channel}`, { defaultValue: item.channel })}
                 {item.used_template && <span aria-hidden="true" title={t('jd.channels.usedTemplate')}> *</span>}

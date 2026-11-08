@@ -37,6 +37,7 @@ class Job(Base):
     interview_window_start = Column(DateTime(timezone=True), nullable=True)
     interview_window_end = Column(DateTime(timezone=True), nullable=True)
     interview_window_timezone = Column(String(64), nullable=True)
+    interview_sla_hours = Column(Integer, nullable=True)
 
 
 class JobRequirement(Base):
@@ -75,6 +76,12 @@ class Application(Base):
     job_id = Column(Integer, ForeignKey("jobs.id", ondelete="CASCADE"), nullable=False, index=True)
     job_version = Column(Integer, nullable=False, default=1)
     candidate_user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
+    candidate_name = Column(String(255), nullable=True)
+    candidate_email = Column(String(255), nullable=True, index=True)
+    candidate_phone = Column(String(50), nullable=True)
+    contact_hash = Column(String(64), nullable=True, index=True)
+    claim_token_hash = Column(String(64), nullable=True, unique=True, index=True)
+    invited_at = Column(DateTime(timezone=True), nullable=True)
     alias = Column(String(20), nullable=False)
     source_channel = Column(String(50), nullable=True)
     cv_file_path = Column(String(500), nullable=True)

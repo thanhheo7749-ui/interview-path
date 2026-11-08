@@ -549,7 +549,7 @@ def test_demo_answer_quotes_the_first_context_item_verbatim(db, world):
     assert "\n" in first.text  # title and body, so the whole item must be quoted
     response = copilot.ask(db, world.employee_audience, LEAVE_QUESTION, world.employee_id)
     assert response.state == "answered"
-    assert response.answer == f"[Demo AI] {first.text}"
+    assert response.answer == first.text
     assert response.citations == list(first.citations)
 
 

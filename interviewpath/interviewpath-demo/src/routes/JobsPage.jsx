@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { useCompany } from '../company/CompanyContext.jsx';
 import { EmptyState, ErrorAlert, cardClass, primaryButton } from '../components/KbFeedback.jsx';
+import StatusBadge from '../components/StatusBadge.jsx';
 import { api } from '../lib/api.js';
 import { listJobs } from '../lib/jobs.js';
 
@@ -71,7 +72,7 @@ function JobsPage() {
                     </Link>
                   </td>
                   <td className="py-3 pr-3 text-slate-600">{departmentName(job.department_id)}</td>
-                  <td className="py-3 pr-3 text-slate-600">{t(`jobs.status.${job.status}`, { defaultValue: job.status })}</td>
+                  <td className="py-3 pr-3"><StatusBadge status={job.status}>{t(`jobs.status.${job.status}`, { defaultValue: job.status })}</StatusBadge></td>
                   <td className="py-3 pr-3 text-slate-600">{job.version}</td>
                   <td className="py-3 text-slate-600">{job.published_at ? new Date(job.published_at).toLocaleDateString() : ''}</td>
                   <td className="space-x-3 py-3 pl-3">

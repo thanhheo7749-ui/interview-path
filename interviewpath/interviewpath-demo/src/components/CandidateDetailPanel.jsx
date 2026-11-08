@@ -1,7 +1,17 @@
-import { X } from 'lucide-react';
+import { Check, Copy, Download, ExternalLink, Eye, EyeOff, FileText, KeyRound, X } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { CONSENT_WITHDRAWN, getApplication } from '../lib/board.js';
+import {
+  CANDIDATE_PORTAL_URL,
+  CONSENT_WITHDRAWN,
+  downloadCvFile,
+  getApplication,
+  getCandidateAvatarUrl,
+  getCandidateInitials,
+  getCandidatePalette,
+  inviteFromHold,
+   updateContact,
+} from '../lib/board.js';
 import { BriefWorkflow } from './board/BriefEditor.jsx';
 import DecisionBar from './board/DecisionBar.jsx';
 import EvidenceTable from './board/EvidenceTable.jsx';
@@ -12,15 +22,23 @@ import HrScorecard from './board/HrScorecard.jsx';
 import TranscriptPanel from './board/TranscriptPanel.jsx';
 import { ErrorAlert } from './KbFeedback.jsx';
 
-// Reads in the order HR should: the transcript first, then the evidence, then the AI suggestion.
+// Reads in the order HR should: the candidate profile & CV first, then the transcript, then the evidence, then the AI suggestion.
 function CandidateDetailPanel({ companyId, appId, onClose, onChanged }) {
   const { t } = useTranslation();
   const [detail, setDetail] = useState(null);
   const [error, setError] = useState('');
   const [deleted, setDeleted] = useState(false);
+  const [contactEmail, setContactEmail] = useState('');
+  const [contactName, setContactName] = useState('');
+  const [actionBusy, setActionBusy] = useState(false);
+  const [showFullCv, setShowFullCv] = useState(true);
+  const [showPw, setShowPw] = useState(false);
+  const [copiedField, setCopiedField] = useState('');
+  const [imgErr, setImgErr] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
+    setImgErr(false);
     getApplication(companyId, appId)
       .then((data) => { if (!cancelled) setDetail(data); })
       .catch((err) => {
@@ -37,6 +55,45 @@ function CandidateDetailPanel({ companyId, appId, onClose, onChanged }) {
     await onChanged();
   }, [companyId, appId, onChanged]);
 
+  const handleSaveContact = async (e) => {
+    e.preventDefault();
+    if (!contactEmail.trim()) return;
+    setActionBusy(true);
+    setError('');
+    try {
+      await updateContact(companyId, appId, { email: contactEmail.trim(), name: contactName.trim() || detail?.candidate_name || null });
+      await changed();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setActionBusy(false);
+    }
+  };
+
+  const handleInviteFromHold = async () => {
+    setActionBusy(true);
+    setError('');
+    try {
+      await inviteFromHold(companyId, appId);
+      await changed();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setActionBusy(false);
+    }
+  };
+
+  const handleDownloadCv = async () => {
+    try {
+      await downloadCvFile(companyId, appId, detail?.candidate_name || detail?.alias || 'CV');
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
+  const [fg, bg] = getCandidatePalette(detail?.id || appId);
+  const initials = getCandidateInitials(detail?.candidate_name, detail?.alias);
+
   return (
     <aside
       role="complementary"
@@ -45,9 +102,42 @@ function CandidateDetailPanel({ companyId, appId, onClose, onChanged }) {
       className="fixed inset-y-0 right-0 z-40 w-full max-w-2xl overflow-y-auto border-l border-slate-200 bg-white p-6 shadow-panel"
     >
       <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">{t('board.detail.title')}</p>
-          <h2 className="text-xl font-extrabold text-slate-950">{detail?.alias ?? ''}</h2>
+        <div className="flex items-center gap-3.5">
+          <div
+            className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-slate-200 text-base font-extrabold shadow-sm"
+            style={{ backgroundColor: bg, color: fg }}
+          >
+            {detail && !imgErr ? (
+              <img
+                src={getCandidateAvatarUrl(detail.candidate_name, detail.alias, detail.id)}
+                alt={detail.candidate_name || detail.alias}
+                className="h-full w-full object-cover"
+                onError={() => setImgErr(true)}
+              />
+            ) : (
+              <span>{initials}</span>
+            )}
+          </div>
+          <div>
+            <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">{t('board.detail.title')}</p>
+            <h2 className="text-xl font-extrabold text-slate-950">
+              {detail?.candidate_name || detail?.alias || ''}
+              {detail?.candidate_name && detail?.alias && (
+                <span className="ml-2 text-sm font-semibold text-slate-400">({detail.alias})</span>
+              )}
+            </h2>
+            {(detail?.candidate_email || detail?.candidate_phone || detail?.source_channel) && (
+              <p className="mt-1 flex flex-wrap items-center gap-2 text-xs font-semibold text-slate-600">
+                {detail.candidate_email && <span>{detail.candidate_email}</span>}
+                {detail.candidate_phone && <span>• {detail.candidate_phone}</span>}
+                {detail.source_channel && (
+                  <span className="rounded bg-slate-100 px-2 py-0.5 text-[10px] font-bold uppercase text-slate-700">
+                    {detail.source_channel}
+                  </span>
+                )}
+              </p>
+            )}
+          </div>
         </div>
         <button type="button" onClick={onClose} aria-label={t('board.detail.close')} className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100">
           <X size={18} />
@@ -79,6 +169,175 @@ function CandidateDetailPanel({ companyId, appId, onClose, onChanged }) {
           {detail.cv_consent_withdrawn && detail.stage === 'cv_failed' && <p data-testid="cv-consent-note" className="text-sm font-semibold text-amber-800">{t('board.cvConsentWithdrawn')}</p>}
           {detail.cv_status_correction_reason && (
             <p className="text-xs text-slate-600">{t('board.cvCorrection.reasonShown', { reason: detail.cv_status_correction_reason })}</p>
+          )}
+
+          {detail.stage === 'missing_contact' && (
+            <form onSubmit={handleSaveContact} className="space-y-3 rounded-2xl border border-amber-200 bg-amber-50 p-4">
+              <p className="text-xs font-bold text-amber-900">
+                {t('board.missingContactNote', { defaultValue: 'This CV has no extractable email. Fill in the candidate email to send the AI interview invite:' })}
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <input
+                  type="text"
+                  placeholder={detail.candidate_name || 'Candidate name'}
+                  value={contactName}
+                  onChange={(e) => setContactName(e.target.value)}
+                  className="rounded-xl border border-amber-300 bg-white px-3 py-1.5 text-xs"
+                />
+                <input
+                  type="email"
+                  required
+                  placeholder="candidate@example.com"
+                  value={contactEmail}
+                  onChange={(e) => setContactEmail(e.target.value)}
+                  className="min-w-56 flex-1 rounded-xl border border-amber-300 bg-white px-3 py-1.5 text-xs"
+                />
+                <button
+                  type="submit"
+                  disabled={actionBusy}
+                  className="rounded-xl bg-amber-800 px-3.5 py-1.5 text-xs font-bold text-white"
+                >
+                  {t('board.saveContact', { defaultValue: 'Save & Process CV' })}
+                </button>
+              </div>
+            </form>
+          )}
+
+          {detail.stage === 'cv_hold' && (
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4">
+              <p className="text-xs font-semibold text-amber-900">
+                {t('board.cvHoldNote', { defaultValue: 'Held: 0% of must-have requirements matched on CV. You can still invite this candidate manually.' })}
+              </p>
+              <button
+                type="button"
+                disabled={actionBusy}
+                onClick={handleInviteFromHold}
+                className="rounded-xl bg-blue-600 px-3.5 py-1.5 text-xs font-bold text-white"
+              >
+                {t('board.inviteFromHold', { defaultValue: 'Invite to AI interview anyway' })}
+              </button>
+            </div>
+          )}
+
+          {detail.account_created && detail.candidate_email && (
+            <section className="rounded-2xl border border-emerald-200 bg-emerald-50/60 p-4">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-600 text-white">
+                    <KeyRound size={14} />
+                  </div>
+                  <h3 className="text-xs font-extrabold uppercase tracking-wider text-emerald-900">
+                    Tài khoản Thí sinh Tự động tạo (Vòng 1 AI Interview)
+                  </h3>
+                </div>
+                {detail.claim_token && (
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        navigator.clipboard?.writeText(`${CANDIDATE_PORTAL_URL}/claim/${detail.claim_token}`);
+                        setCopiedField('magic');
+                        setTimeout(() => setCopiedField(''), 2000);
+                      }}
+                      className="inline-flex items-center gap-1 rounded-lg bg-emerald-700 px-2.5 py-1 text-[11px] font-bold text-white hover:bg-emerald-800"
+                    >
+                      {copiedField === 'magic' ? <Check size={12} /> : <Copy size={12} />}
+                      {copiedField === 'magic' ? 'Đã copy Magic Link!' : 'Copy Magic Link 1-Click'}
+                    </button>
+                    <a
+                      href={`${CANDIDATE_PORTAL_URL}/claim/${detail.claim_token}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-1 rounded-lg border border-emerald-300 bg-white px-2.5 py-1 text-[11px] font-bold text-emerald-800 hover:bg-emerald-100"
+                    >
+                      <ExternalLink size={12} />
+                      Mở phòng thi
+                    </a>
+                  </div>
+                )}
+              </div>
+              <div className="mt-2.5 flex flex-wrap items-center gap-4 text-xs text-slate-700">
+                <div className="flex items-center gap-1.5">
+                  <span className="font-semibold text-slate-500">Tài khoản:</span>
+                  <code className="rounded bg-white px-2 py-0.5 font-mono font-bold text-slate-900">
+                    {detail.candidate_email}
+                  </code>
+                </div>
+                {detail.default_password && (
+                  <div className="flex items-center gap-1.5">
+                    <span className="font-semibold text-slate-500">Mật khẩu mặc định:</span>
+                    <code className="rounded bg-white px-2 py-0.5 font-mono font-bold text-emerald-800">
+                      {showPw ? detail.default_password : '••••••••••'}
+                    </code>
+                    <button
+                      type="button"
+                      onClick={() => setShowPw((v) => !v)}
+                      className="rounded p-1 text-slate-500 hover:bg-white"
+                    >
+                      {showPw ? <EyeOff size={13} /> : <Eye size={13} />}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        navigator.clipboard?.writeText(detail.default_password);
+                        setCopiedField('pw');
+                        setTimeout(() => setCopiedField(''), 2000);
+                      }}
+                      className="rounded p-1 text-slate-500 hover:bg-white"
+                    >
+                      {copiedField === 'pw' ? <Check size={13} className="text-emerald-600" /> : <Copy size={13} />}
+                    </button>
+                  </div>
+                )}
+              </div>
+            </section>
+          )}
+
+          {detail.cv_text_blind && (
+            <section data-testid="candidate-cv-section" className="rounded-2xl border border-blue-200 bg-slate-50 p-4 shadow-sm">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-600 text-white">
+                    <FileText size={16} />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-extrabold text-slate-900">
+                      {t('board.cvSectionTitle', { defaultValue: 'Hồ sơ CV ứng viên (Candidate CV)' })}
+                    </h3>
+                    <p className="text-[11px] font-medium text-slate-500">
+                      {detail.cv_suffix ? `Định dạng gốc: ${detail.cv_suffix.toUpperCase()}` : 'CV Text'}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowFullCv((v) => !v)}
+                    className="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-100"
+                  >
+                    {showFullCv ? <EyeOff size={14} /> : <Eye size={14} />}
+                    {showFullCv
+                      ? t('board.hideCv', { defaultValue: 'Thu gọn CV' })
+                      : t('board.viewCv', { defaultValue: 'Xem toàn bộ CV' })}
+                  </button>
+                  {detail.has_cv_file && (
+                    <button
+                      type="button"
+                      onClick={handleDownloadCv}
+                      className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-blue-700"
+                    >
+                      <Download size={14} />
+                      {t('board.downloadCv', { defaultValue: 'Tải CV gốc' })}
+                    </button>
+                  )}
+                </div>
+              </div>
+              {showFullCv && (
+                <div className="mt-3 max-h-80 overflow-y-auto rounded-xl border border-slate-200 bg-white p-4 font-sans text-xs leading-relaxed whitespace-pre-wrap text-slate-800 shadow-inner">
+                  {detail.cv_text_blind}
+                </div>
+              )}
+            </section>
           )}
 
           <TranscriptPanel companyId={companyId} appId={appId} turns={detail.transcript} masked={detail.identity_masked} />

@@ -1,11 +1,14 @@
 STAGES = (
-    "submitted", "cv_processing", "cv_failed", "invited", "withdrawn", "declined_recording",
+    "submitted", "missing_contact", "cv_processing", "cv_failed", "cv_hold",
+    "invited", "withdrawn", "declined_recording",
     "session_in_progress", "session_completed", "analyzing", "ready_for_hr",
 )
 TRANSITIONS = {
-    "submitted": {"cv_processing"},
-    "cv_processing": {"invited", "cv_failed"},
+    "submitted": {"cv_processing", "missing_contact"},
+    "missing_contact": {"cv_processing", "withdrawn"},
+    "cv_processing": {"invited", "cv_hold", "cv_failed", "missing_contact"},
     "cv_failed": {"cv_processing", "invited", "withdrawn"},  # invited by HR's hand only: the CV gave no label
+    "cv_hold": {"invited", "ready_for_hr", "withdrawn"},
     "invited": {"session_in_progress", "withdrawn", "declined_recording", "ready_for_hr"},
     "declined_recording": {"ready_for_hr"},
     "session_in_progress": {"session_completed", "ready_for_hr"},

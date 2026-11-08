@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Link, useNavigate } from 'react-router-dom';
 import { useCompany } from '../company/CompanyContext.jsx';
 import { ConfirmBar, EmptyState, ErrorAlert, cardClass, inputClass, primaryButton, secondaryButton } from '../components/KbFeedback.jsx';
+import StatusBadge from '../components/StatusBadge.jsx';
 import {
   cancelHiringRequest, createHiringRequest, generateDraft, listDepartments, listHiringRequests, listMembers,
   updateHiringRequest,
@@ -352,8 +353,10 @@ function HiringRequestsPage() {
             <li key={request.id} data-testid={`request-${request.id}`} className={`${cardClass} flex flex-wrap items-center justify-between gap-4`}>
               <div>
                 <p className="font-bold">{request.title}</p>
-                <p data-testid="request-status" className="text-sm text-slate-600">
-                  {t(`bridges.requests.status.${request.status}`, { defaultValue: request.status })}
+                <p data-testid="request-status">
+                  <StatusBadge status={request.status}>
+                    {t(`bridges.requests.status.${request.status}`, { defaultValue: request.status })}
+                  </StatusBadge>
                 </p>
               </div>
               {isHr && request.status !== 'cancelled' && <DraftActions companyId={companyId} request={request} roles={roles} />}

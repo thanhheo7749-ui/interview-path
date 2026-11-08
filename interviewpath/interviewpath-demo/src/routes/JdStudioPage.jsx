@@ -7,6 +7,7 @@ import ChannelContent from '../components/jd/ChannelContent.jsx';
 import LineEditor from '../components/jd/LineEditor.jsx';
 import LintPanel from '../components/jd/LintPanel.jsx';
 import { ErrorAlert, cardClass, inputClass, primaryButton, secondaryButton } from '../components/KbFeedback.jsx';
+import StatusBadge from '../components/StatusBadge.jsx';
 import {
   acknowledgeUnchecked, approveDraft, askAssistant, confirmDraftLine, dismissProposal, generateChannelContent,
   getChannelContent, getDraft, patchDraftLines, publishDraft, requestDraftChanges, rerunLint, submitDraft,
@@ -194,9 +195,9 @@ function JdStudio() {
       <div className="flex flex-wrap items-center justify-between gap-4">
         <h1 className="text-2xl font-extrabold tracking-tight">{t('jd.title')}</h1>
         <div className="flex flex-wrap items-center gap-3">
-          <span data-testid="draft-status" className="rounded-full bg-slate-200 px-3 py-1 text-xs font-bold uppercase tracking-[0.12em] text-slate-700">
-            {t(`jd.status.${status}`, { defaultValue: status })}
-          </span>
+          <StatusBadge status={status}>
+            <span data-testid="draft-status">{t(`jd.status.${status}`, { defaultValue: status })}</span>
+          </StatusBadge>
           <span data-testid="draft-version" data-version={draft.version} className="text-xs font-bold text-slate-500">
             {t('jd.version', { version: draft.version })}
           </span>
@@ -240,7 +241,7 @@ function JdStudio() {
                 type="button"
                 aria-selected={lang === item.code}
                 onClick={() => setLang(item.code)}
-                className={`rounded-xl px-3 py-2 text-sm font-bold ${lang === item.code ? 'bg-slate-950 text-white' : 'bg-white text-slate-700 shadow-card'}`}
+                className={`rounded-xl px-3 py-2 text-sm font-bold ${lang === item.code ? 'bg-blue-600 text-white' : 'bg-white text-slate-700 shadow-card'}`}
               >
                 {item.label}
               </button>

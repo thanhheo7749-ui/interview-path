@@ -127,7 +127,7 @@ function GraphExplorer({ companyId }) {
                 onClick={() => setViewAs(audience)}
                 className={[
                   'rounded-xl px-3 py-2 text-sm font-semibold transition',
-                  viewAs === audience ? 'bg-slate-950 text-white shadow-card' : 'bg-slate-100 text-slate-600 hover:bg-slate-200',
+                  viewAs === audience ? 'bg-blue-600 text-white shadow-card' : 'bg-slate-100 text-slate-600 hover:bg-slate-200',
                 ].join(' ')}
               >
                 {t(`graph.audiences.${audience}`)}
@@ -292,7 +292,7 @@ function GraphExplorer({ companyId }) {
                   onClick={() => select(node.id)}
                   className={[
                     'flex w-full items-center gap-2 rounded-xl border px-3 py-2 text-left text-sm font-semibold transition',
-                    selectedId === node.id ? 'border-slate-950 bg-slate-50' : 'border-slate-200 hover:bg-slate-50',
+                    selectedId === node.id ? 'border-blue-600 bg-blue-50' : 'border-slate-200 hover:bg-slate-50',
                   ].join(' ')}
                 >
                   <span aria-hidden="true" className="inline-block h-3 w-3 shrink-0 rounded-full" style={{ backgroundColor: LAYER_COLORS[node.layer] }} />

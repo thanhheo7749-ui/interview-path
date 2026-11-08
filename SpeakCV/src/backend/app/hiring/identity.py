@@ -71,6 +71,58 @@ class MaskResult:
     blind_hash: str
 
 
+@dataclass(frozen=True)
+class ContactInfo:
+    name: str | None
+    email: str | None
+    phone: str | None
+    contact_hash: str | None
+
+
+_HEADING_SKIP = re.compile(
+    r"^(?:cv|resume|curriculum\s+vitae|sơ\s+yếu\s+lý\s+lịch|hồ\s+sơ\s+ứng\s+tuyển|이력서)$",
+    re.IGNORECASE,
+)
+_NAME_LABEL = re.compile(r"^(?:full\s*name|name|họ\s*(?:và\s*)?tên|성명|이름)\s*[:：]\s*(.+)$", re.IGNORECASE)
+
+
+def extract_contact_info(
+    text: str, fallback_name: str | None = None, fallback_email: str | None = None, fallback_phone: str | None = None
+) -> ContactInfo:
+    normalised = unicodedata.normalize("NFC", text or "").replace("\r\n", "\n").replace("\r", "\n")
+    email_match = _EMAIL.search(normalised)
+    email = (email_match.group(0).strip().lower() if email_match else (fallback_email or "").strip().lower()) or None
+
+    phone_match = _PHONE.search(normalised)
+    phone = " ".join(phone_match.group(0).split()) if phone_match else ((fallback_phone or "").strip() or None)
+    phone_digits = re.sub(r"\D+", "", phone or "")
+    if phone_digits.startswith("84") and len(phone_digits) >= 10:
+        phone_digits = "0" + phone_digits[2:]
+
+    name = (fallback_name or "").strip() or None
+    if not name:
+        for raw_line in normalised.splitlines()[:10]:
+            line = " ".join(raw_line.split()).strip()
+            if not line or _HEADING_SKIP.match(line):
+                continue
+            labelled = _NAME_LABEL.match(line)
+            if labelled:
+                candidate = labelled.group(1).strip()
+                if candidate:
+                    name = candidate[:255]
+                    break
+            if _EMAIL.search(line) or _SCHEME_URL.search(line) or _PHONE.search(line) or ":" in line:
+                continue
+            if 2 <= len(line) <= 80 and not any(ch.isdigit() for ch in line):
+                name = line[:255]
+                break
+
+    contact_hash = None
+    if email or phone_digits:
+        contact_hash = hashlib.sha256(f"{email or ''}|{phone_digits}".encode("utf-8")).hexdigest()
+    return ContactInfo(name=name, email=email, phone=phone, contact_hash=contact_hash)
+
+
 def cv_section(text: str) -> str:
     """Wrap CV text as a data section. A tag written in the CV cannot close the section or open another."""
     return f"<cv>\n{_SECTION_TAG.sub('[tag]', text)}\n</cv>"
@@ -142,9 +194,8 @@ def apply_terms(text: str, terms: dict[str, list[str]]) -> str:
 
 
 def mask_spoken(text: str, known_terms: list[str]) -> str:
-    """What a candidate said, as HR reads it before a reveal. At read time, so no AI is involved. Words such as "anh"
-    and "chị" and anything else said about oneself can remain: the portal tells HR so."""
-    return apply_terms(regex_mask(text), {_NAME: list(known_terms)})
+    """Preserves spoken text as-is (non-blind workflow)."""
+    return unicodedata.normalize("NFC", text)
 
 
 def _collapse(text: str) -> str:
@@ -172,13 +223,28 @@ def hash_of(blind_text: str) -> str:
 
 
 def mask(raw_text: str, *, company_id: int, known_terms: list[str] = ()) -> MaskResult:
-    masked = regex_mask(raw_text)
-    prompt = f"List the identifying details in this CV.\n\n{cv_section(masked)}"
-    result = gateway.generate_structured(
-        "bulk", SYSTEM, [{"role": "user", "content": prompt}], IdentityTerms, MAX_OUTPUT_TOKENS, "cv_mask", company_id,
-    )
-    found = result.value
-    blind = _collapse(apply_terms(masked, {
-        _NAME: [*found.names, *known_terms], "[GENDER]": found.gender_terms, "[AGE]": found.ages, "[ADDRESS]": found.addresses,
-    }))
-    return MaskResult(blind_text=blind, blind_hash=hash_of(blind))
+    """Non-blind workflow: preserves real CV text without calling AI masking."""
+    normalised = _collapse(unicodedata.normalize("NFC", raw_text))
+    return MaskResult(blind_text=normalised, blind_hash=hash_of(normalised))
+
+
+def mask_with_ai(raw_text: str, *, company_id: int, known_terms: list[str] = ()) -> MaskResult:
+    """AI-assisted masking used by the counterfactual fairness check."""
+    regex_masked = regex_mask(raw_text)
+    found = gateway.generate_structured(
+        slot="bulk",
+        system=SYSTEM,
+        messages=[{"role": "user", "content": cv_section(regex_masked)}],
+        schema=IdentityTerms,
+        max_output_tokens=MAX_OUTPUT_TOKENS,
+        feature="cv_mask",
+        company_id=company_id,
+    ).value
+    terms = {
+        "[NAME]": [*known_terms, *found.names],
+        "[GENDER]": found.gender_terms,
+        "[AGE]": found.ages,
+        "[ADDRESS]": found.addresses,
+    }
+    blind_text = _collapse(apply_terms(regex_masked, terms))
+    return MaskResult(blind_text=blind_text, blind_hash=hash_of(blind_text))

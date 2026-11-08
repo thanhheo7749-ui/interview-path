@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { MicCheck } from "@/components/Hiring/MicCheck";
+import { MicroButton } from "@/components/Interview/MicroButton";
 import { MAX_ANSWER_SECONDS, supportsRecording, useAnswerRecorder } from "@/hooks/useAnswerRecorder";
 import { detectLocale, screeningText, type Locale } from "@/lib/i18n";
 import {
@@ -412,7 +413,6 @@ export function ScreeningRoom({ applicationId }: { applicationId: number }) {
     state.status === "paused" ? text.paused : state.status === "closing" ? text.closing : null,
     state.notice === "repeat" ? text.repeat : state.notice === "retry" ? text.retry : null,
   ].filter((item): item is string => item !== null);
-  const busy = uploading || recorder.isRecording;
   const answeredIndex = state.position;
 
   return shell(
@@ -434,17 +434,58 @@ export function ScreeningRoom({ applicationId }: { applicationId: number }) {
         </span>
       </div>
 
-      <section className="rounded-2xl border border-theme-border bg-theme-primary p-5">
-        {state.is_followup && <p className="mb-1 text-xs font-bold uppercase text-blue-600">{text.followup}</p>}
-        <p data-testid="question-text" className="text-lg font-semibold">
-          {state.question_text}
-        </p>
-        {state.why && (
-          <p className="mt-3 text-sm text-theme-text-secondary">
-            <span className="font-bold">{text.why}:</span> {state.why}
+      {!stream && <MicCheck text={text} onStream={adoptStream} />}
+
+      <div className="flex flex-col items-center gap-10 py-4">
+        <MicroButton
+          testId={recorder.isRecording ? "stop-answer" : "record-answer"}
+          disabled={!recorder.isRecording && (!stream || uploading || uploadFailed)}
+          status={recorder.isRecording ? "Listening" : uploading ? "Processing" : text.record}
+          onClick={() => {
+            if (recorder.isRecording) recorder.stop();
+            else if (stream && !uploading && !uploadFailed) startRecording();
+          }}
+          langLabel={languages.find((l) => l.code === language)?.label ?? language}
+        />
+        {recorder.isRecording && (
+          <p className="mt-2 text-sm font-bold text-red-600">
+            {text.stop} ({formatClock(recorder.elapsed)} / {formatClock(recorder.limitSeconds)})
           </p>
         )}
-      </section>
+      </div>
+
+      <div className="grid w-full grid-cols-1 gap-6 md:grid-cols-2">
+        <div className="flex flex-col rounded-2xl border border-theme-border bg-theme-primary p-5">
+          <span className="mb-2 text-xs font-bold uppercase tracking-widest text-blue-500">{text.recordingSession}</span>
+          <p className="flex-1 text-sm text-theme-text-secondary">
+            {uploading ? text.uploading : recorder.isRecording ? text.recordingOn : text.recordingAuto}
+          </p>
+          {uploadFailed && pendingRef.current && (
+            <button
+              type="button"
+              onClick={() => pendingRef.current && void send(pendingRef.current.position, pendingRef.current.blob)}
+              className="mt-3 self-start rounded-xl border border-theme-border px-4 py-2 text-sm font-bold hover:bg-theme-secondary"
+            >
+              {text.retrySend}
+            </button>
+          )}
+        </div>
+        <div className="flex flex-col rounded-2xl border border-theme-border bg-theme-primary p-5">
+          <span className="mb-2 flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-emerald-500">
+            <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-500" />
+            {text.questionOf(answeredIndex, state.total)}
+          </span>
+          {state.is_followup && <p className="mb-1 text-xs font-bold uppercase text-blue-600">{text.followup}</p>}
+          <p data-testid="question-text" className="text-lg font-semibold">
+            {state.question_text}
+          </p>
+          {state.why && (
+            <p className="mt-3 text-sm text-theme-text-secondary">
+              <span className="font-bold">{text.why}:</span> {state.why}
+            </p>
+          )}
+        </div>
+      </div>
 
       {notices.map((notice) => (
         <p key={notice} role="status" data-testid="session-notice" className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
@@ -452,40 +493,6 @@ export function ScreeningRoom({ applicationId }: { applicationId: number }) {
         </p>
       ))}
 
-      {!stream && <MicCheck text={text} onStream={adoptStream} />}
-
-      <div className="flex flex-wrap items-center gap-3">
-        {!recorder.isRecording ? (
-          <button
-            type="button"
-            data-testid="record-answer"
-            onClick={startRecording}
-            disabled={!stream || uploading || uploadFailed}
-            className="rounded-xl bg-blue-600 px-5 py-3 font-bold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {text.record}
-          </button>
-        ) : (
-          <button
-            type="button"
-            data-testid="stop-answer"
-            onClick={recorder.stop}
-            className="rounded-xl bg-red-600 px-5 py-3 font-bold text-white hover:bg-red-700"
-          >
-            {text.stop} ({formatClock(recorder.elapsed)} / {formatClock(recorder.limitSeconds)})
-          </button>
-        )}
-        {uploadFailed && pendingRef.current && (
-          <button
-            type="button"
-            onClick={() => pendingRef.current && void send(pendingRef.current.position, pendingRef.current.blob)}
-            className="rounded-xl border border-theme-border px-5 py-3 font-bold hover:bg-theme-primary"
-          >
-            {text.retrySend}
-          </button>
-        )}
-      </div>
-      {!busy && <p className="text-xs text-theme-text-secondary">{text.recordingAuto}</p>}
       {uploading && <p role="status">{text.uploading}</p>}
       {uploadFailed && (
         <p role="alert" className="text-sm text-red-600">

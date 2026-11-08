@@ -46,7 +46,14 @@
     "graph": "지식 그래프",
     "copilot": "코파일럿",
     "jobs": "채용공고",
-    "learning": "학습 카탈로그"
+    "candidateAccounts": "지원자 계정",
+    "learning": "학습 카탈로그",
+    "sections": {
+      "hiring": "채용",
+      "knowledge": "지식",
+      "assistant": "어시스턴트",
+      "account": "계정"
+    }
   },
   "auth": {
     "loadFailed": "계정을 불러오지 못했습니다. 연결을 확인하고 다시 시도해 주세요.",
@@ -382,10 +389,26 @@
     }
   },
   "board": {
+    "stage": {
+      "cv_hold": "CV 보류 (필수 요건 0%)",
+      "missing_contact": "연락처 누락"
+    },
     "lanes": {
       "transcription_failed": "기술 문제: 음성 파일 있음",
-      "cv_failed": "이력서를 처리하지 못함"
+      "cv_failed": "이력서를 처리하지 못함",
+      "cv_hold": "CV 보류 (필수 요건 0%)",
+      "missing_contact": "연락처 누락"
     },
+    "import": {
+      "title": "이력서 일괄 가져오기 (PDF / DOCX / ZIP)",
+      "upload": "업로드 및 평가",
+      "uploading": "업로드 중...",
+      "summary": "{{imported}}건 가져옴, 중복 {{skipped_duplicates}}건 건너뜀, 연락처 누락 {{missing_contact}}건"
+    },
+    "cvHoldNote": "이 이력서는 필수 요건을 0% 충족하여 AI 면접 전에 보류되었습니다. 원하시면 면접에 초대할 수 있습니다.",
+    "inviteFromHold": "그래도 AI 면접에 초대",
+    "missingContactNote": "이 이력서에서 이메일 주소를 추출할 수 없습니다. 초대장을 보내려면 연락처를 입력하세요:",
+    "saveContact": "저장 및 초대",
     "actions": {
       "retryTranscription": "음성 변환 다시 시도",
       "inviteAnyway": "그래도 면접에 초대",
@@ -409,7 +432,13 @@
     "descriptionInJdStudio": "이 공고는 JD Studio에서 만들었습니다. 검사와 매니저 승인이 적용되도록 설명은 그곳에서 수정하세요.",
     "openJdStudio": "JD Studio에서 열기",
     "insightsChannels": "채널",
-    "insightsReality": "요건 점검"
+    "insightsReality": "요건 점검",
+    "schedulingEnabled": "지원자가 AI 면접을 시작할 수 있는 시간 제한",
+    "windowStart": "시작 시간",
+    "windowEnd": "종료 시간",
+    "windowTimezoneHint": "표시된 시간은 사용자의 시간대({{tz}})입니다. 지원자는 채용 공고 페이지에서 이 시간대를 봅니다.",
+    "windowInvalid": "시작 시간이 종료 시간보다 앞서도록 시작 및 종료 시간을 입력하세요.",
+    "slaHours": "면접 SLA (초대 후 시간, 예: 72)"
   },
   "insights": {
     "eyebrow": "성과 측정",

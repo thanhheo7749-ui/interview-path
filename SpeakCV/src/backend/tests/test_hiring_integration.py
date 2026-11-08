@@ -274,13 +274,15 @@ def test_a_deletion_during_the_cv_assessment_writes_no_cache_row_and_no_results(
 
 
 def test_a_deletion_during_the_cv_masking_writes_nothing(db, world, monkeypatch):
+    from app.hiring import identity
+
     application_id = cv_job(db, world, monkeypatch)
 
-    def deleting(system, messages, schema):
+    def deleting(raw_text, *, company_id, known_terms=()):
         delete_application(application_id)
-        return json.dumps({"names": [], "gender_terms": [], "age_terms": [], "address_terms": []})
+        return identity.MaskResult(blind_text=raw_text, blind_hash=identity.hash_of(raw_text))
 
-    fake.register("cv_mask", deleting)
+    monkeypatch.setattr(identity, "mask", deleting)
     cv_processing.run(application_id)
     row = fresh(db, Application, application_id)
     assert row.cv_text_raw is None and row.cv_text_blind is None and row.stage == "cv_failed"

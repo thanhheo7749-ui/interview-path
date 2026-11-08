@@ -4,9 +4,8 @@
  * See the LICENSE file in the project root for more information.
  */
 
-import { useState, useEffect } from "react";
 import { X, Settings2, Sliders, Clock, Target, Briefcase } from "lucide-react";
-import { getJdTemplates } from "@/services/api";
+import { JdTemplatePicker } from "@/components/Interview/JdTemplatePicker";
 
 export default function SettingsModal({
   show,
@@ -24,26 +23,6 @@ export default function SettingsModal({
   timeLimit,
   setTimeLimit,
 }: any) {
-  const [templates, setTemplates] = useState<any[]>([]);
-
-  useEffect(() => {
-    if (show) {
-      getJdTemplates()
-        .then((data) => setTemplates(data.templates || []))
-        .catch((err) => console.log("Error loading JD templates:", err));
-    }
-  }, [show]);
-
-  const handleSelectTemplate = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const selectedId = parseInt(e.target.value);
-    const selectedTemplate = templates.find((t) => t.id === selectedId);
-    if (selectedTemplate) {
-      setJd(selectedTemplate.description);
-    } else {
-      setJd("");
-    }
-  };
-
   if (!show) return null;
 
   return (
@@ -191,21 +170,7 @@ export default function SettingsModal({
               </div>
 
               {/* JD template dropdown */}
-              <select
-                className="w-full bg-white border border-slate-200 p-2.5 rounded-lg text-sm text-slate-700 outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-200 cursor-pointer"
-                onChange={handleSelectTemplate}
-                defaultValue=""
-              >
-                <option value="" disabled>
-                  -- Select a JD template (Optional) --
-                </option>
-                <option value="">Custom Input</option>
-                {templates.map((tpl) => (
-                  <option key={tpl.id} value={tpl.id}>
-                    {tpl.title}
-                  </option>
-                ))}
-              </select>
+              <JdTemplatePicker onPick={setJd} />
 
               {/* Textarea */}
               <textarea

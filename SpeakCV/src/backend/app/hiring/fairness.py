@@ -131,7 +131,7 @@ def check(db, application, *, actor_user_id=None) -> FairnessResult:
     application_id, company_id = application.id, application.company_id
     db.commit()
 
-    masked = identity.mask(swapped_text, company_id=company_id)
+    masked = identity.mask_with_ai(swapped_text, company_id=company_id)
 
     application = (
         db.query(Application).filter(Application.id == application_id)

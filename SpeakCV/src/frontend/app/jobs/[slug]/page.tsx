@@ -8,6 +8,7 @@ import { safeRedirect } from "@/lib/safeRedirect";
 import { format, Strings, useLang } from "@/lib/i18n";
 import { applyToJob, ConsentText, getConsentText, getPublicJob, HiringError, PublicJob } from "@/services/hiring";
 import SampleNotice, { LangToggle } from "@/components/Hiring/SampleNotice";
+import AskCompanyWidget from "@/components/Hiring/AskCompanyWidget";
 
 const MAX_CV_BYTES = 20 * 1024 * 1024; // the server's default limit; the server still has the final say
 const CV_NAME = /\.(pdf|docx)$/i;
@@ -38,10 +39,13 @@ function applyErrorText(err: unknown, t: Strings, lang: string): string {
 
 function ApplyForm({ job, src }: { job: PublicJob; src: string | null }) {
   const { t, lang } = useLang();
+  const { user } = useAuth();
   const router = useRouter();
   const [consent, setConsent] = useState<ConsentText | null>(null);
   const [consentError, setConsentError] = useState(false);
   const [file, setFile] = useState<File | null>(null);
+  const [candidateName, setCandidateName] = useState("");
+  const [candidateEmail, setCandidateEmail] = useState("");
   const [agreed, setAgreed] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -79,7 +83,21 @@ function ApplyForm({ job, src }: { job: PublicJob; src: string | null }) {
     setBusy(true);
     setError("");
     try {
-      const application = await applyToJob(job.slug, file, consent.version, consent.language, src);
+      const application = await applyToJob(
+        job.slug,
+        file,
+        consent.version,
+        consent.language,
+        src,
+        candidateEmail,
+        candidateName,
+      );
+      if (application.access_token) {
+        sessionStorage.setItem("token", application.access_token);
+        sessionStorage.setItem("userName", candidateName || candidateEmail || "Candidate");
+        sessionStorage.setItem("userRole", "user");
+        window.dispatchEvent(new Event("auth-changed"));
+      }
       router.push(`/applications/${application.id}/fit`);
     } catch (err) {
       setError(applyErrorText(err, t, lang));
@@ -94,6 +112,29 @@ function ApplyForm({ job, src }: { job: PublicJob; src: string | null }) {
   return (
     <form onSubmit={submit} className="rounded-2xl border border-theme-border bg-theme-surface p-5 space-y-4">
       <h2 className="text-lg font-bold text-theme-text">{t.applyTitle}</h2>
+      {!user && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <label className="block text-sm text-theme-text-secondary">
+            {t.candidateName}
+            <input
+              type="text"
+              value={candidateName}
+              onChange={(e) => setCandidateName(e.target.value)}
+              className="mt-1 block w-full rounded-lg border border-theme-border bg-theme-secondary px-3 py-2 text-theme-text"
+            />
+          </label>
+          <label className="block text-sm text-theme-text-secondary">
+            {t.candidateEmail} *
+            <input
+              type="email"
+              required={!user}
+              value={candidateEmail}
+              onChange={(e) => setCandidateEmail(e.target.value)}
+              className="mt-1 block w-full rounded-lg border border-theme-border bg-theme-secondary px-3 py-2 text-theme-text"
+            />
+          </label>
+        </div>
+      )}
       <label className="block text-sm text-theme-text-secondary">
         {t.cvFile}
         <input
@@ -176,17 +217,21 @@ function JobView({ slug }: { slug: string }) {
       )}
       {!job.can_apply ? (
         <p className="text-theme-text-secondary">{t.jobClosed}</p>
-      ) : isLoading ? null : !user ? (
-        <Link href={loginHref()} className="inline-block px-5 py-2 rounded-lg bg-blue-600 text-white font-bold">
-          {t.loginToApply}
-        </Link>
-      ) : showForm ? (
+      ) : isLoading ? null : showForm ? (
         <ApplyForm job={job} src={src} />
       ) : (
-        <button onClick={() => setShowForm(true)} className="px-5 py-2 rounded-lg bg-blue-600 text-white font-bold">
-          {t.apply}
-        </button>
+        <div className="flex flex-wrap items-center gap-3">
+          <button onClick={() => setShowForm(true)} className="px-5 py-2 rounded-lg bg-blue-600 text-white font-bold">
+            {t.apply}
+          </button>
+          {!user && (
+            <Link href={loginHref()} className="text-sm text-blue-400 underline">
+              {t.loginToApply}
+            </Link>
+          )}
+        </div>
       )}
+      <AskCompanyWidget companySlug={job.company_slug} />
     </div>
   );
 }

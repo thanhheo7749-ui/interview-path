@@ -27,7 +27,14 @@
     "graph": "Knowledge graph",
     "copilot": "Copilot",
     "jobs": "Jobs",
-    "learning": "Learning catalogue"
+    "candidateAccounts": "Candidate accounts",
+    "learning": "Learning catalogue",
+    "sections": {
+      "hiring": "Hiring",
+      "knowledge": "Knowledge",
+      "assistant": "Assistant",
+      "account": "Account"
+    }
   },
   "auth": {
     "loadFailed": "We could not load your account. Check your connection and try again.",
@@ -482,12 +489,18 @@
     "descriptionInJdStudio": "This job was made in JD Studio. Edit its description there, so the checks and the manager's approval apply.",
     "openJdStudio": "Open it in JD Studio",
     "insightsChannels": "Channels",
-    "insightsReality": "Reality Check"
+    "insightsReality": "Reality Check",
+    "schedulingEnabled": "Limit when candidates can start the AI interview",
+    "windowStart": "Window start",
+    "windowEnd": "Window end",
+    "windowTimezoneHint": "Times shown in your timezone ({{tz}}). Candidates see this timezone on the job page.",
+    "windowInvalid": "Enter a start and end time, with the start before the end.",
+    "slaHours": "Interview SLA (hours from invitation, e.g. 72)"
   },
   "board": {
     "eyebrow": "Candidate board",
     "title": "Candidate board",
-    "intro": "Candidates appear under an alias. Read the answers first; identity stays hidden until you choose to reveal it. AI only suggests. Approval and rejection are your decisions.",
+    "intro": "Candidate name, email, phone, and source channel are shown directly so you can review evidence and contact candidates across all channels. AI only suggests; approval and rejection are your decisions.",
     "axes": {
       "much": "Much interview evidence",
       "little": "Little interview evidence",
@@ -552,7 +565,9 @@
       "session_in_progress": "Interview in progress",
       "session_completed": "Interview finished",
       "analyzing": "Analyzing",
-      "ready_for_hr": "Ready for review"
+      "ready_for_hr": "Ready for review",
+      "cv_hold": "CV on hold (0% must-have)",
+      "missing_contact": "Missing contact info"
     },
     "lanes": {
       "title": "Not on the board yet",
@@ -562,8 +577,20 @@
       "refused_recording": "Refused recording",
       "withdrawn": "Withdrawn",
       "transcription_failed": "Technical problem: audio available",
-      "cv_failed": "CV could not be processed"
+      "cv_failed": "CV could not be processed",
+      "cv_hold": "CV on hold (0% must-have)",
+      "missing_contact": "Missing contact info"
     },
+    "import": {
+      "title": "Bulk import CVs (PDF / DOCX / ZIP)",
+      "upload": "Upload & assess",
+      "uploading": "Uploading...",
+      "summary": "Imported {{imported}}, skipped {{skipped_duplicates}} duplicates, {{missing_contact}} missing contact"
+    },
+    "cvHoldNote": "This CV matched 0% of must-have requirements and was held before AI interview. You can still invite them if you want.",
+    "inviteFromHold": "Invite to AI interview anyway",
+    "missingContactNote": "No email address could be extracted from this CV. Enter the candidate's contact details to invite them:",
+    "saveContact": "Save & invite",
     "bulk": {
       "button": "Reject {{count}} selected",
       "confirmTitle": "Confirm bulk rejection",

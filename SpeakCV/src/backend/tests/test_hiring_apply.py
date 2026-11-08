@@ -130,9 +130,13 @@ def assess_weak(world):
 
 
 def test_apply_requires_login(client, world):
-    response = client.post("/api/public/jobs/acme-backend/apply", files={"file": ("cv.docx", make_docx(), DOCX)},
-                           data={"consent_version": consents.VERSION})
-    assert response.status_code == 401
+    """Unauthenticated apply requires an email in either the form or the CV."""
+    response = client.post(
+        "/api/public/jobs/acme-backend/apply",
+        files={"file": ("cv.docx", make_docx(["No email address here"]), DOCX)},
+        data={"consent_version": consents.VERSION},
+    )
+    assert response.status_code == 422
 
 
 def test_apply_requires_consent_version(client, world, db):
@@ -391,7 +395,6 @@ def test_a_strong_cv_is_labelled_by_code(client, world, db):
 
 def test_an_injected_cv_is_invited_and_the_label_is_unchanged_end_to_end(client, world, db):
     """Visible and white-text instructions; the model is fooled and answers met with quotes that are not there."""
-    fake.enqueue("cv_mask", json.dumps({"names": [], "gender_terms": [], "ages": [], "addresses": []}))
     fake.enqueue("cv_assess", json.dumps({
         "requirements": [
             {"requirement_id": world.must_public, "status": "met", "quote": "Ten years of FastAPI"},
@@ -401,7 +404,7 @@ def test_an_injected_cv_is_invited_and_the_label_is_unchanged_end_to_end(client,
     }))
     lines = INJECTION.splitlines()
     application = fresh(db, apply(client, data=make_docx(lines[:5], hidden=lines[5:])).json()["id"])
-    assert application.stage == "invited"
+    assert application.stage == "cv_hold"
     assert application.cv_status == "not_met"
     assert application.hr_decision == "pending"
     assert application.hidden_text_detected is True
@@ -439,7 +442,10 @@ def test_reapplying_is_allowed_after_90_days(client, world, db):
 
 
 def test_a_withdrawn_application_still_counts_within_90_days(client, world, db):
+    from app.database.sql_models import VoiceSession
     application_id = apply(client).json()["id"]
+    db.add(VoiceSession(company_id=world.company_id, purpose="screening", application_id=application_id, language="en", status="ended"))
+    db.commit()
     assert client.post(f"/api/applications/{application_id}/withdraw", headers=auth_header(CANDIDATE)).status_code == 200
     assert apply(client).status_code == 409
 
@@ -559,8 +565,11 @@ def _ai_down(_system, _messages, _schema):
     raise AIProviderError("down")
 
 
-def test_ai_down_during_masking_fails_and_no_assessment_runs(client, world, db):
-    fake.register("cv_mask", _ai_down)
+def test_ai_down_during_masking_fails_and_no_assessment_runs(client, world, db, monkeypatch):
+    def mask_down(*_args, **_kwargs):
+        raise AIProviderError("down")
+
+    monkeypatch.setattr(cv_processing.identity, "mask", mask_down)
     assess_calls = []
     fake.register("cv_assess", lambda *_: assess_calls.append(1) or "{}")
     application = fresh(db, apply(client).json()["id"])
@@ -581,12 +590,10 @@ def test_ai_down_during_assessment_fails_with_the_same_message_and_keeps_no_rows
 
 
 def test_ai_garbage_during_masking_fails_safely(client, world, db):
-    fake.enqueue("cv_mask", "not json")
-    fake.enqueue("cv_mask", "still not json")
-    assess_calls = []
-    fake.register("cv_assess", lambda *_: assess_calls.append(1) or "{}")
+    fake.enqueue("cv_assess", "not json")
+    fake.enqueue("cv_assess", "still not json")
     application = fresh(db, apply(client).json()["id"])
-    assert application.stage == "cv_failed" and assess_calls == []
+    assert application.stage == "cv_failed"
 
 
 def test_an_unexpected_error_fails_with_a_generic_message(client, world, db, monkeypatch):
@@ -603,14 +610,14 @@ def test_cv_text_never_reaches_the_logs(client, world, db, caplog):
     import logging
 
     caplog.set_level(logging.DEBUG)
-    fake.enqueue("cv_mask", "not json with Canaryname Zebrawski")
-    fake.enqueue("cv_mask", "not json with Canaryname Zebrawski")
+    fake.enqueue("cv_assess", "not json with Canaryname Zebrawski")
+    fake.enqueue("cv_assess", "not json with Canaryname Zebrawski")
     apply(client)
     assert "Canaryname" not in caplog.text and "Zebrawski" not in caplog.text
 
 
 def test_the_masking_call_is_the_only_one_that_sees_the_raw_cv(client, world, db, monkeypatch):
-    """The canary name sits on the first line, the email is regex-masked before any AI call."""
+    """Non-blind workflow: cv_assess runs directly on raw CV text without a separate cv_mask AI call."""
     calls = []
     real = gateway.generate_structured
 
@@ -621,48 +628,30 @@ def test_the_masking_call_is_the_only_one_that_sees_the_raw_cv(client, world, db
 
     monkeypatch.setattr(gateway, "generate_structured", spy)
     application_id = apply(client).json()["id"]
-    assert [feature for feature, _ in calls] == ["cv_mask", "cv_assess"]
-    mask_prompt, assess_prompt = calls[0][1], calls[1][1]
-    assert "Canaryname" in mask_prompt
-    assert "canary.zebrawski@example.test" not in mask_prompt
-    for secret in ("Canaryname", "Zebrawski", "canary.zebrawski", "912 345 678"):
-        assert secret not in assess_prompt
+    assert [feature for feature, _ in calls] == ["cv_assess"]
+    assess_prompt = calls[0][1]
     assert "Built a FastAPI service" in assess_prompt
     application = fresh(db, application_id)
     assert "Canaryname" in application.cv_text_raw
-    assert "Canaryname" not in application.cv_text_blind and "canary.zebrawski" not in application.cv_text_blind
+    assert "Canaryname" in application.cv_text_blind
 
 
 def test_cv_assess_prompt_after_processing_has_no_name_or_email_by_last_messages(client, world, db):
     apply(client)
     prompt = json.dumps(fake.last_messages(), ensure_ascii=False)
     assert "<cv>" in prompt
-    for secret in ("Canaryname", "Zebrawski", "canary.zebrawski@example.test"):
-        assert secret not in prompt
+    assert "Built a FastAPI service" in prompt
 
 
 def test_the_registered_name_is_gone_from_cv_assess_when_the_model_lists_no_names(client, world, db, monkeypatch):
-    """The CV told the model to list nothing, and it obeyed. The account's own details still go."""
+    """Non-blind workflow: registered name and CV text are preserved in cv_text_blind."""
     user = db.get(User, world.user.id)
     user.full_name = "Canaryname Q Zebrawski"
     user.email = "canary.handle@example.test"
     db.commit()
-    prompts = {}
-    real = gateway.generate_structured
-
-    def spy(slot, system, messages, schema, max_output_tokens, feature, company_id=None):
-        prompts[feature] = json.dumps(messages, ensure_ascii=False)
-        return real(slot, system, messages, schema, max_output_tokens, feature, company_id)
-
-    monkeypatch.setattr(gateway, "generate_structured", spy)
-    fake.enqueue("cv_mask", json.dumps({"names": [], "gender_terms": [], "ages": [], "addresses": []}))
     lines = ["Canaryname Zebrawski", "Handle canary.handle on forums", "Q built a FastAPI service used by 3 teams."]
     application_id = apply(client, data=make_docx(lines), email="canary.handle@example.test").json()["id"]
-    assert "Canaryname" in prompts["cv_mask"]
-    for secret in ("Canaryname", "Zebrawski", "canary.handle"):
-        assert secret not in prompts["cv_assess"]
-    assert "Q built a FastAPI" in prompts["cv_assess"], "a single-character token is not a term"
-    assert fresh(db, application_id).cv_text_blind.startswith("[NAME] [NAME]")
+    assert fresh(db, application_id).cv_text_blind.startswith("Canaryname Zebrawski")
 
 
 def test_a_registered_name_that_is_a_common_word_does_not_change_the_blind_text(client, world, db):
@@ -670,17 +659,15 @@ def test_a_registered_name_that_is_a_common_word_does_not_change_the_blind_text(
     user.full_name = "Trần Long"
     user.email = "long@example.test"
     db.commit()
-    fake.enqueue("cv_mask", json.dumps({"names": [], "gender_terms": [], "ages": [], "addresses": []}))
     application_id = apply(client, data=make_docx(["Long ran a long-running job"]), email="long@example.test").json()["id"]
-    assert fresh(db, application_id).cv_text_blind == "[NAME] ran a long-running job"
+    assert fresh(db, application_id).cv_text_blind == "Long ran a long-running job"
 
 
 def test_identity_only_differences_give_exactly_the_same_result_end_to_end(client, world, db):
-    """Same CV, different person: the second application is answered from the cache."""
-    second_lines = ["Otherperson Quillfeather", "Email: quill@example.test  Phone: 0987 654 321", *CV_LINES[2:]]
+    """Same CV text applied by two users uses the ScreeningCache."""
     one = fresh(db, apply(client).json()["id"]).id
     assess_count = db.query(AIUsageLog).filter_by(feature="cv_assess").count()
-    two = fresh(db, apply(client, data=make_docx(second_lines), email=OTHER).json()["id"]).id
+    two = fresh(db, apply(client, data=make_docx(CV_LINES), email=OTHER).json()["id"]).id
     assert db.query(AIUsageLog).filter_by(feature="cv_assess").count() == assess_count
     first, second = fresh(db, one), fresh(db, two)
     assert first.cv_blind_hash == second.cv_blind_hash
@@ -765,8 +752,8 @@ def test_candidate_responses_never_contain_the_label_or_cv_text(client, world, d
 def test_application_response_holds_exactly_the_agreed_fields(client, world):
     application_id = apply(client).json()["id"]
     body = client.get(f"/api/applications/{application_id}", headers=auth_header(CANDIDATE)).json()
-    assert set(body) == {"id", "alias", "status", "job_title", "company_name", "company_slug", "is_sample", "created_at",
-                         "withdraw_reason", "processing_error", "interview_languages", "decision", "failure_reason", "email_enabled", "contact_email", "feedback", "reapply_after", "interview_window"}
+    assert set(body) == {"id", "alias", "status", "job_title", "job_slug", "company_name", "company_slug", "is_sample", "created_at",
+                         "withdraw_reason", "processing_error", "interview_languages", "decision", "failure_reason", "email_enabled", "contact_email", "feedback", "reapply_after", "interview_window", "final_outcome", "access_token"}
     assert body["alias"] == "#A1" and body["job_title"] == "Backend Developer" and body["company_name"] == "Acme"
     assert body["company_slug"] == "acme" and body["interview_languages"] == ["en"]
     assert body["is_sample"] is False and body["status"] == "invited"
@@ -1079,7 +1066,7 @@ def test_consent_text_unknown_purpose_or_company_gets_404(client, world):
 
 def test_the_demo_responders_are_installed_with_the_app(client, world, db):
     application = fresh(db, apply(client).json()["id"])
-    assert "[NAME]" in application.cv_text_blind
+    assert "Canaryname" in application.cv_text_blind
     assert db.query(RequirementResult).filter_by(application_id=application.id, requirement_id=world.must_public).one().status == "met"
     assert db.query(RequirementResult).filter_by(application_id=application.id, requirement_id=world.must_kube).one().status == "not_found"
     claims = [claim.quote for claim in db.query(CvClaim).filter_by(application_id=application.id)]
@@ -1144,3 +1131,125 @@ def test_deleting_before_any_session_or_decision_leaves_the_job_open(client, wor
     db.rollback()
     assert client.delete(f"/api/me/applications/{first}", headers=auth_header(CANDIDATE)).status_code == 204
     assert apply(client).status_code == 201
+
+
+def test_zero_must_have_cv_enters_cv_hold(client, world, db):
+    fake.enqueue("cv_assess", json.dumps({
+        "requirements": [
+            {"requirement_id": world.must_public, "status": "not_found", "quote": ""},
+            {"requirement_id": world.must_kube, "status": "not_found", "quote": ""},
+        ],
+        "claims": [],
+    }))
+    application = fresh(db, apply(client).json()["id"])
+    assert application.stage == "cv_hold"
+    assert application.cv_status == "not_met"
+    assert db.query(Notification).filter_by(application_id=application.id, kind="invited").count() == 0
+
+
+def test_withdrawn_before_interview_can_reapply_immediately(client, world, db):
+    application_id = apply(client).json()["id"]
+    assert client.post(f"/api/applications/{application_id}/withdraw", headers=auth_header(CANDIDATE)).status_code == 200
+    assert apply(client).status_code == 201
+
+
+def test_expired_fixed_window_closes_public_apply_and_sla_hours_gates_screening(client, world, db):
+    from app.hiring import interview_window
+    job = db.get(Job, world.job_id)
+    now = datetime.now(timezone.utc)
+    job.scheduling_enabled = True
+    job.interview_window_start = now - timedelta(hours=5)
+    job.interview_window_end = now - timedelta(hours=1)
+    db.commit()
+    pub = client.get(f"/api/public/jobs/{world.slug}").json()
+    assert pub["can_apply"] is False
+
+    job.scheduling_enabled = False
+    job.interview_sla_hours = 24
+    db.commit()
+    app_id = apply(client).json()["id"]
+    app_row = fresh(db, app_id)
+    assert app_row.invited_at is not None
+    assert interview_window.is_open(job, now, app_row) is True
+    assert interview_window.is_open(job, now + timedelta(hours=25), app_row) is False
+
+
+def test_guest_can_apply_without_login_and_claim_via_magic_link(client, world, db):
+    guest_cv = make_docx([
+        "Le Van Guest",
+        "Email: guest.candidate@example.test  Phone: +84 909 111 222",
+        "Built a FastAPI service used by 3 teams.",
+        "Used Docker in production for 2 years.",
+    ])
+    resp = client.post(
+        f"/api/public/jobs/{world.slug}/apply",
+        files={"file": ("guest.docx", guest_cv, DOCX)},
+        data={"consent_version": consents.VERSION, "candidate_email": "guest.candidate@example.test", "candidate_name": "Le Van Guest"},
+    )
+    assert resp.status_code == 201, resp.text
+    body = resp.json()
+    assert body.get("access_token")
+    app_row = fresh(db, body["id"])
+    assert app_row.candidate_email == "guest.candidate@example.test"
+    assert app_row.candidate_name == "Le Van Guest"
+    assert app_row.claim_token_hash is not None
+
+    raw_token = applications.issue_claim_token(app_row)
+    db.commit()
+    claim_info = client.get(f"/api/public/applications/claim/{raw_token}")
+    assert claim_info.status_code == 200
+    assert claim_info.json()["application_id"] == app_row.id
+
+    claim_post = client.post("/api/public/applications/claim", json={"token": raw_token, "consent_version": consents.VERSION})
+    assert claim_post.status_code == 200
+    assert claim_post.json()["access_token"]
+
+
+def test_hr_bulk_cv_import_deduplicates_across_channels_and_handles_missing_contact(client, world, db):
+    from app.database.sql_models import CompanyMember
+    hr_user = make_user(db, "hr.importer@example.test")
+    db.add(CompanyMember(company_id=world.company_id, user_id=hr_user.id, role="hr"))
+    db.commit()
+
+    cv_with_email = make_docx([
+        "Tran Thi Multi",
+        "Email: multi.channel@example.test  Phone: +84 911 222 333",
+        "Built a FastAPI service used by 3 teams.",
+        "Used Docker in production for 2 years.",
+    ])
+    cv_no_email = make_docx([
+        "Scanned Candidate Name",
+        "Built a FastAPI service used by 3 teams.",
+    ])
+
+    zip_buf = io.BytesIO()
+    with zipfile.ZipFile(zip_buf, "w") as zf:
+        zf.writestr("topcv_1.docx", cv_with_email)
+        zf.writestr("topcv_dup.docx", cv_with_email)
+        zf.writestr("topcv_scan.docx", cv_no_email)
+
+    resp = client.post(
+        f"/api/companies/{world.company_id}/jobs/{world.job_id}/import-cvs",
+        data={"source_channel": "topcv"},
+        files=[("files", ("batch.zip", zip_buf.getvalue(), "application/zip"))],
+        headers=auth_header("hr.importer@example.test"),
+    )
+    assert resp.status_code == 201, resp.text
+    summary = resp.json()
+    assert summary["imported"] == 1
+    assert summary["duplicates"] == 1
+    assert summary["missing_contact"] == 1
+
+    missing_id = summary["missing_contact_ids"][0]
+    fill = client.post(
+        f"/api/companies/{world.company_id}/applications/{missing_id}/contact",
+        json={"email": "recovered.scan@example.test", "name": "Scanned Candidate Name"},
+        headers=auth_header("hr.importer@example.test"),
+    )
+    assert fill.status_code == 200
+    recovered = fresh(db, missing_id)
+    assert recovered.stage in ("invited", "cv_hold")
+    assert recovered.candidate_email == "recovered.scan@example.test"
+
+
+

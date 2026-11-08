@@ -27,7 +27,14 @@
     "graph": "Đồ thị tri thức",
     "copilot": "Copilot",
     "jobs": "Việc làm",
-    "learning": "Danh mục học tập"
+    "candidateAccounts": "Tài khoản thí sinh",
+    "learning": "Danh mục học tập",
+    "sections": {
+      "hiring": "Tuyển dụng",
+      "knowledge": "Tri thức",
+      "assistant": "Trợ lý",
+      "account": "Tài khoản"
+    }
   },
   "auth": {
     "loadFailed": "Không thể tải tài khoản của bạn. Hãy kiểm tra kết nối rồi thử lại.",
@@ -481,12 +488,18 @@
     "descriptionInJdStudio": "Công việc này được tạo trong JD Studio. Hãy sửa mô tả tại đó để các bước kiểm tra và phê duyệt của quản lý được áp dụng.",
     "openJdStudio": "Mở trong JD Studio",
     "insightsChannels": "Kênh",
-    "insightsReality": "Kiểm chứng yêu cầu"
+    "insightsReality": "Kiểm chứng yêu cầu",
+    "schedulingEnabled": "Giới hạn thời gian ứng viên có thể bắt đầu phỏng vấn AI",
+    "windowStart": "Bắt đầu khung giờ",
+    "windowEnd": "Kết thúc khung giờ",
+    "windowTimezoneHint": "Thời gian hiển thị theo múi giờ của bạn ({{tz}}). Ứng viên sẽ thấy múi giờ này trên trang việc làm.",
+    "windowInvalid": "Nhập thời gian bắt đầu và kết thúc, với thời gian bắt đầu trước thời gian kết thúc.",
+    "slaHours": "Thời hạn phỏng vấn SLA (số giờ tính từ lúc mời, VD: 72)"
   },
   "board": {
     "eyebrow": "Bảng ứng viên",
     "title": "Bảng ứng viên",
-    "intro": "Ứng viên hiển thị bằng mã ẩn danh. Hãy đọc câu trả lời trước; danh tính được ẩn cho đến khi bạn chọn tiết lộ. AI chỉ gợi ý. Duyệt hay loại là quyết định của bạn.",
+    "intro": "Tên, email, số điện thoại và kênh nguồn của ứng viên được hiển thị trực tiếp để bạn đối chiếu bằng chứng và liên hệ đa kênh. AI chỉ gợi ý; duyệt hay loại là quyết định của bạn.",
     "axes": {
       "much": "Nhiều bằng chứng phỏng vấn",
       "little": "Ít bằng chứng phỏng vấn",
@@ -551,7 +564,9 @@
       "session_in_progress": "Đang phỏng vấn",
       "session_completed": "Đã phỏng vấn xong",
       "analyzing": "Đang phân tích",
-      "ready_for_hr": "Sẵn sàng để xem xét"
+      "ready_for_hr": "Sẵn sàng để xem xét",
+      "cv_hold": "Tạm giữ CV (0% yêu cầu bắt buộc)",
+      "missing_contact": "Thiếu thông tin liên hệ"
     },
     "lanes": {
       "title": "Chưa vào bảng",
@@ -561,8 +576,20 @@
       "refused_recording": "Từ chối ghi âm",
       "withdrawn": "Đã rút hồ sơ",
       "transcription_failed": "Lỗi kỹ thuật: vẫn có bản ghi âm",
-      "cv_failed": "Không xử lý được CV"
+      "cv_failed": "Không xử lý được CV",
+      "cv_hold": "Tạm giữ CV (0% yêu cầu bắt buộc)",
+      "missing_contact": "Thiếu thông tin liên hệ"
     },
+    "import": {
+      "title": "Nhập CV hàng loạt (PDF / DOCX / ZIP)",
+      "upload": "Tải lên & chấm CV",
+      "uploading": "Đang tải lên...",
+      "summary": "Đã nhập {{imported}}, bỏ qua {{skipped_duplicates}} trùng lặp, {{missing_contact}} thiếu liên hệ"
+    },
+    "cvHoldNote": "CV này đạt 0% yêu cầu bắt buộc nên được tạm giữ trước khi phỏng vấn AI. Bạn vẫn có thể mời phỏng vấn nếu muốn.",
+    "inviteFromHold": "Vẫn mời phỏng vấn AI",
+    "missingContactNote": "Không trích xuất được email từ CV này. Vui lòng nhập thông tin liên hệ của ứng viên để gửi lời mời:",
+    "saveContact": "Lưu & mời phỏng vấn",
     "bulk": {
       "button": "Loại {{count}} đã chọn",
       "confirmTitle": "Xác nhận loại hàng loạt",

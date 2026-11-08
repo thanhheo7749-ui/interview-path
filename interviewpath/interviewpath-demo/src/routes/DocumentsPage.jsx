@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useCompany } from '../company/CompanyContext.jsx';
 import { ConfirmBar, EmptyState, ErrorAlert, cardClass, inputClass, primaryButton, secondaryButton } from '../components/KbFeedback.jsx';
+import StatusBadge from '../components/StatusBadge.jsx';
 import { api } from '../lib/api.js';
 import {
   decideReview, getJob, listDocuments, notifyKbChanged, retryFailedSections, retryJob, retryMasking, unpublishDocument,
@@ -197,6 +198,11 @@ function DocumentsPage() {
     );
   };
 
+  const statusKey = (document) => {
+    const job = document.job;
+    if (job && (document.status === 'processing' || ACTIVE_JOB.includes(job.status))) return job.status;
+    return document.status;
+  };
   const statusLabel = (document) => {
     const job = document.job;
     if (job && (document.status === 'processing' || ACTIVE_JOB.includes(job.status))) return t(`documents.job.${job.status}`, { defaultValue: job.status });
@@ -296,7 +302,7 @@ function DocumentsPage() {
                     <td className="py-3 pr-3 text-slate-600">{t(`layers.${document.visibility}`, { defaultValue: document.visibility })}</td>
                     <td className="py-3 pr-3 text-slate-600">{departmentName(document.department_id)}</td>
                     <td className="space-y-2 py-3">
-                      <p className="font-semibold text-slate-900">{statusLabel(document)}</p>
+                      <StatusBadge status={statusKey(document)}>{statusLabel(document)}</StatusBadge>
                       {running && (
                         <div
                           role="progressbar"

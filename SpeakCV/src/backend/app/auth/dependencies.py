@@ -1,4 +1,5 @@
 from fastapi import Depends, HTTPException
+from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 
 from app.auth import security
@@ -6,6 +7,7 @@ from app.database.database import get_db
 from app.database.sql_models import CompanyMember, User
 
 MEMBER_ROLES = ("hr", "manager", "employee")
+optional_oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/login", auto_error=False)
 
 
 def user_from_token(db: Session, token: str) -> User | None:
@@ -23,6 +25,12 @@ def get_authenticated_user(token: str = Depends(security.oauth2_scheme), db: Ses
     if user is None:
         raise HTTPException(status_code=401, detail="Invalid token")
     return user
+
+
+def get_optional_user(token: str | None = Depends(optional_oauth2_scheme), db: Session = Depends(get_db)) -> User | None:
+    if not token:
+        return None
+    return user_from_token(db, token)
 
 
 def require_member(*roles: str):

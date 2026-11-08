@@ -115,8 +115,8 @@ def _check_can_start(db: Session, application: Application) -> None:
     if application.stage != "invited":
         raise HTTPException(status_code=409, detail="This interview cannot be started now")
     job = db.get(Job, application.job_id)  # expired after rollback/commit; next attribute read refreshes it
-    if not interview_window.is_open(job, datetime.now(timezone.utc)):
-        window = interview_window.payload(job)
+    if not interview_window.is_open(job, datetime.now(timezone.utc), application):
+        window = interview_window.payload(job, application)
         raise HTTPException(status_code=409, detail={
             "code": interview_window.OUTSIDE_INTERVIEW_WINDOW,
             "message": "The interview window for this job is not open now.",

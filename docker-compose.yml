@@ -21,6 +21,8 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      mailpit:
+        condition: service_started
 
   speakcv-frontend:
     build:
@@ -56,6 +58,14 @@ services:
       retries: 20
     volumes:
       - speakcv_db_data:/var/lib/mysql
+
+  mailpit:
+    image: axllent/mailpit
+    container_name: speakcv_mailpit
+    restart: unless-stopped
+    ports:
+      - "8025:8025"
+      - "1025:1025"
 
   interviewpath-demo:
     build:

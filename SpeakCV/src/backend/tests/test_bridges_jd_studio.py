@@ -64,7 +64,7 @@ def test_generation_outputs_traceable_three_language_lines(db, world):
     for item in draft.lines:
         assert set(item) >= {"id", "text", "source_node_ids", "hr_confirmed"}
         assert item["hr_confirmed"] is None
-        assert all(item["text"][lang].startswith("[Demo AI]") for lang in ("en", "vi", "ko"))
+        assert item["text"]["en"] and item["text"]["en"] == item["text"]["vi"] == item["text"]["ko"]
         assert item["source_node_ids"] and set(item["source_node_ids"]) <= set(context.texts) <= public_ids
     assert world.role.id in {i for item in draft.lines for i in item["source_node_ids"]}
     assert draft.failed_languages == []

@@ -6,6 +6,7 @@
 
 export { default as SettingsModal } from "./SettingsModal";
 export { default as ReportModal } from "./ReportModal";
+export { ReportContent } from "./ReportContent";
 export { default as ProfileModal } from "./ProfileModal";
 export { default as GenCVModal } from "./GenCVModal";
 export { default as ReviewCVModal } from "./ReviewCVModal";

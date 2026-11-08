@@ -92,7 +92,7 @@ def capturing(captured, items=None):
         nodes = [int(i) for i in re.findall(r"^\[n(\d+)\]", content, re.MULTILINE)]
         resources = [int(i) for i in re.findall(r"^\[r(\d+)\]", content, re.MULTILINE)]
         built = items(nodes, resources) if items else [
-            {"phase": phase, "title": f"[Demo AI] step {phase}", "source_node_id": nodes[0], "learning_resource_id": 0}
+            {"phase": phase, "title": f"step {phase}", "source_node_id": nodes[0], "learning_resource_id": 0}
             for phase in (30, 60, 90)
         ]
         return json.dumps({"items": built})
@@ -147,7 +147,7 @@ def test_a_plan_is_built_across_three_phases(client, db, s):
     body = response.json()
     assert body["status"] == "draft" and body["application_id"] == s.application.id
     assert [item["phase"] for item in body["items"]] == [30, 60, 90]
-    assert all(item["title"].startswith("[Demo AI]") for item in body["items"])
+    assert all(item["title"].startswith("Day ") for item in body["items"])
     assert all("done_at" not in item for item in body["items"])
     assert db.query(OnboardingPlan).filter_by(application_id=s.application.id).count() == 1
 

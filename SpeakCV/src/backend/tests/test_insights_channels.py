@@ -292,7 +292,7 @@ def test_invented_numbers_twice_returns_the_table_without_commentary(db, world, 
 def test_demo_responder_cites_applications_and_approval_rate(db, world, api):
     fixture_rows(db, world)
     lines = post_commentary(api, world).json()["observations"]
-    assert len(lines) == 3 and all(line.startswith("[Demo AI]") for line in lines)
+    assert len(lines) == 3 and all(": " in line for line in lines)
     assert any("33.3%" in line and "6" in line for line in lines)
 
 

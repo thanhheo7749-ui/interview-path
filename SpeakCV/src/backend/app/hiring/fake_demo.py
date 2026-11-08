@@ -52,7 +52,10 @@ def _assess(_system, messages, _schema) -> str:
                     quote = found.group(0)
                     break
         requirements.append({"requirement_id": int(requirement_id), "status": "met" if quote else "not_found", "quote": quote})
-    lines = [line.strip() for line in text.splitlines() if any(char.isdigit() for char in line)]
+    lines = [
+        line.strip() for line in text.splitlines()
+        if any(char.isdigit() for char in line) and not re.search(r"email|phone|sđt|điện thoại|@", line, re.IGNORECASE)
+    ]
     claims = [{"text": line, "quote": line} for line in lines[:_MAX_CLAIMS]]
     return json.dumps({"requirements": requirements, "claims": claims}, ensure_ascii=False)
 

@@ -59,7 +59,7 @@ def _copilot(_system, messages, _schema) -> str:
     if not match:
         return json.dumps({"can_answer": False, "answer": "", "citation_ids": []})
     return json.dumps(
-        {"can_answer": True, "answer": f"[Demo AI] {match.group(2)}", "citation_ids": [match.group(1)]},
+        {"can_answer": True, "answer": match.group(2), "citation_ids": [match.group(1)]},
         ensure_ascii=False,
     )
 
@@ -76,10 +76,10 @@ def _candidate_brief(_system, messages, _schema) -> str:
     strengths, clarify, questions = [], [], []
     for ident, status, label, _quote in _FACT.findall(content):
         if status in _CLEAR:
-            strengths.append({"evidence_id": ident, "summary": f"[Demo AI] ({language}) {label}", "quote": ""})
+            strengths.append({"evidence_id": ident, "summary": f"({language}) {label}", "quote": ""})
         else:
-            clarify.append({"evidence_id": ident, "summary": f"[Demo AI] ({language}) {label}", "quote": ""})
-            questions.append({"evidence_id": ident, "question": f"[Demo AI] ({language}) {label}?"})
+            clarify.append({"evidence_id": ident, "summary": f"({language}) {label}", "quote": ""})
+            questions.append({"evidence_id": ident, "question": f"({language}) {label}?"})
     return json.dumps({"strengths": strengths, "to_clarify": clarify, "questions": questions}, ensure_ascii=False)
 
 
@@ -94,8 +94,8 @@ def _jd_generate(_system, messages, _schema) -> str:
     lines = []
     for index, match in enumerate(_JD_CONTEXT_ITEM.finditer(context), 1):
         text = match.group(2)
-        lines.append({"id": f"l{index}", "en": f"[Demo AI] {text}", "vi": f"[Demo AI] {text}",
-                      "ko": f"[Demo AI] {text}", "source_node_ids": [int(match.group(1))],
+        lines.append({"id": f"l{index}", "en": text, "vi": text,
+                      "ko": text, "source_node_ids": [int(match.group(1))],
                       "is_requirement": False, "must_have": False})
     return json.dumps({"lines": lines}, ensure_ascii=False)
 
@@ -108,11 +108,11 @@ def _jd_assistant(_system, messages, _schema) -> str:
     lines = json.loads(draft.group(1)) if draft else []
     if any(word in asked for word in _SALARY_WORDS):
         # A model that does what it was asked, citing whatever is at hand. Stopping this line is the job of code.
-        text = "[Demo AI] Salary to be confirmed by HR"
+        text = "Salary to be confirmed by HR"
         cited = next((item["source_node_ids"] for item in lines if item["source_node_ids"]), [])
         lines.append({"id": "demo-salary", "en": text, "vi": text, "ko": text, "source_node_ids": cited,
                       "is_requirement": False, "must_have": False})
-    return json.dumps({"lines": lines, "summary": "Demo AI revision", "proposals": []}, ensure_ascii=False)
+    return json.dumps({"lines": lines, "summary": "Revision applied", "proposals": []}, ensure_ascii=False)
 
 
 _CHANNEL_DRAFT = re.compile(r"<draft>\n(.*?)\n</draft>", re.DOTALL)
@@ -121,7 +121,7 @@ _CHANNEL_DRAFT = re.compile(r"<draft>\n(.*?)\n</draft>", re.DOTALL)
 def _channel_content(_system, messages, _schema) -> str:
     draft = _CHANNEL_DRAFT.search(messages[-1]["content"])
     lines = [row[2:].strip() for row in (draft.group(1) if draft else "").splitlines() if row.startswith("- ")]
-    return json.dumps({"body": "[Demo AI] " + " ".join(lines) + "\n\n{link}"}, ensure_ascii=False)
+    return json.dumps({"body": " ".join(lines) + "\n\n{link}"}, ensure_ascii=False)
 
 
 _ONBOARDING_NODE = re.compile(r"^\[n(\d+)\] (.*)$", re.MULTILINE)
@@ -132,7 +132,7 @@ def _onboarding_plan(_system, messages, _schema) -> str:
     match = _ONBOARDING_NODE.search(messages[-1]["content"])
     if not match:
         return json.dumps({"items": []})
-    items = [{"phase": phase, "title": f"[Demo AI] Day {phase}: {match.group(2)[:60]}",
+    items = [{"phase": phase, "title": f"Day {phase}: {match.group(2)[:60]}",
               "source_node_id": int(match.group(1)), "learning_resource_id": 0} for phase in (30, 60, 90)]
     return json.dumps({"items": items}, ensure_ascii=False)
 
@@ -150,10 +150,10 @@ def _rejection_feedback(_system, messages, _schema) -> str:
     gaps = [item for item in items if item[1] == "to_build"][:1]
     learning = content.split("<learning>")[1] if "<learning>" in content else ""
     return json.dumps({
-        "went_well": [{"ref": ref, "text": f"[Demo AI] {label}", "quote": quote} for ref, _, label, quote in good],
-        "to_build": [{"ref": ref, "text": f"[Demo AI] {label}", "quote": ""} for ref, _, label, _ in gaps],
+        "went_well": [{"ref": ref, "text": label, "quote": quote} for ref, _, label, quote in good],
+        "to_build": [{"ref": ref, "text": label, "quote": ""} for ref, _, label, _ in gaps],
         "learning_ids": [int(found) for found in _FEEDBACK_LEARNING.findall(learning)],
-        "message": f"[Demo AI] ({language}) Thank you for the time you gave us.",
+        "message": f"({language}) Thank you for the time you gave us.",
     }, ensure_ascii=False)
 
 
@@ -172,7 +172,7 @@ def _channel_commentary(_system, messages, _schema) -> str:
     for row in rows:
         rate = row["approval_rate_pct"]
         shown = "no approval rate yet" if rate is None else f"{rate}% approved"
-        lines.append(f"[Demo AI] {row['channel']}: {row['applications']} applications, {shown}.")
+        lines.append(f"{row['channel']}: {row['applications']} applications, {shown}.")
     return json.dumps({"observations": lines}, ensure_ascii=False)
 
 

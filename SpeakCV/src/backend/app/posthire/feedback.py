@@ -490,12 +490,16 @@ def _row(db, application_id: int) -> RejectionFeedback | None:
     return db.query(RejectionFeedback).filter(RejectionFeedback.application_id == application_id).first()
 
 
+def _is_rejected(application) -> bool:
+    return application.hr_decision == "rejected" or getattr(application, "final_outcome", None) == "not_hired"
+
+
 def _check_can_draft(application) -> None:
     if application.is_simulated:
         raise FeedbackError(404, "Application not found")
     if application.anonymized_at is not None:
         raise FeedbackError(409, "This application's personal data has been deleted")
-    if application.hr_decision != "rejected":
+    if not _is_rejected(application):
         raise FeedbackError(409, "Feedback can only be drafted for a rejected application")
 
 
@@ -525,7 +529,7 @@ def draft(db, application, user_id) -> RejectionFeedback:
         text, source, failures, response = template(language, title), SOURCE_NO_SESSION, [], None
 
     locked = _locked_application(db, application_id)
-    if locked is None or locked.anonymized_at is not None or locked.hr_decision != "rejected":
+    if locked is None or locked.anonymized_at is not None or not _is_rejected(locked):
         db.rollback()
         raise FeedbackError(409, "This application can no longer receive feedback")
     if locked.analysis_status == CONSENT_WITHDRAWN and not had_withdrawn:
@@ -633,7 +637,7 @@ def approve(db, company_id, items, user_id) -> int:
     for application in pending:
         if application.anonymized_at is not None or application.candidate_user_id is None:
             problems[str(application.id)] = ["candidate_gone"]
-        elif application.hr_decision != "rejected":
+        elif not _is_rejected(application):
             problems[str(application.id)] = ["not_rejected"]
     if problems:
         raise FeedbackError(409, "Some feedback can no longer be sent", problems)
@@ -706,7 +710,7 @@ def _naive_utc(now: datetime | None) -> datetime:
 def _still_unanswered(db, application) -> bool:
     if (
         application is None or application.is_simulated or application.anonymized_at is not None
-        or application.candidate_user_id is None or application.hr_decision != "rejected"
+        or application.candidate_user_id is None or not _is_rejected(application)
     ):
         return False
     row = _row(db, application.id)

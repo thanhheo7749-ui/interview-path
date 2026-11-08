@@ -43,6 +43,7 @@ export interface Application {
   alias: string;
   status: ApplicationStatus;
   job_title: string;
+  job_slug: string | null;
   company_name: string;
   company_slug: string;
   is_sample: boolean;
@@ -63,6 +64,8 @@ export interface Application {
   reapply_after?: string | null;
   /** The job's interview scheduling window, or null when the job does not schedule interviews. */
   interview_window?: { start: string; end: string; timezone: string | null } | null;
+  final_outcome?: "hired" | "not_hired" | null;
+  access_token?: string | null;
 }
 
 export interface LearningItem { id: number; title: string; url: string; provider: string; language: string }
@@ -141,16 +144,47 @@ export const getPublicJob = (slug: string, src?: string | null) =>
   request<PublicJob>(`/public/jobs/${encodeURIComponent(slug)}${src ? `?src=${encodeURIComponent(src)}` : ""}`, {}, false);
 
 export const getConsentText = (purpose: string, language = "en") =>
-  request<ConsentText>(`/consents/${encodeURIComponent(purpose)}?language=${language}`);
+  request<ConsentText>(`/public/consents/${encodeURIComponent(purpose)}?language=${language}`, {}, false);
 
-export function applyToJob(slug: string, file: File, consentVersion: string, consentLanguage: string, src?: string | null) {
+export function applyToJob(
+  slug: string,
+  file: File,
+  consentVersion: string,
+  consentLanguage: string,
+  src?: string | null,
+  candidateEmail?: string,
+  candidateName?: string,
+) {
   const form = new FormData();
   form.append("file", file);
   form.append("consent_version", consentVersion);
   form.append("consent_language", consentLanguage);
   if (src) form.append("src", src);
+  if (candidateEmail?.trim()) form.append("candidate_email", candidateEmail.trim());
+  if (candidateName?.trim()) form.append("candidate_name", candidateName.trim());
   return request<Application>(`/public/jobs/${encodeURIComponent(slug)}/apply`, { method: "POST", body: form });
 }
+
+export interface ClaimInfo {
+  application_id: number;
+  candidate_name: string | null;
+  candidate_email: string | null;
+  job_title: string;
+  company_name: string;
+  company_id: number;
+  stage: string;
+  consent_version: string;
+}
+
+export const getClaimInfo = (token: string) =>
+  request<ClaimInfo>(`/public/applications/claim/${encodeURIComponent(token)}`, {}, false);
+
+export const claimApplication = (token: string, consentVersion: string, consentLanguage = "en") =>
+  request<{ application_id: number; access_token: string; email: string }>(
+    "/public/applications/claim",
+    json({ token, consent_version: consentVersion, consent_language: consentLanguage }),
+    false,
+  );
 
 export const listMyApplications = () => request<Application[]>("/me/applications");
 export const getApplication = (id: number) => request<Application>(`/applications/${id}`);

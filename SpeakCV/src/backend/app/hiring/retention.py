@@ -38,7 +38,8 @@ REMINDER = {
 # Cleared when an application is anonymized: to NULL, or to "" where the column cannot be NULL.
 ERASED = {
     "applications": (
-        "candidate_user_id", "cv_file_path", "cv_text_raw", "cv_text_blind", "cv_blind_hash", "processing_error",
+        "candidate_user_id", "candidate_name", "candidate_email", "candidate_phone", "contact_hash",
+        "claim_token_hash", "cv_file_path", "cv_text_raw", "cv_text_blind", "cv_blind_hash", "processing_error",
         "cv_status_reason", "cv_status_correction_reason", "ai_suggestion", "withdraw_reason",
     ),
     "requirement_results": ("quote",),

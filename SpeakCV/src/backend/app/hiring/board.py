@@ -9,7 +9,7 @@ from app.brain.text import quote_in
 from app.database.sql_models import (
     Application, AuditLog, CandidateBrief, CultureNote, CvClaim, Job, KbNode, OnboardingPlan, RequirementResult, User, VoiceSession, VoiceTurn,
 )
-from app.hiring import consents, decisions, identity, jobs
+from app.hiring import applications, consents, decisions, identity, jobs
 from app.hiring.state import CONSENT_WITHDRAWN, NOT_TAKEN, TRANSCRIPTION_FAILED
 
 CELLS = {
@@ -18,7 +18,10 @@ CELLS = {
     ("not_met", "many"): "hidden_gem",
     ("not_met", "few"): "not_enough_evidence",
 }
-LANES = ("not_interviewed", "refused_recording", "withdrawn", "analysis_failed", "analyzing", "transcription_failed", "cv_failed")
+LANES = (
+    "not_interviewed", "cv_hold", "missing_contact", "refused_recording", "withdrawn",
+    "analysis_failed", "analyzing", "transcription_failed", "cv_failed"
+)
 NOT_ENOUGH_EVIDENCE = "not_enough_evidence"
 NOT_TAKEN_NOTE = "did not take the interview"
 CONSENT_WITHDRAWN_NOTE = "withdrew consent to recording"
@@ -28,7 +31,7 @@ ANALYZING = ("session_completed", "analyzing")
 
 
 def cell_for(application) -> str | None:
-    if application.stage != "ready_for_hr":
+    if application.stage not in ("ready_for_hr", "in_manager_round"):
         return None
     if application.analysis_status in NO_EVIDENCE_NOTES:  # whatever the CV label says: the interview gave no evidence
         return NOT_ENOUGH_EVIDENCE
@@ -47,15 +50,19 @@ def _lane_for(application, refused_ids=frozenset()) -> str | None:
     stage = application.stage
     if stage == "withdrawn":
         return "withdrawn"
-    if stage == "declined_recording" or (stage == "ready_for_hr" and application.id in refused_ids):
+    if stage == "declined_recording" or (stage in ("ready_for_hr", "in_manager_round") and application.id in refused_ids):
         return "refused_recording"
     if stage == "cv_failed":
         return "cv_failed"
+    if stage == "cv_hold":
+        return "cv_hold"
+    if stage == "missing_contact":
+        return "missing_contact"
     if stage in NOT_INTERVIEWED:
         return "not_interviewed"
     if stage in ANALYZING:
         return "analyzing"
-    if stage == "ready_for_hr":
+    if stage in ("ready_for_hr", "in_manager_round"):
         if application.analysis_status == "failed":
             return "analysis_failed"
         if application.analysis_status == "running":
@@ -75,10 +82,15 @@ def card(application) -> dict:
     return {
         "id": application.id,
         "alias": application.alias,
+        "candidate_name": application.candidate_name,
+        "candidate_email": application.candidate_email,
+        "candidate_phone": application.candidate_phone,
+        "source_channel": application.source_channel,
         "stage": application.stage,
         "cv_status": application.cv_status,
         "interview_band": application.interview_band,
         "hr_decision": application.hr_decision,
+        "final_outcome": application.final_outcome,
         "fast_tracked": bool(application.fast_tracked),
         "analysis_status": application.analysis_status,
         "interview_note": interview_note(application),
@@ -163,10 +175,11 @@ def _candidate_terms(db, application) -> list[str]:
 
 def detail(db, application, viewer_id: int | None = None) -> dict:
     job = db.get(Job, application.job_id)
+    user = db.get(User, application.candidate_user_id) if application.candidate_user_id else None
     turns = [] if application.analysis_status == CONSENT_WITHDRAWN else latest_turns(db, application)
     position_of = {turn.id: turn.position for turn in turns}
-    masked = not _has_revealed(db, application, viewer_id)
-    terms = _candidate_terms(db, application) if masked else []
+    masked = False
+    terms: list[str] = []
 
     def spoken(text):
         return identity.mask_spoken(text, terms) if masked and text else text
@@ -215,8 +228,12 @@ def detail(db, application, viewer_id: int | None = None) -> dict:
     return {
         "id": application.id,
         "alias": application.alias,
+        "candidate_name": application.candidate_name or (user.full_name if user else None),
+        "candidate_email": application.candidate_email or (user.email if user else None),
+        "candidate_phone": application.candidate_phone,
+        "source_channel": application.source_channel,
         "anonymized": application.anonymized_at is not None,
-        "identity_masked": masked,
+        "identity_masked": False,
         "job": {"id": job.id, "title": job.title},
         "stage": application.stage,
         "cell": cell_for(application),
@@ -237,7 +254,14 @@ def detail(db, application, viewer_id: int | None = None) -> dict:
         "cv_consent_withdrawn": consents.was_withdrawn(db, application.id, "cv_processing"),
         "long_pause": long_pause(turns),
         "hidden_text_detected": bool(application.hidden_text_detected),
-        "cv_text_blind": application.cv_text_blind,
+        "cv_text_blind": application.cv_text_blind or application.cv_text_raw,
+        "cv_suffix": application.cv_suffix,
+        "has_cv_file": bool(application.cv_file_path),
+        "account_created": bool(application.candidate_user_id),
+        "default_password": applications.default_candidate_password(
+            application.candidate_email or (user.email if user else None)
+        ) if (application.candidate_email or user) else None,
+        "claim_token": applications.deterministic_claim_token(application) if application.candidate_user_id else None,
         "requirements": requirements,
         "claims": claims,
         "culture_notes": culture_notes,

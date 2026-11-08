@@ -39,8 +39,11 @@ export const ChatBox = ({
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full max-w-6xl h-72 z-10">
       {/* User's panel */}
-      <div className="bg-theme-primary/60 border border-theme-border/30 rounded-3xl p-4 backdrop-blur-md shadow-xl flex flex-col hover:border-blue-500/20 transition-colors relative">
-        <div className="flex flex-wrap justify-between items-center gap-2 mb-2 px-2">
+      <div
+        data-testid="practice-answer"
+        className="rounded-2xl border border-theme-border bg-theme-primary p-5 flex flex-col relative"
+      >
+        <div className="flex flex-wrap justify-between items-center gap-2 mb-2">
           <span className="text-xs font-bold text-blue-500 uppercase tracking-widest flex items-center gap-2">
             Candidate (You)
           </span>
@@ -61,10 +64,10 @@ export const ChatBox = ({
             </button>
           </div>
         </div>
-        <div className="flex-1 relative bg-theme-primary/30 rounded-xl border border-theme-border/30 overflow-hidden focus-within:border-blue-500/50 transition-colors">
+        <div className="flex-1 relative bg-theme-secondary/40 rounded-xl border border-theme-border/60 overflow-hidden focus-within:border-blue-500/50 transition-colors">
           <textarea
             ref={textareaRef}
-            className="w-full h-full bg-transparent p-4 outline-none resize-none text-theme-text-secondary text-lg leading-relaxed custom-scrollbar placeholder:text-theme-muted"
+            className="w-full h-full bg-transparent p-4 outline-none resize-none text-theme-text text-lg leading-relaxed custom-scrollbar placeholder:text-theme-muted"
             placeholder="Speak or type your answer..."
             value={userText}
             onChange={(e) => onUserTextChange(e.target.value)}
@@ -92,12 +95,15 @@ export const ChatBox = ({
       </div>
 
       {/* AI's panel */}
-      <div className="bg-theme-primary border border-theme-border rounded-2xl p-6 shadow-md flex flex-col">
-        <span className="text-xs font-bold text-emerald-400 uppercase tracking-widest mb-4 flex items-center gap-2">
-          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>{" "}
+      <div className="rounded-2xl border border-theme-border bg-theme-primary p-5 flex flex-col">
+        <span className="text-xs font-bold text-emerald-500 uppercase tracking-widest mb-4 flex items-center gap-2">
+          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
           AI Response
         </span>
-        <p className="text-xl text-theme-text leading-relaxed overflow-y-auto custom-scrollbar flex-1 whitespace-pre-wrap">
+        <p
+          data-testid="practice-ai-text"
+          className="text-xl text-theme-text leading-relaxed overflow-y-auto custom-scrollbar flex-1 whitespace-pre-wrap"
+        >
           {aiText}
         </p>
       </div>

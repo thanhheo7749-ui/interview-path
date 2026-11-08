@@ -48,7 +48,7 @@ function BoardCell({ cellKey, cards, selectedId, onSelect, onBulkReject, feedbac
         </div>
         <span
           data-testid={`count-${cellKey}`}
-          className="shrink-0 rounded-full bg-slate-950 px-2.5 py-1 text-xs font-bold text-white"
+          className="shrink-0 rounded-full bg-slate-700 px-2.5 py-1 text-xs font-bold text-white"
           title={t('board.undecidedOf', { undecided, total: cards.length })}
         >
           {t('board.toDecide', { count: undecided })}

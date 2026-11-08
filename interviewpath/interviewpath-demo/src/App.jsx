@@ -3,7 +3,6 @@ import { useTranslation } from 'react-i18next';
 import { Navigate, Outlet, Route, Routes } from 'react-router-dom';
 import RequireAuth from './auth/RequireAuth.jsx';
 import { CompanyProvider } from './company/CompanyContext.jsx';
-import SampleBanner from './components/SampleBanner.jsx';
 import Sidebar from './components/Sidebar.jsx';
 import ChangePasswordPage from './routes/ChangePasswordPage.jsx';
 import CompanySettingsPage from './routes/CompanySettingsPage.jsx';
@@ -18,6 +17,7 @@ import TrustPage from './routes/TrustPage.jsx';
 import JobEditorPage from './routes/JobEditorPage.jsx';
 import JobsPage from './routes/JobsPage.jsx';
 import BoardPage from './routes/BoardPage.jsx';
+import CandidateAccountsPage from './routes/CandidateAccountsPage.jsx';
 import ChannelsPage from './routes/ChannelsPage.jsx';
 import RealityCheckPage from './routes/RealityCheckPage.jsx';
 import HiringRequestsPage from './routes/HiringRequestsPage.jsx';
@@ -28,7 +28,6 @@ import LearningPage from './routes/LearningPage.jsx';
 import JdStudioPage from './routes/JdStudioPage.jsx';
 import OnboardingPage from './routes/OnboardingPage.jsx';
 import MyOnboardingPage from './routes/MyOnboardingPage.jsx';
-import DemoAiNotice from './components/DemoAiNotice.jsx';
 import { useCompany } from './company/CompanyContext.jsx';
 
 // Knowledge base management is for HR. Other members go to the Copilot.
@@ -65,8 +64,6 @@ function PortalLayout() {
     <div className="min-h-[100dvh] bg-slate-100 text-slate-950">
       <Sidebar />
       <main className="ml-64 min-h-[100dvh]">
-        <SampleBanner />
-        <DemoAiNotice />
         {/* Keyed by company so no page keeps the previous company's data after a switch. */}
         <Outlet key={membership?.company_id ?? 'none'} />
       </main>
@@ -98,6 +95,7 @@ function App() {
           <Route path="/trust" element={<TrustPage />} />
           <Route path="/learning" element={<LearningPage />} />
           <Route path="/jobs" element={<JobsPage />} />
+          <Route path="/candidate-accounts" element={<CandidateAccountsPage />} />
           <Route path="/jobs/new" element={<JobEditorPage />} />
           <Route path="/jobs/:jobId" element={<JobEditorPage />} />
           <Route path="/jobs/:jobId/board" element={<BoardPage />} />

@@ -186,7 +186,7 @@ def test_every_point_carries_original_quote_turn_and_recording_time(db, world, a
     assert by_quote[CLAIM_EVIDENCE]["turn_position"] == 3 and by_quote[CLAIM_EVIDENCE]["recording_seconds"] == 30
     strength_quotes = {p["original_quote"] for p in content["strengths"]}
     assert QUOTE_FASTAPI in strength_quotes and CLAIM_EVIDENCE in strength_quotes
-    assert "[Demo AI]" in content["strengths"][0]["summary"]
+    assert content["strengths"][0]["summary"]
 
 
 # 3

@@ -5,7 +5,7 @@ a request assigned to them, or of a job with no request in their department subt
 reads and scores only the requirements of their layer. Every lookup filters on company_id.
 Routes that run AI are plain `def`.
 """
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from sqlalchemy import and_, exists, or_
 from sqlalchemy.orm import Session
 
@@ -17,6 +17,7 @@ from app.database.sql_models import (
     Application, CandidateBrief, CompanyMember, HiringRequest, InterviewScorecard, Job, JobRequirement, OnboardingPlan, User,
 )
 from app.hiring import decisions
+from app.posthire import feedback
 from app.schemas.bridges import BriefIn, BriefPatch, OutcomeIn, ScorecardIn
 
 router = APIRouter()
@@ -232,7 +233,7 @@ def post_scorecard(company_id: int, app_id: int, body: ScorecardIn,
 
 
 @router.post(BASE + "/applications/{app_id}/outcome")
-def post_outcome(company_id: int, app_id: int, body: OutcomeIn,
+def post_outcome(company_id: int, app_id: int, body: OutcomeIn, background: BackgroundTasks,
                  member: CompanyMember = Depends(require_member("hr")), db: Session = Depends(get_db)):
     application = _application(db, company_id, app_id)
     try:
@@ -241,4 +242,6 @@ def post_outcome(company_id: int, app_id: int, body: OutcomeIn,
         db.rollback()
         raise _translate(error)
     db.commit()
+    if body.outcome == "not_hired":
+        background.add_task(feedback.create_draft_for, application.id)
     return {"id": application.id, "final_outcome": application.final_outcome}

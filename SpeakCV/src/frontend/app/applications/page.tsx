@@ -35,7 +35,10 @@ function statusText(a: Application, t: Strings): string {
     case "invited": return t.statusInvited;
     case "interview_in_progress": return t.statusInterview;
     case "with_hr": return t.statusWithHr;
-    case "decided": return a.decision === "approved" ? approvedText(a, t) : t.statusRejected;
+    case "decided":
+      if (a.final_outcome === "hired") return t.statusHired;
+      if (a.decision === "approved" && !a.final_outcome) return `${t.statusManagerRound} — ${approvedText(a, t)}`;
+      return a.decision === "approved" ? approvedText(a, t) : t.statusRejected;
     case "withdrawn": return t.statusWithdrawn;
     default: return "";
   }
@@ -190,7 +193,6 @@ export default function ApplicationsPage() {
               <p className="font-bold text-theme-text">{a.job_title}</p>
               <p className="text-sm text-theme-muted">
                 {a.company_name}
-                {a.is_sample ? ` (${t.sampleTag})` : ""}
               </p>
               <p className="mt-2 text-sm text-theme-text">{statusText(a, t)}</p>
               {a.status === "cv_unreadable" && (
@@ -205,7 +207,7 @@ export default function ApplicationsPage() {
                   <TalentPoolOffer app={a} entry={pool.find((e) => e.application_id === a.id)} onJoined={load} />
                 </>
               )}
-              {a.status === "decided" && a.decision === "approved" && <OnboardingConsentPrompt applicationId={a.id} />}
+              {a.status === "decided" && a.final_outcome === "hired" && <OnboardingConsentPrompt applicationId={a.id} />}
               {a.status === "invited" && (
                 <Link href={`/applications/${a.id}/fit`} className="mt-2 inline-block text-sm text-blue-400 underline">
                   {t.seeFit}

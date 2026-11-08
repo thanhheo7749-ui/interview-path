@@ -77,6 +77,10 @@ class InterviewHistory(Base):
     interview_type = Column(String(50), default="free")
     question_limit = Column(Integer, default=0)
     time_limit = Column(Integer, default=0)
+    company = Column(String(255), nullable=True)
+    jd_text = Column(Text, nullable=True)
+    voice = Column(String(64), nullable=True)
+    mode = Column(String(32), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 # 6. JD Templates table

@@ -59,6 +59,8 @@ class DecisionError(ValueError):
 
 def visible_to_candidate(application) -> str | None:
     """The decision the candidate may see once HR has made it: approved or rejected, never a reason, label or band."""
+    if getattr(application, "final_outcome", None) == "not_hired":
+        return "rejected"
     if application.stage == "ready_for_hr" and application.hr_decision in DECISIONS:
         return application.hr_decision
     return None

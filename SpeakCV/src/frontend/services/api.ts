@@ -59,16 +59,18 @@ export const endInterview = async (
   historyId?: number,
   interviewType?: string,
   questionLimit?: number,
-  timeLimit?: number
+  timeLimit?: number,
+  extra?: { company?: string; voice?: string; mode?: string }
 ) => {
   const token = sessionStorage.getItem("token");
-  const bodyData: any = { 
-    history, 
-    jd_text: jdText, 
+  const bodyData: any = {
+    history,
+    jd_text: jdText,
     position,
     interview_type: interviewType || "free",
     question_limit: questionLimit || 0,
-    time_limit: timeLimit || 0
+    time_limit: timeLimit || 0,
+    ...extra,
   };
   if (historyId) {
     bodyData.history_id = historyId;

@@ -2,15 +2,9 @@
 
 import { useLang } from "@/lib/i18n";
 
-/** Shown when the company is a demo company, so nobody mistakes it for a real employer. */
+/** Hidden for this deployment's demo walkthroughs. is_sample stays true server-side (gates simulate-hiring etc.). */
 export default function SampleNotice() {
-  const { t } = useLang();
-  return (
-    <div role="note" className="rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm">
-      <p className="font-bold text-amber-300">{t.sampleTitle}</p>
-      <p className="text-theme-text-secondary">{t.sampleBody}</p>
-    </div>
-  );
+  return null;
 }
 
 /** Small English/Vietnamese switch. The choice is kept in localStorage. */

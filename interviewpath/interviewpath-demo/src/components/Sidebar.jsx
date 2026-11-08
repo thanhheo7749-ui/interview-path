@@ -6,25 +6,44 @@ import { useCompany } from "../company/CompanyContext.jsx";
 import { useKbCounts } from "../lib/useKbCounts.js";
 import LanguageSwitch from "./LanguageSwitch.jsx";
 
-// Knowledge base pages for HR; `badge` names a key of the counts from useKbCounts.
-const kbNavItems = [
-  { labelKey: "navKb.documents", to: "/documents", icon: FileText },
-  { labelKey: "navKb.review", to: "/review", icon: ClipboardCheck, badge: "review" },
-  { labelKey: "navKb.conflicts", to: "/conflicts", icon: AlertTriangle, badge: "conflicts" },
-  { labelKey: "navKb.gaps", to: "/gaps", icon: HelpCircle },
-  { labelKey: "trust.nav", to: "/trust", icon: ShieldCheck },
-];
-
-const navItems = [
-  { labelKey: "nav.settings", to: "/settings", icon: Settings },
-  { labelKey: "nav.graph", to: "/graph", icon: Network, hrOnly: true },
-  { labelKey: "nav.jobs", to: "/jobs", icon: Briefcase, hrOnly: true },
-  { labelKey: "nav.learning", to: "/learning", icon: BookOpen, hrOnly: true },
-  { labelKey: "bridges.nav.hiringRequests", to: "/hiring-requests", icon: ClipboardList, roles: ["hr", "manager"] },
-  { labelKey: "bridges.nav.myInterviews", to: "/my-interviews", icon: Users, roles: ["manager"] },
-  { labelKey: "onboarding.nav", to: "/my-onboarding", icon: ListChecks, roles: ["employee"] },
-  { labelKey: "nav.copilot", to: "/copilot", icon: MessageSquare },
-  { labelKey: "nav.password", to: "/account/password", icon: KeyRound },
+// Grouped navigation sections so daily hiring tasks, knowledge base management,
+// AI assistant, and account/company configuration are clearly separated.
+const navSections = [
+  {
+    titleKey: "nav.sections.hiring",
+    items: [
+      { labelKey: "nav.jobs", to: "/jobs", icon: Briefcase, hrOnly: true },
+      { labelKey: "nav.candidateAccounts", to: "/candidate-accounts", icon: Users, hrOnly: true },
+      { labelKey: "bridges.nav.hiringRequests", to: "/hiring-requests", icon: ClipboardList, roles: ["hr", "manager"] },
+      { labelKey: "navKb.review", to: "/review", icon: ClipboardCheck, badge: "review", hrOnly: true },
+      { labelKey: "bridges.nav.myInterviews", to: "/my-interviews", icon: Users, roles: ["manager"] },
+      { labelKey: "onboarding.nav", to: "/my-onboarding", icon: ListChecks, roles: ["employee"] },
+    ],
+  },
+  {
+    titleKey: "nav.sections.knowledge",
+    items: [
+      { labelKey: "nav.graph", to: "/graph", icon: Network, hrOnly: true },
+      { labelKey: "navKb.documents", to: "/documents", icon: FileText, hrOnly: true },
+      { labelKey: "nav.learning", to: "/learning", icon: BookOpen, hrOnly: true },
+      { labelKey: "navKb.conflicts", to: "/conflicts", icon: AlertTriangle, badge: "conflicts", hrOnly: true },
+      { labelKey: "navKb.gaps", to: "/gaps", icon: HelpCircle, hrOnly: true },
+      { labelKey: "trust.nav", to: "/trust", icon: ShieldCheck, hrOnly: true },
+    ],
+  },
+  {
+    titleKey: "nav.sections.assistant",
+    items: [
+      { labelKey: "nav.copilot", to: "/copilot", icon: MessageSquare },
+    ],
+  },
+  {
+    titleKey: "nav.sections.account",
+    items: [
+      { labelKey: "nav.settings", to: "/settings", icon: Settings },
+      { labelKey: "nav.password", to: "/account/password", icon: KeyRound },
+    ],
+  },
 ];
 
 function Sidebar() {
@@ -33,7 +52,14 @@ function Sidebar() {
   const { memberships, membership, selectCompany } = useCompany();
   const isHr = membership?.role === "hr";
   const kbCounts = useKbCounts(membership?.company_id ?? null, isHr);
-  const items = [...navItems.filter((item) => (!item.hrOnly || isHr) && (!item.roles || item.roles.includes(membership?.role))), ...(isHr ? kbNavItems : [])];
+  const visibleSections = navSections
+    .map((section) => ({
+      ...section,
+      items: section.items.filter(
+        (item) => (!item.hrOnly || isHr) && (!item.roles || item.roles.includes(membership?.role))
+      ),
+    }))
+    .filter((section) => section.items.length > 0);
 
   return (
     <aside className="fixed inset-y-0 left-0 z-30 flex w-64 flex-col overflow-y-auto border-r border-slate-200 bg-white px-4 py-5 shadow-panel">
@@ -51,32 +77,41 @@ function Sidebar() {
         </div>
       </div>
 
-      <nav className="mt-6 min-h-0 flex-1 space-y-1 overflow-y-auto">
-        {items.map((item) => {
-          const Icon = item.icon;
-          return (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              className={({ isActive }) =>
-                [
-                  "flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-semibold transition",
-                  isActive
-                    ? "bg-slate-950 text-white shadow-card"
-                    : "text-slate-600 hover:bg-slate-100 hover:text-slate-950",
-                ].join(" ")
-              }
-            >
-              <Icon size={18} />
-              {t(item.labelKey)}
-              {item.badge && kbCounts[item.badge] > 0 && (
-                <span className="ml-auto rounded-full bg-blue-600 px-2 py-0.5 text-xs font-bold text-white">
-                  {kbCounts[item.badge]}
-                </span>
-              )}
-            </NavLink>
-          );
-        })}
+      <nav className="mt-6 min-h-0 flex-1 space-y-5 overflow-y-auto">
+        {visibleSections.map((section) => (
+          <div key={section.titleKey}>
+            <p className="px-3 pb-1.5 text-[11px] font-bold uppercase tracking-[0.16em] text-slate-400">
+              {t(section.titleKey)}
+            </p>
+            <div className="space-y-1">
+              {section.items.map((item) => {
+                const Icon = item.icon;
+                return (
+                  <NavLink
+                    key={item.to}
+                    to={item.to}
+                    className={({ isActive }) =>
+                      [
+                        "flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-semibold transition",
+                        isActive
+                          ? "bg-blue-600 text-white shadow-card"
+                          : "text-slate-600 hover:bg-slate-100 hover:text-slate-950",
+                      ].join(" ")
+                    }
+                  >
+                    <Icon size={18} />
+                    <span className="truncate">{t(item.labelKey)}</span>
+                    {item.badge && kbCounts[item.badge] > 0 && (
+                      <span className="ml-auto rounded-full bg-blue-600 px-2 py-0.5 text-xs font-bold text-white">
+                        {kbCounts[item.badge]}
+                      </span>
+                    )}
+                  </NavLink>
+                );
+              })}
+            </div>
+          </div>
+        ))}
       </nav>
 
       <div className="mt-4 shrink-0 space-y-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
@@ -109,7 +144,7 @@ function Sidebar() {
         <button
           type="button"
           onClick={logout}
-          className="flex w-full items-center justify-center gap-2 rounded-xl bg-slate-950 px-3 py-3 text-sm font-bold text-white shadow-card transition hover:bg-slate-800"
+          className="flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-3 py-3 text-sm font-bold text-white shadow-card transition hover:bg-blue-700"
         >
           <LogOut size={17} />
           {t("nav.signOut")}

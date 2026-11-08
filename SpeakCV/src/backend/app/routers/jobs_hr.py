@@ -56,6 +56,7 @@ def _out(db: Session, job: Job, warnings: list[str] | None = None, requirements:
         "interview_window_start": interview_window.as_aware(job.interview_window_start),
         "interview_window_end": interview_window.as_aware(job.interview_window_end),
         "interview_window_timezone": job.interview_window_timezone,
+        "interview_sla_hours": job.interview_sla_hours,
     }
 
 
@@ -128,6 +129,7 @@ def create_job(company_id: int, body: JobCreate, member: CompanyMember = Depends
         interview_window_start=interview_window.to_utc(body.interview_window_start),
         interview_window_end=interview_window.to_utc(body.interview_window_end),
         interview_window_timezone=body.interview_window_timezone,
+        interview_sla_hours=body.interview_sla_hours,
     )
     db.add(job)
     db.flush()
@@ -198,6 +200,8 @@ def patch_job(company_id: int, job_id: int, body: JobPatch, member: CompanyMembe
         job.interview_window_end = window_end
     if "interview_window_timezone" in fields:
         job.interview_window_timezone = tz
+    if "interview_sla_hours" in fields:
+        job.interview_sla_hours = body.interview_sla_hours
     if checked is not None:
         try:
             warnings += jobs.update_requirements(db, job, body.requirements, checked)

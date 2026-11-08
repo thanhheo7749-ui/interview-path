@@ -54,6 +54,7 @@ function JobEditor() {
   const [schedulingEnabled, setSchedulingEnabled] = useState(false);
   const [windowStart, setWindowStart] = useState('');
   const [windowEnd, setWindowEnd] = useState('');
+  const [slaHours, setSlaHours] = useState('');
   const [rows, setRows] = useState([]);
   const [loadedSignature, setLoadedSignature] = useState(signature([]));
 
@@ -69,6 +70,7 @@ function JobEditor() {
     setSchedulingEnabled(Boolean(data.scheduling_enabled));
     setWindowStart(isoToLocalInput(data.interview_window_start));
     setWindowEnd(isoToLocalInput(data.interview_window_end));
+    setSlaHours(data.interview_sla_hours == null ? '' : String(data.interview_sla_hours));
     setRows(loaded);
   }, []);
 
@@ -147,6 +149,7 @@ function JobEditor() {
       interview_window_start: localInputToIso(windowStart),
       interview_window_end: localInputToIso(windowEnd),
       interview_window_timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      interview_sla_hours: slaHours === '' ? null : Number(slaHours),
     };
     if (isNew) {
       return createJob(companyId, {
@@ -324,6 +327,20 @@ function JobEditor() {
           onStart={setWindowStart}
           onEnd={setWindowEnd}
         />
+
+        <label className="block max-w-xs text-sm font-semibold text-slate-700">
+          <span className="block">{t('jobs.slaHours', { defaultValue: 'Rolling interview SLA (hours from invite, optional)' })}</span>
+          <input
+            type="number"
+            min="1"
+            max="720"
+            placeholder="e.g. 72"
+            value={slaHours}
+            disabled={readOnly}
+            onChange={(e) => setSlaHours(e.target.value)}
+            className={`${inputClass} mt-1 w-full`}
+          />
+        </label>
       </section>
 
       <section className={`${cardClass} space-y-3`}>

@@ -269,7 +269,6 @@ def test_channels_generate_each_piece_with_its_tracked_link(api, db, world):
         link = db.query(JobChannelLink).filter_by(job_id=body["job"]["id"], channel=piece["channel"]).one()
         url = f"http://localhost:3000/jobs/{slug}?src={link.token}"
         assert url in piece["body"] and "{link}" not in piece["body"] and piece["link"]["url"] == url
-        assert piece["body"].startswith("[Demo AI]")
     assert {p["channel"]: p["language"] for p in pieces}["facebook"] == "vi"
     assert "Xay dung API" in pieces[1]["body"]
 
@@ -296,7 +295,7 @@ def test_a_number_the_lines_do_not_contain_is_replaced_by_a_template(api, db, wo
     linkedin = pieces[0]
     assert "50 million" not in linkedin["body"] and "Backend Developer" in linkedin["body"]
     assert "12 days of annual leave" in linkedin["body"] and "/jobs/" in linkedin["body"]
-    assert pieces[1]["body"].startswith("[Demo AI]")  # the others kept the AI text
+    assert "Xay dung API" in pieces[1]["body"]  # the others kept the AI text
 
 
 def test_ai_text_with_only_known_numbers_is_kept_and_an_unknown_link_is_not(api, db, world):

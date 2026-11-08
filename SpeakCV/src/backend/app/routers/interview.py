@@ -525,6 +525,13 @@ def get_hint(request: models.HintRequest, current_user: sql_models.User = Depend
     except Exception:
         return {"hint": "Unable to fetch hints."}
 
+def _apply_context(row: sql_models.InterviewHistory, request: models.ReportRequest) -> None:
+    row.company = request.company or None
+    row.jd_text = request.jd_text.strip() if request.jd_text and request.jd_text.strip() else None
+    row.voice = request.voice or None
+    row.mode = request.mode or None
+
+
 @router.post("/api/end-interview")
 def end_interview(request: models.ReportRequest, current_user: sql_models.User = Depends(get_current_user), db: Session = Depends(get_db)):
     try:
@@ -629,6 +636,7 @@ def end_interview(request: models.ReportRequest, current_user: sql_models.User =
                     question_limit=request.question_limit,
                     time_limit=request.time_limit
                 )
+                _apply_context(new_history, request)
                 db.add(new_history)
                 db.commit()
                 db.refresh(new_history)
@@ -637,6 +645,7 @@ def end_interview(request: models.ReportRequest, current_user: sql_models.User =
                 existing.interview_type = request.interview_type
                 existing.question_limit = request.question_limit
                 existing.time_limit = request.time_limit
+                _apply_context(existing, request)
                 db.commit()
 
             return {"report": report_data, "history_id": history_id}

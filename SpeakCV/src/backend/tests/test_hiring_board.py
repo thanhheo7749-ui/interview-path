@@ -175,8 +175,10 @@ def test_detail_has_everything_for_hr_and_no_identity(db, world, api):
     assert response.status_code == 200, response.text
     body = response.json()
     raw = response.text
-    assert body["alias"] == "#A1" and body["cv_text_blind"].startswith("[NAME]")
-    for identifier in (CANDIDATE_NAME, CANDIDATE_EMAIL, CV_RAW, "cv_text_raw"):
+    assert body["alias"] == "#A1" and body["candidate_name"] == CANDIDATE_NAME
+    assert body["candidate_email"] == CANDIDATE_EMAIL
+    assert body["identity_masked"] is False
+    for identifier in (CV_RAW, "cv_text_raw"):
         assert identifier not in raw
     by_id = {r["requirement_id"]: r for r in body["requirements"]}
     first = by_id[world["requirements"][0].id]
@@ -305,14 +307,13 @@ def _detail(api, world, application, headers=None):
 
 
 def test_before_a_reveal_transcripts_and_quotes_are_masked(api, db, world):
+    """Non-blind workflow: HR immediately sees unmasked transcripts and quotes without needing a reveal."""
     application = _spoken_world(db, world)
     response = _detail(api, world, application)
-    for secret in ("0901234567", "canary.candidate", "Nguyen", "Canary Candidate"):
-        assert secret not in response.text, secret
     body = response.json()
-    assert body["identity_masked"] is True
-    assert "[NAME]" in body["transcript"][0]["transcript"] and "[ID]" in body["transcript"][0]["transcript"]
-    assert body["suggestion"]["text"] == "Ask [NAME] about [ID]"
+    assert body["identity_masked"] is False
+    assert body["transcript"][0]["transcript"] == SPOKEN
+    assert body["suggestion"]["text"] == "Ask Nguyen about 0901234567"
 
 
 def test_a_masked_quote_still_matches_the_masked_transcript(api, db, world):
@@ -322,16 +323,14 @@ def test_a_masked_quote_still_matches_the_masked_transcript(api, db, world):
     interview = next(item["interview"] for item in body["requirements"] if item["interview"])
     assert interview["quote"] == PLAIN_QUOTE and interview["quote"] in transcript
     culture_quote = body["culture_notes"][0]["quote"]
-    assert culture_quote == "call me on [ID]" and culture_quote in transcript
+    assert culture_quote == IDENTIFYING_QUOTE and culture_quote in transcript
 
 
 def test_a_quote_that_cannot_match_after_masking_is_not_shown(api, db, world):
-    """The AI cut the phone number in half. Masking it alone would leave digits next to a transcript showing [ID]."""
     application = _spoken_world(db, world)
     response = _detail(api, world, application)
     claim = response.json()["claims"][0]
-    assert claim["evidence_quote"] is None and claim["position"] == 1
-    assert "0901234" not in response.text
+    assert claim["evidence_quote"] == "0901234" and claim["position"] == 1
 
 
 def test_after_a_logged_reveal_this_member_reads_the_raw_text(api, db, world):
@@ -351,17 +350,16 @@ def test_another_hr_member_stays_masked_until_they_reveal_too(api, db, world):
     second = make_user(db, "second-hr@example.test")
     db.add(CompanyMember(company_id=world["company"].id, user_id=second.id, role="hr"))
     db.commit()
-    assert api.post(url(world, f"/applications/{application.id}/reveal"), headers=hr(world)).status_code == 200
     body = _detail(api, world, application, headers=auth_header("second-hr@example.test")).json()
-    assert body["identity_masked"] is True
-    assert "0901234567" not in body["transcript"][0]["transcript"]
+    assert body["identity_masked"] is False
+    assert "0901234567" in body["transcript"][0]["transcript"]
 
 
 def test_a_reveal_of_another_application_does_not_count(api, db, world):
     application = _spoken_world(db, world)
     other = make_application(db, world["job"], "#A2", cv_status="meets", band="many")
     assert api.post(url(world, f"/applications/{other.id}/reveal"), headers=hr(world)).status_code == 200
-    assert _detail(api, world, application).json()["identity_masked"] is True
+    assert _detail(api, world, application).json()["identity_masked"] is False
 
 
 def test_the_hr_audio_and_detail_routes_refuse_an_anonymized_application(api, db, world, tmp_path, monkeypatch):
@@ -377,3 +375,26 @@ def test_the_hr_audio_and_detail_routes_refuse_an_anonymized_application(api, db
     db.commit()
     assert api.get(application_url, headers=hr(world)).status_code == 404
     assert api.get(f"{application_url}/turns/1/audio", headers=hr(world)).status_code == 404
+
+
+def test_board_exposes_real_identity_and_omni_channel_lanes(api, db, world):
+    app_hold = make_application(
+        db, world["job"], "#A20", stage="cv_hold", cv_status="not_met",
+        candidate_name="Pham Hold", candidate_email="hold@example.test", source_channel="topcv"
+    )
+    app_missing = make_application(
+        db, world["job"], "#A21", stage="missing_contact", cv_status=None,
+        candidate_name="Scanned Only", source_channel="itviec"
+    )
+    board_resp = api.get(url(world, f"/jobs/{world['job'].id}/board"), headers=hr(world)).json()
+    assert [c["id"] for c in board_resp["lanes"]["cv_hold"]] == [app_hold.id]
+    assert board_resp["lanes"]["cv_hold"][0]["candidate_name"] == "Pham Hold"
+    assert board_resp["lanes"]["cv_hold"][0]["source_channel"] == "topcv"
+    assert [c["id"] for c in board_resp["lanes"]["missing_contact"]] == [app_missing.id]
+
+    detail_resp = api.get(url(world, f"/applications/{app_hold.id}"), headers=hr(world)).json()
+    assert detail_resp["identity_masked"] is False
+    assert detail_resp["candidate_name"] == "Pham Hold"
+    assert detail_resp["candidate_email"] == "hold@example.test"
+    assert detail_resp["source_channel"] == "topcv"
+

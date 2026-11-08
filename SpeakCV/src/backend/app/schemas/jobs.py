@@ -36,6 +36,7 @@ class JobCreate(BaseModel):
     interview_window_start: Optional[AwareDatetime] = None
     interview_window_end: Optional[AwareDatetime] = None
     interview_window_timezone: Optional[Annotated[str, StringConstraints(max_length=64)]] = None
+    interview_sla_hours: Optional[int] = Field(default=None, ge=1, le=720)
 
 
 class JobPatch(BaseModel):
@@ -48,6 +49,7 @@ class JobPatch(BaseModel):
     interview_window_start: Optional[AwareDatetime] = None
     interview_window_end: Optional[AwareDatetime] = None
     interview_window_timezone: Optional[Annotated[str, StringConstraints(max_length=64)]] = None
+    interview_sla_hours: Optional[int] = Field(default=None, ge=1, le=720)
 
 
 class ChannelsIn(BaseModel):
@@ -82,6 +84,7 @@ class JobOut(JobSummary):
     interview_window_start: Optional[datetime] = None
     interview_window_end: Optional[datetime] = None
     interview_window_timezone: Optional[str] = None
+    interview_sla_hours: Optional[int] = None
 
 
 class RoleOption(BaseModel):
