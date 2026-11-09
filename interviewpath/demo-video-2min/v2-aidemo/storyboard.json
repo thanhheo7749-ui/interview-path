@@ -1,0 +1,104 @@
+{
+  "title": "InterviewPath — 2-Minute Product Demo",
+  "language": "en",
+  "knownTerms": ["InterviewPath", "JD Studio", "Copilot", "TopCV", "LinkedIn", "Daehan Precision"],
+  "targetLengthSeconds": 118,
+  "video": { "width": 1280, "height": 800 },
+  "voice": { "voiceId": "am_adam", "speed": 0.8 },
+  "zoom": { "enabled": false },
+  "transition": { "type": "crossfade", "durationMs": 450 },
+  "hold": { "mode": "freeze" },
+  "captions": { "position": "bottom", "style": "pill" },
+  "setup": {
+    "preflight": "bash reseed.sh",
+    "expectState": true
+  },
+  "intro": {
+    "title": "InterviewPath",
+    "subtitle": "AI hiring, from screening to onboarding",
+    "durationMs": 2400
+  },
+  "outro": {
+    "title": "InterviewPath",
+    "subtitle": "Hire smarter. Onboard faster.",
+    "durationMs": 2400
+  },
+  "scenes": [
+    {
+      "id": "screening",
+      "title": "AI screens every CV",
+      "narration": "It's Monday morning, and Mai already has over a hundred and fifty CVs for one open role. InterviewPath's AI has screened every CV against her real hiring criteria and sorted them onto an evidence board. The Priority lane holds strong matches, backed up by strong interviews. But look at Hidden Gem — candidates whose paper resume looks thin, yet whose spoken answers showed real evidence. A plain CV filter would have missed every one of them.",
+      "actions": [
+        { "op": "goto", "url": "http://localhost:5174/login" },
+        { "op": "waitFor", "target": { "selector": "role=heading[name=\"Sign in to InterviewPath\"]" }, "timeoutMs": 10000 },
+        { "op": "type", "target": { "selector": "#login-email" }, "text": "hr@daehan-precision.sample" },
+        { "op": "type", "target": { "selector": "#login-password" }, "text": "DemoPass123!" },
+        { "op": "click", "target": { "selector": "button.mt-6.w-full" }, "comment": "Sign in" },
+        { "op": "waitFor", "target": { "selector": "role=heading[name=\"Company settings\"]" }, "timeoutMs": 15000 },
+        { "op": "click", "target": { "selector": "role=link[name=\"Jobs\"]" } },
+        { "op": "waitFor", "target": { "selector": "role=link[name=\"Open board\"]" }, "timeoutMs": 10000 },
+        { "op": "click", "target": { "selector": "role=link[name=\"Open board\"]" } },
+        { "op": "waitFor", "target": { "selector": "[data-testid=\"cell-priority\"]" }, "timeoutMs": 10000 },
+        { "op": "highlight", "target": { "selector": "[data-testid=\"cell-priority\"]" }, "holdMs": 1800 },
+        { "op": "highlight", "target": { "selector": "[data-testid=\"cell-hidden_gem\"]" }, "holdMs": 2200 },
+        { "op": "scrollTo", "target": { "selector": "role=heading[name=\"Not on the board yet\"]" }, "easing": "smooth", "settleMs": 800 },
+        { "op": "pause", "ms": 1200 },
+        { "op": "click", "target": { "selector": "role=link[name=\"Hiring requests\"]" } }
+      ]
+    },
+    {
+      "id": "jd-studio",
+      "title": "AI writes the job description",
+      "narration": "A new role opens on her team. Instead of staring at a blank page, InterviewPath's AI drafts a complete job description in minutes, pulled straight from her company's real standards, with the must-have criteria and the sourcing channels already tagged for tracking later.",
+      "actions": [
+        { "op": "waitFor", "target": { "selector": "role=textbox[name=\"Role to hire\"]" }, "timeoutMs": 10000 },
+        { "op": "type", "target": { "selector": "role=textbox[name=\"Role to hire\"]" }, "text": "Senior Backend Engineer" },
+        { "op": "select", "target": { "selector": "role=combobox[name=\"Hiring manager\"]" }, "label": "Sample Manager" },
+        { "op": "select", "target": { "selector": "role=combobox[name=\"Department\"]" }, "label": "Backend" },
+        { "op": "click", "target": { "selector": "role=button[name=\"Create request\"]" } },
+        { "op": "waitFor", "target": { "selector": "role=button[name=\"Generate draft\"]" }, "timeoutMs": 10000 },
+        { "op": "click", "target": { "selector": "role=button[name=\"Generate draft\"]" } },
+        { "op": "waitFor", "target": { "selector": "role=heading[name=\"JD Studio\"]" }, "timeoutMs": 20000 },
+        { "op": "pause", "ms": 1600 },
+        { "op": "click", "target": { "selector": "role=link[name=\"Jobs\"]" } },
+        { "op": "waitFor", "target": { "selector": "role=link[name=\"Channels\"]" }, "timeoutMs": 10000 },
+        { "op": "click", "target": { "selector": "role=link[name=\"Channels\"]" } }
+      ]
+    },
+    {
+      "id": "channels",
+      "title": "AI finds your best hiring channels",
+      "narration": "InterviewPath's Channel Intelligence breaks down every application by source — LinkedIn, TopCV, university fairs, referrals — and shows exactly which channel brings candidates she actually approves, not just the most CVs. So instead of spending the biggest budget on the loudest channel, she spends it on the one with the lowest cost per real hire.",
+      "actions": [
+        { "op": "waitFor", "target": { "selector": "role=heading[name=\"Channel Intelligence\"]" }, "timeoutMs": 10000 },
+        { "op": "click", "target": { "selector": "role=button[name=\"Simulated data\"]" } },
+        { "op": "waitFor", "target": { "selector": "text=\"linkedin\"" }, "timeoutMs": 8000 },
+        { "op": "highlight", "target": { "selector": "[data-testid=\"channel-table\"]" }, "holdMs": 1800 },
+        { "op": "hover", "target": { "selector": "text=\"linkedin\"" } },
+        { "op": "pause", "ms": 1600 },
+        { "op": "hover", "target": { "selector": "text=\"topcv\"" } },
+        { "op": "pause", "ms": 1600 },
+        { "op": "hover", "target": { "selector": "text=\"university\"" }, "optional": true },
+        { "op": "pause", "ms": 1400 },
+        { "op": "hover", "target": { "selector": "text=\"facebook\"" }, "optional": true },
+        { "op": "pause", "ms": 1600 },
+        { "op": "hover", "target": { "selector": "text=\"referral\"" }, "optional": true },
+        { "op": "pause", "ms": 1600 },
+        { "op": "click", "target": { "selector": "role=link[name=\"Copilot\"]" } }
+      ]
+    },
+    {
+      "id": "copilot",
+      "title": "Internal AI Copilot for company policy",
+      "narration": "Employees stop pinging HR for every small question. They ask InterviewPath's Copilot directly, and it answers straight from the real company handbook, citing its sources. It even catches when two policy documents disagree, flagging the conflict instead of guessing. Screening. Writing. Channels. Policy. One AI platform, built around how your company actually hires.",
+      "actions": [
+        { "op": "waitFor", "target": { "selector": "#copilot-question" }, "timeoutMs": 10000 },
+        { "op": "type", "target": { "selector": "#copilot-question" }, "text": "How many annual leave days do I get, and how do I request leave?" },
+        { "op": "click", "target": { "selector": "role=button[name=\"Ask\"]" } },
+        { "op": "waitFor", "target": { "selector": "text=SOURCES DISAGREE" }, "timeoutMs": 15000 },
+        { "op": "highlight", "target": { "selector": "text=SOURCES DISAGREE" }, "holdMs": 2000 },
+        { "op": "pause", "ms": 1800 }
+      ]
+    }
+  ]
+}
