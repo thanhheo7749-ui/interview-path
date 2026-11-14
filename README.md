@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="./interviewpath/demo-video-2min/ppt-master-projects/ai4biz_zenith_ppt169_20261111/images/s3_hidden_gem_evidence.png" alt="InterviewPath — Evidence Calibration & Talent Memory Workspace" width="100%" />
+<img src="./docs/assets/readme-hero.png" alt="InterviewPath — End-to-End White-Box Talent Memory Architecture" width="100%" />
 
 <br />
 
@@ -39,7 +39,7 @@ Click the preview below (or open [**`interviewpath_hr_recruitment_2m30s.mp4`**](
 
 <div align="center">
   <a href="./interviewpath/demo-video-2min/v4-hr-recruitment-2m30s/interviewpath_hr_recruitment_2m30s.mp4">
-    <img src="./interviewpath/demo-video-2min/ppt-master-projects/ai4biz_zenith_ppt169_20261111/images/s1_knowledge_graph.png" alt="Watch the 2m32s InterviewPath Product Walkthrough Video" width="92%" />
+    <img src="./docs/assets/video-preview.png" alt="Watch the 2m32s InterviewPath Product Walkthrough Video" width="92%" />
   </a>
   <p>
     ▶️ <a href="./interviewpath/demo-video-2min/v4-hr-recruitment-2m30s/interviewpath_hr_recruitment_2m30s.mp4"><strong>Watch Full Product Demo Video (MP4 · 2m 32s)</strong></a>
