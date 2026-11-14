@@ -334,7 +334,6 @@ export function detectLocale(): Locale {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored === "en" || stored === "vi") return stored;
   }
-  if (typeof navigator !== "undefined" && navigator.language?.toLowerCase().startsWith("vi")) return "vi";
   return "en";
 }
 

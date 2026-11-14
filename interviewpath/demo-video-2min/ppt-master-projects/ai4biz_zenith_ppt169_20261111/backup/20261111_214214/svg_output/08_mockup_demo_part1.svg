@@ -1,0 +1,89 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" width="1280" height="720" data-pptx-page-role="content" font-family="Calibri">
+  <defs>
+    <filter id="softShadow" x="-15%" y="-20%" width="130%" height="150%">
+      <feDropShadow dx="0" dy="6" stdDeviation="8" flood-color="#0F172A" flood-opacity="0.08"/>
+    </filter>
+  </defs>
+
+  <rect id="page-bg" data-pptx-role="background" x="0" y="0" width="1280" height="720" fill="#FFFFFF"/>
+
+  <g id="header" data-pptx-bounds="56 32 988 94">
+    <rect x="56" y="34" width="236" height="28" rx="14" fill="#EEF5FC" stroke="#0066B3" stroke-width="1"/>
+    <text x="174" y="53" font-size="13" font-weight="bold" fill="#0066B3" text-anchor="middle">08 · MOCKUP / DEMO (1/2)</text>
+    <text x="56" y="104" font-family="Trebuchet MS" font-size="34" font-weight="bold" fill="#0F172A">Live MVP Demo (1/2): Graph, JD, ROI &amp; CV Board</text>
+  </g>
+
+  <g id="brand-logo" data-pptx-bounds="1052 34 172 58">
+    <image href="../images/hutech_logo.png" x="1056" y="36" width="168" height="54" preserveAspectRatio="xMidYMid meet"/>
+  </g>
+
+  <g id="demo-card-1a" data-pptx-bounds="56 140 570 250">
+    <rect x="56" y="140" width="570" height="248" rx="16" fill="#F6F9FC" stroke="#E2E8F0" stroke-width="1.5" filter="url(#softShadow)"/>
+    <rect x="72" y="156" width="96" height="24" rx="12" fill="#EEF5FC" stroke="#0066B3" stroke-width="1"/>
+    <text x="120" y="173" font-size="13" font-weight="bold" fill="#0066B3" text-anchor="middle">SCENE 1A</text>
+    <text x="72" y="208" font-family="Trebuchet MS" font-size="18" font-weight="bold" fill="#0F172A">Living Knowledge
+      <tspan x="72" dy="22">Graph</tspan>
+    </text>
+    <text x="72" y="262" font-size="13" fill="#475569">Extracts stack, ISO
+      <tspan x="72" dy="19">&amp; HR policy nodes</tspan>
+      <tspan x="72" dy="19">from company PDFs.</tspan>
+    </text>
+    <text x="72" y="366" font-size="13" font-weight="bold" fill="#059669">✓ Daehan Precision</text>
+    <rect x="244" y="148" width="372" height="232" rx="8" fill="#FFFFFF" stroke="#CBD5E1" stroke-width="1"/>
+    <image href="../images/s1_knowledge_graph.png" x="246" y="149" width="368" height="230" preserveAspectRatio="xMidYMid meet"/>
+  </g>
+
+  <g id="demo-card-1b" data-pptx-bounds="654 140 570 250">
+    <rect x="654" y="140" width="570" height="248" rx="16" fill="#F6F9FC" stroke="#E2E8F0" stroke-width="1.5" filter="url(#softShadow)"/>
+    <rect x="670" y="156" width="96" height="24" rx="12" fill="#EEF5FC" stroke="#0066B3" stroke-width="1"/>
+    <text x="718" y="173" font-size="13" font-weight="bold" fill="#0066B3" text-anchor="middle">SCENE 1B</text>
+    <text x="670" y="208" font-family="Trebuchet MS" font-size="18" font-weight="bold" fill="#0F172A">AI JD Studio &amp;
+      <tspan x="670" dy="22">Policy Check</tspan>
+    </text>
+    <text x="670" y="262" font-size="13" fill="#475569">Grounds Spring Boot,
+      <tspan x="670" dy="19">SQL &amp; ISO 9001</tspan>
+      <tspan x="670" dy="19">into compliant JDs.</tspan>
+    </text>
+    <text x="670" y="366" font-size="13" font-weight="bold" fill="#0066B3">✓ Track 1.2 Live</text>
+    <rect x="842" y="148" width="372" height="232" rx="8" fill="#FFFFFF" stroke="#CBD5E1" stroke-width="1"/>
+    <image href="../images/s1_jd_studio.png" x="844" y="149" width="368" height="230" preserveAspectRatio="xMidYMid meet"/>
+  </g>
+
+  <g id="demo-card-1c" data-pptx-bounds="56 408 570 250">
+    <rect x="56" y="408" width="570" height="248" rx="16" fill="#F6F9FC" stroke="#E2E8F0" stroke-width="1.5" filter="url(#softShadow)"/>
+    <rect x="72" y="424" width="96" height="24" rx="12" fill="#FFFBEB" stroke="#D97706" stroke-width="1"/>
+    <text x="120" y="441" font-size="13" font-weight="bold" fill="#D97706" text-anchor="middle">SCENE 1C</text>
+    <text x="72" y="476" font-family="Trebuchet MS" font-size="18" font-weight="bold" fill="#0F172A">Channel ROI
+      <tspan x="72" dy="22">Attribution</tspan>
+    </text>
+    <text x="72" y="530" font-size="13" fill="#475569">Ranks LinkedIn,
+      <tspan x="72" dy="19">TopCV, University</tspan>
+      <tspan x="72" dy="19">&amp; Referral quality.</tspan>
+    </text>
+    <text x="72" y="634" font-size="13" font-weight="bold" fill="#D97706">✓ Track 1.3 Live</text>
+    <rect x="244" y="416" width="372" height="232" rx="8" fill="#FFFFFF" stroke="#CBD5E1" stroke-width="1"/>
+    <image href="../images/s1_channel_intel.png" x="246" y="417" width="368" height="230" preserveAspectRatio="xMidYMid meet"/>
+  </g>
+
+  <g id="demo-card-2a" data-pptx-bounds="654 408 570 250">
+    <rect x="654" y="408" width="570" height="248" rx="16" fill="#EEF5FC" stroke="#0D9488" stroke-width="1.5" filter="url(#softShadow)"/>
+    <rect x="670" y="424" width="96" height="24" rx="12" fill="#ECFDF5" stroke="#0D9488" stroke-width="1"/>
+    <text x="718" y="441" font-size="13" font-weight="bold" fill="#0D9488" text-anchor="middle">SCENE 2A</text>
+    <text x="670" y="476" font-family="Trebuchet MS" font-size="18" font-weight="bold" fill="#0F172A">CV Hold &amp; 1-Click
+      <tspan x="670" dy="22">Magic Link</tspan>
+    </text>
+    <text x="670" y="530" font-size="13" fill="#0F172A">HR overrides Marcus
+      <tspan x="670" dy="19">(<tspan font-family="Consolas" font-weight="bold" fill="#0066B3">#A6</tspan>) CV hold with</tspan>
+      <tspan x="670" dy="19">a Voice AI invite.</tspan>
+    </text>
+    <text x="670" y="634" font-size="13" font-weight="bold" fill="#0D9488">✓ Human-in-Loop</text>
+    <rect x="842" y="416" width="372" height="232" rx="8" fill="#FFFFFF" stroke="#0D9488" stroke-width="1"/>
+    <image href="../images/s2_cv_screening_board.png" x="844" y="417" width="368" height="230" preserveAspectRatio="xMidYMid meet"/>
+  </g>
+
+  <g id="footer" data-pptx-bounds="56 676 1168 28">
+    <line x1="56" y1="678" x2="1224" y2="678" stroke="#E2E8F0" stroke-width="1"/>
+    <text x="56" y="696" font-size="13" fill="#475569">Team Zenith (HUTECH University) · InterviewPath · AI4Biz 2026 — Track 1: HR &amp; Recruitment</text>
+    <text x="1224" y="696" font-size="13" font-weight="bold" fill="#0066B3" text-anchor="end">08 / 11</text>
+  </g>
+</svg>

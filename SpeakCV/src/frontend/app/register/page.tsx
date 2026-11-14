@@ -34,11 +34,11 @@ export default function RegisterPage() {
     try {
       await registerUser(email, password, fullName);
       toast.success(
-        "Đăng ký thành công! Đang chuyển hướng đến trang đăng nhập...",
+        "Registration successful! Redirecting to sign in...",
       );
       router.push("/login");
     } catch (err: any) {
-      setError(err.message || "Email này đã được sử dụng hoặc có lỗi xảy ra!");
+      setError(err.message || "Email already in use or an error occurred!");
     } finally {
       setLoading(false);
     }
@@ -52,12 +52,12 @@ export default function RegisterPage() {
         const data = await loginGoogle(tokenResponse.access_token);
         login(data.access_token, data.user_name, data.role || "user");
       } catch (err: any) {
-        setError(err.message || "Lỗi đăng nhập qua Google!");
+        setError(err.message || "Google sign-in error!");
         setLoading(false);
       }
     },
     onError: () => {
-      setError("Đăng nhập Google thất bại!");
+      setError("Google sign-in failed!");
     },
   });
 
@@ -66,10 +66,10 @@ export default function RegisterPage() {
       <div className="bg-theme-primary w-full max-w-md rounded-3xl border border-theme-border p-8 shadow-2xl">
         <button className="absolute top-6 left-6 text-theme-text-secondary hover:text-theme-text flex items-center gap-2 font-bold transition-colors bg-theme-surface/70 px-4 py-2 rounded-xl">
           <ArrowLeft size={20} />
-          <Link href="/">Thoát</Link>
+          <Link href="/">Back</Link>
         </button>
         <h2 className="text-3xl font-bold text-theme-text mb-6 text-center">
-          Tạo Tài Khoản
+          Create Account
         </h2>
 
         <form onSubmit={handleSubmit} className="space-y-5">
@@ -77,7 +77,7 @@ export default function RegisterPage() {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-bold text-theme-muted mb-2 uppercase">
-                Họ và đệm
+                First Name
               </label>
               <input
                 type="text"
@@ -85,12 +85,12 @@ export default function RegisterPage() {
                 className="w-full bg-theme-secondary border border-theme-border rounded-xl p-4 text-theme-text focus:border-blue-600 outline-none transition-colors"
                 value={ho}
                 onChange={(e) => setHo(e.target.value)}
-                placeholder="VD: Nguyễn Văn"
+                placeholder="e.g. Alex"
               />
             </div>
             <div>
               <label className="block text-xs font-bold text-theme-muted mb-2 uppercase">
-                Tên
+                Last Name
               </label>
               <input
                 type="text"
@@ -98,7 +98,7 @@ export default function RegisterPage() {
                 className="w-full bg-theme-secondary border border-theme-border rounded-xl p-4 text-theme-text focus:border-blue-600 outline-none transition-colors"
                 value={ten}
                 onChange={(e) => setTen(e.target.value)}
-                placeholder="VD: A"
+                placeholder="e.g. Carter"
               />
             </div>
           </div>
@@ -119,7 +119,7 @@ export default function RegisterPage() {
 
           <div>
             <label className="block text-xs font-bold text-theme-muted mb-2 uppercase">
-              Mật khẩu
+              Password
             </label>
             <input
               type="password"
@@ -128,7 +128,7 @@ export default function RegisterPage() {
               className="w-full bg-theme-secondary border border-theme-border rounded-xl p-4 text-theme-text focus:border-blue-600 outline-none transition-colors"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="Ít nhất 10 ký tự"
+              placeholder="At least 10 characters"
             />
           </div>
 
@@ -148,14 +148,14 @@ export default function RegisterPage() {
             ) : (
               <UserPlus size={20} />
             )}
-            {loading ? "Đang tạo..." : "Đăng Ký Tài Khoản"}
+            {loading ? "Creating..." : "Create Account"}
           </button>
         </form>
 
         <div className="mt-6 flex items-center justify-between">
           <span className="border-b border-theme-border flex-grow"></span>
           <span className="text-theme-muted text-xs px-2 uppercase font-semibold">
-            Hoặc tiếp tục với
+            Or continue with
           </span>
           <span className="border-b border-theme-border flex-grow"></span>
         </div>
@@ -189,12 +189,12 @@ export default function RegisterPage() {
         </button>
 
         <p className="text-center text-theme-text-secondary text-sm mt-8">
-          Đã có tài khoản?{" "}
+          Already have an account?{" "}
           <Link
             href="/login"
             className="text-emerald-400 hover:text-emerald-300 font-bold hover:underline"
           >
-            Đăng nhập ngay
+            Sign in now
           </Link>
         </p>
       </div>

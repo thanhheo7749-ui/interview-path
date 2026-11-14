@@ -1,0 +1,568 @@
+{
+  "version": 1,
+  "defaults": {
+    "transition": {
+      "effect": "fade",
+      "duration": 0.5
+    },
+    "animation": {
+      "effect": "entrance_fade",
+      "trigger": "after-previous",
+      "duration": 0.32,
+      "stagger": 0.06
+    }
+  },
+  "slides": {
+    "01_cover": {
+      "transition": {
+        "effect": "fade",
+        "duration": 0.6
+      },
+      "groups": {
+        "cover-top": {
+          "effect": "entrance_fade",
+          "order": 1,
+          "duration": 0.35,
+          "delay": 0
+        },
+        "cover-hero": {
+          "effect": "entrance_faded_zoom",
+          "order": 2,
+          "duration": 0.45,
+          "delay": 0.05
+        },
+        "pillar-1": {
+          "effect": "entrance_faded_zoom",
+          "order": 3,
+          "duration": 0.26,
+          "delay": 0.05
+        },
+        "pillar-2": {
+          "effect": "entrance_faded_zoom",
+          "order": 4,
+          "duration": 0.26,
+          "delay": 0.05
+        },
+        "pillar-3": {
+          "effect": "entrance_faded_zoom",
+          "order": 5,
+          "duration": 0.26,
+          "delay": 0.05
+        },
+        "pillar-4": {
+          "effect": "entrance_faded_zoom",
+          "order": 6,
+          "duration": 0.26,
+          "delay": 0.05
+        },
+        "cover-team": {
+          "effect": "entrance_rise_up",
+          "order": 7,
+          "duration": 0.4,
+          "delay": 0.08
+        }
+      }
+    },
+    "02_business_problem": {
+      "groups": {
+        "header": {
+          "effect": "entrance_fade",
+          "order": 1,
+          "duration": 0.28,
+          "delay": 0
+        },
+        "leak-1": {
+          "effect": "entrance_ascend",
+          "order": 2,
+          "duration": 0.28,
+          "delay": 0.05
+        },
+        "leak-2": {
+          "effect": "entrance_ascend",
+          "order": 3,
+          "duration": 0.28,
+          "delay": 0.05
+        },
+        "leak-3": {
+          "effect": "entrance_ascend",
+          "order": 4,
+          "duration": 0.28,
+          "delay": 0.05
+        },
+        "leak-4": {
+          "effect": "entrance_ascend",
+          "order": 5,
+          "duration": 0.28,
+          "delay": 0.05
+        },
+        "problem-context": {
+          "effect": "entrance_fade",
+          "order": 6,
+          "duration": 0.35,
+          "delay": 0.06
+        }
+      }
+    },
+    "03_target_users": {
+      "transition": {
+        "effect": "push",
+        "effect_options": {
+          "direction": "up"
+        },
+        "duration": 0.55
+      },
+      "groups": {
+        "header": {
+          "effect": "entrance_fade",
+          "order": 1,
+          "duration": 0.28,
+          "delay": 0
+        },
+        "enterprise-hub": {
+          "effect": "entrance_faded_zoom",
+          "order": 2,
+          "duration": 0.38,
+          "delay": 0.04
+        },
+        "user-connectors": {
+          "effect": "entrance_wipe",
+          "effect_options": {
+            "direction": "down"
+          },
+          "order": 3,
+          "duration": 0.5,
+          "delay": 0.04
+        },
+        "role-1": {
+          "effect": "entrance_faded_zoom",
+          "order": 4,
+          "duration": 0.26,
+          "delay": 0.05
+        },
+        "role-2": {
+          "effect": "entrance_faded_zoom",
+          "order": 5,
+          "duration": 0.26,
+          "delay": 0.05
+        },
+        "role-3": {
+          "effect": "entrance_faded_zoom",
+          "order": 6,
+          "duration": 0.26,
+          "delay": 0.05
+        },
+        "role-4": {
+          "effect": "entrance_faded_zoom",
+          "order": 7,
+          "duration": 0.26,
+          "delay": 0.05
+        }
+      }
+    },
+    "04_business_insight": {
+      "groups": {
+        "header": {
+          "effect": "entrance_fade",
+          "order": 1,
+          "duration": 0.28,
+          "delay": 0
+        },
+        "calibration-matrix": {
+          "effect": "entrance_faded_zoom",
+          "order": 2,
+          "duration": 0.42,
+          "delay": 0.05
+        },
+        "insight-quote": {
+          "effect": "entrance_fade",
+          "order": 3,
+          "duration": 0.34,
+          "delay": 0.06
+        },
+        "limit-1": {
+          "effect": "entrance_wipe",
+          "effect_options": {
+            "direction": "right"
+          },
+          "order": 4,
+          "duration": 0.28,
+          "delay": 0.05
+        },
+        "limit-2": {
+          "effect": "entrance_wipe",
+          "effect_options": {
+            "direction": "right"
+          },
+          "order": 5,
+          "duration": 0.28,
+          "delay": 0.05
+        },
+        "limit-3": {
+          "effect": "entrance_wipe",
+          "effect_options": {
+            "direction": "right"
+          },
+          "order": 6,
+          "duration": 0.28,
+          "delay": 0.05
+        }
+      }
+    },
+    "05_proposed_solution": {
+      "transition": {
+        "effect": "push",
+        "effect_options": {
+          "direction": "right"
+        },
+        "duration": 0.6
+      },
+      "groups": {
+        "header": {
+          "effect": "entrance_fade",
+          "order": 1,
+          "duration": 0.28,
+          "delay": 0
+        },
+        "orchestrator-hub": {
+          "effects": [
+            {
+              "effect": "entrance_faded_zoom",
+              "order": 2,
+              "duration": 0.4,
+              "delay": 0.04
+            },
+            {
+              "effect": "emphasis_grow_shrink",
+              "effect_options": {
+                "size": 104
+              },
+              "auto_reverse": true,
+              "order": 12,
+              "duration": 0.45,
+              "delay": 0.05
+            }
+          ]
+        },
+        "n8n-connectors": {
+          "effect": "entrance_wipe",
+          "effect_options": {
+            "direction": "down"
+          },
+          "order": 3,
+          "duration": 0.6,
+          "delay": 0.04
+        },
+        "node-1": {
+          "effect": "entrance_faded_zoom",
+          "order": 4,
+          "duration": 0.22,
+          "delay": 0.04
+        },
+        "node-2": {
+          "effect": "entrance_faded_zoom",
+          "order": 5,
+          "duration": 0.22,
+          "delay": 0.04
+        },
+        "node-3": {
+          "effect": "entrance_faded_zoom",
+          "order": 6,
+          "duration": 0.22,
+          "delay": 0.04
+        },
+        "node-4": {
+          "effect": "entrance_faded_zoom",
+          "order": 7,
+          "duration": 0.22,
+          "delay": 0.04
+        },
+        "node-5": {
+          "effect": "entrance_faded_zoom",
+          "order": 8,
+          "duration": 0.22,
+          "delay": 0.04
+        },
+        "node-6": {
+          "effect": "entrance_faded_zoom",
+          "order": 9,
+          "duration": 0.22,
+          "delay": 0.04
+        },
+        "node-7": {
+          "effect": "entrance_faded_zoom",
+          "order": 10,
+          "duration": 0.22,
+          "delay": 0.04
+        },
+        "node-8": {
+          "effect": "entrance_faded_zoom",
+          "order": 11,
+          "duration": 0.22,
+          "delay": 0.04
+        }
+      }
+    },
+    "06_how_ai_helps": {
+      "transition": {
+        "effect": "morph",
+        "effect_options": {
+          "morph_by": "object"
+        },
+        "duration": 0.8
+      },
+      "morph": {
+        "from": "05_proposed_solution",
+        "pairs": {
+          "brain-core": {
+            "from": "orchestrator-hub",
+            "to": "ai-brain-core"
+          }
+        }
+      },
+      "groups": {
+        "header": {
+          "effect": "entrance_fade",
+          "order": 1,
+          "duration": 0.28,
+          "delay": 0
+        },
+        "ai-brain-core": {
+          "effect": "none"
+        },
+        "raw-signals": {
+          "effect": "entrance_wipe",
+          "effect_options": {
+            "direction": "right"
+          },
+          "order": 2,
+          "duration": 0.34,
+          "delay": 0.04
+        },
+        "arrow-in": {
+          "effect": "entrance_wipe",
+          "effect_options": {
+            "direction": "right"
+          },
+          "order": 3,
+          "duration": 0.24,
+          "delay": 0.02
+        },
+        "arrow-out": {
+          "effect": "entrance_wipe",
+          "effect_options": {
+            "direction": "right"
+          },
+          "order": 4,
+          "duration": 0.24,
+          "delay": 0.04
+        },
+        "smart-results": {
+          "effect": "entrance_wipe",
+          "effect_options": {
+            "direction": "right"
+          },
+          "order": 5,
+          "duration": 0.34,
+          "delay": 0.04
+        },
+        "memory-loop": {
+          "effect": "entrance_rise_up",
+          "order": 6,
+          "duration": 0.38,
+          "delay": 0.06
+        }
+      }
+    },
+    "07_how_it_works": {
+      "transition": {
+        "effect": "push",
+        "effect_options": {
+          "direction": "right"
+        },
+        "duration": 0.55
+      },
+      "groups": {
+        "header": {
+          "effect": "entrance_fade",
+          "order": 1,
+          "duration": 0.28,
+          "delay": 0
+        },
+        "exec-1": {
+          "effect": "entrance_ascend",
+          "order": 2,
+          "duration": 0.28,
+          "delay": 0.05
+        },
+        "exec-2": {
+          "effect": "entrance_ascend",
+          "order": 3,
+          "duration": 0.28,
+          "delay": 0.05
+        },
+        "exec-3": {
+          "effect": "entrance_ascend",
+          "order": 4,
+          "duration": 0.28,
+          "delay": 0.05
+        },
+        "exec-4": {
+          "effect": "entrance_ascend",
+          "order": 5,
+          "duration": 0.28,
+          "delay": 0.05
+        },
+        "exec-5": {
+          "effect": "entrance_ascend",
+          "order": 6,
+          "duration": 0.28,
+          "delay": 0.05
+        }
+      }
+    },
+    "08_mockup_demo_part1": {
+      "groups": {
+        "header": {
+          "effect": "entrance_fade",
+          "order": 1,
+          "duration": 0.28,
+          "delay": 0
+        },
+        "demo-1a": {
+          "effect": "entrance_faded_zoom",
+          "order": 2,
+          "duration": 0.3,
+          "delay": 0.05
+        },
+        "demo-1b": {
+          "effect": "entrance_faded_zoom",
+          "order": 3,
+          "duration": 0.3,
+          "delay": 0.05
+        },
+        "demo-1c": {
+          "effect": "entrance_faded_zoom",
+          "order": 4,
+          "duration": 0.3,
+          "delay": 0.05
+        },
+        "demo-2a": {
+          "effect": "entrance_faded_zoom",
+          "order": 5,
+          "duration": 0.3,
+          "delay": 0.05
+        }
+      }
+    },
+    "09_mockup_demo_part2": {
+      "transition": {
+        "effect": "push",
+        "effect_options": {
+          "direction": "right"
+        },
+        "duration": 0.55
+      },
+      "groups": {
+        "header": {
+          "effect": "entrance_fade",
+          "order": 1,
+          "duration": 0.28,
+          "delay": 0
+        },
+        "demo-2b": {
+          "effect": "entrance_faded_zoom",
+          "order": 2,
+          "duration": 0.3,
+          "delay": 0.05
+        },
+        "demo-3": {
+          "effect": "entrance_faded_zoom",
+          "order": 3,
+          "duration": 0.3,
+          "delay": 0.05
+        },
+        "demo-4": {
+          "effect": "entrance_faded_zoom",
+          "order": 4,
+          "duration": 0.3,
+          "delay": 0.05
+        },
+        "demo-5": {
+          "effect": "entrance_faded_zoom",
+          "order": 5,
+          "duration": 0.3,
+          "delay": 0.05
+        }
+      }
+    },
+    "10_feasibility_value": {
+      "groups": {
+        "header": {
+          "effect": "entrance_fade",
+          "order": 1,
+          "duration": 0.28,
+          "delay": 0
+        },
+        "roi-dumbbell": {
+          "effect": "entrance_wipe",
+          "effect_options": {
+            "direction": "right"
+          },
+          "order": 2,
+          "duration": 0.42,
+          "delay": 0.04
+        },
+        "kpi-1": {
+          "effect": "entrance_faded_zoom",
+          "order": 3,
+          "duration": 0.26,
+          "delay": 0.05
+        },
+        "kpi-2": {
+          "effect": "entrance_faded_zoom",
+          "order": 4,
+          "duration": 0.26,
+          "delay": 0.05
+        },
+        "kpi-3": {
+          "effect": "entrance_faded_zoom",
+          "order": 5,
+          "duration": 0.26,
+          "delay": 0.05
+        },
+        "docker-stack": {
+          "effect": "entrance_rise_up",
+          "order": 6,
+          "duration": 0.38,
+          "delay": 0.06
+        }
+      }
+    },
+    "11_competitive_advantage": {
+      "transition": {
+        "effect": "fade",
+        "duration": 0.6
+      },
+      "groups": {
+        "header": {
+          "effect": "entrance_fade",
+          "order": 1,
+          "duration": 0.28,
+          "delay": 0
+        },
+        "comp-matrix": {
+          "effect": "entrance_faded_zoom",
+          "order": 2,
+          "duration": 0.42,
+          "delay": 0.05
+        },
+        "closing-banner": {
+          "effect": "entrance_rise_up",
+          "order": 3,
+          "duration": 0.4,
+          "delay": 0.08
+        }
+      }
+    }
+  }
+}

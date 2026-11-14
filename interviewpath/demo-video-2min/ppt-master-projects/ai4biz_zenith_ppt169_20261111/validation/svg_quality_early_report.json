@@ -1,0 +1,506 @@
+{
+  "schema": "ppt-master.svg-quality-report.v1",
+  "stage": "early",
+  "target": "/home/vanii/Documents/Workspace/ktech/interview-path/interviewpath/demo-video-2min/ppt-master-projects/ai4biz_zenith_ppt169_20261111",
+  "source_fingerprint": {
+    "algorithm": "sha256",
+    "digest": "fc008737881cbc9c5f1f2b8c85e1a9bf75e7a458de0f2b60a0e637c6e3d81186",
+    "file_count": 5,
+    "files": [
+      {
+        "file": "01_cover.svg",
+        "sha256": "28c833008a55128839b14547ce6a1b4bc0e1ea3f115b09332cd02e70baaacf87"
+      },
+      {
+        "file": "02_business_problem.svg",
+        "sha256": "fc596c0bcf9661efafb8711ba596b8a9f5498d986d67d7be72b1cfb9da3b8a6e"
+      },
+      {
+        "file": "03_target_users.svg",
+        "sha256": "41b7799e729aa953666b9dd2fba7d752e421b926f616dbf03829591554d6fd2d"
+      },
+      {
+        "file": "04_business_insight.svg",
+        "sha256": "6421391106acd05071658cc01877a2844c94f9f156f6b2edab4e45fa2259dc21"
+      },
+      {
+        "file": "05_proposed_solution.svg",
+        "sha256": "45a029d951aa8a112911ae44a5a260863a44230cb8ff9afa944d374abe222501"
+      }
+    ]
+  },
+  "summary": {
+    "total": 5,
+    "passed": 5,
+    "warnings": 0,
+    "errors": 0
+  },
+  "issue_types": {},
+  "categories": {
+    "blocking": {
+      "count": 0,
+      "issues": []
+    },
+    "introduced": {
+      "count": 0,
+      "issues": []
+    },
+    "inherited": {
+      "count": 0,
+      "issues": []
+    },
+    "source-import": {
+      "count": 0,
+      "summary": {
+        "warning_count": 0,
+        "by_code": {}
+      }
+    }
+  },
+  "drift": {
+    "colors": {
+      "#CBD5E1": [
+        "02_business_problem.svg",
+        "04_business_insight.svg"
+      ],
+      "#ECFDF5": [
+        "03_target_users.svg",
+        "04_business_insight.svg",
+        "05_proposed_solution.svg"
+      ],
+      "#FDE68A": [
+        "02_business_problem.svg"
+      ],
+      "#FECDD3": [
+        "02_business_problem.svg",
+        "04_business_insight.svg"
+      ],
+      "#FFF1F2": [
+        "02_business_problem.svg",
+        "03_target_users.svg",
+        "04_business_insight.svg"
+      ],
+      "#FFFBEB": [
+        "04_business_insight.svg",
+        "05_proposed_solution.svg"
+      ]
+    },
+    "fonts": {},
+    "sizes": {}
+  },
+  "carrier_receipt": {
+    "scope": "informational-not-a-quota",
+    "pages": 5,
+    "totals": {
+      "text_elements": 143,
+      "image_placements": 8,
+      "icons": 28,
+      "svg_geometry_elements": 85,
+      "preset_shapes": 9,
+      "page_frame_elements": 5,
+      "marker_uses": 2,
+      "inline_emphasis_runs": 7,
+      "gradient_uses": 3,
+      "filter_uses": 6,
+      "text_effects": 0
+    },
+    "pages_with": {
+      "images": 5,
+      "icons": 5,
+      "presets": 5,
+      "charts": 0,
+      "tables": 0,
+      "formulas": 0,
+      "inline_emphasis_runs": 3,
+      "gradient_uses": 3,
+      "filter_uses": 5,
+      "text_effects": 0
+    },
+    "relationship_pages": 1,
+    "geometry_elements": {
+      "circle": 5,
+      "ellipse": 0,
+      "line": 12,
+      "path": 0,
+      "polygon": 0,
+      "polyline": 0,
+      "rect": 68
+    },
+    "preset_names": {
+      "chevron": 4,
+      "hexagon": 1,
+      "homePlate": 1,
+      "rightArrow": 1,
+      "snipRoundRect": 1,
+      "wedgeRoundRectCallout": 1
+    },
+    "native_objects": {
+      "chart": 0,
+      "formula_block": 0,
+      "formula_inline": 0,
+      "other": 0,
+      "table": 0
+    },
+    "image_page_max_frame_share_range": [
+      0.0098,
+      0.2844
+    ]
+  },
+  "project_issues": {
+    "template": [],
+    "animation": [],
+    "illustration": [],
+    "communication_trace": [],
+    "pptx_structure": []
+  },
+  "files": [
+    {
+      "file": "01_cover.svg",
+      "path": "/home/vanii/Documents/Workspace/ktech/interview-path/interviewpath/demo-video-2min/ppt-master-projects/ai4biz_zenith_ppt169_20261111/svg_output/01_cover.svg",
+      "exists": true,
+      "errors": [],
+      "warnings": [],
+      "info": {
+        "viewbox": "0 0 1280 720",
+        "carrier_receipt": {
+          "text_elements": 23,
+          "images": {
+            "placements": 2,
+            "files": [
+              "ai_cover_talent_memory.png",
+              "hutech_logo.png"
+            ],
+            "max_frame_share": 0.2844
+          },
+          "icons": 6,
+          "effects": {
+            "inline_emphasis_runs": 2,
+            "gradient_uses": 1,
+            "filter_uses": 1,
+            "text_effects": 0
+          },
+          "geometry": {
+            "svg_elements": {
+              "rect": 11,
+              "circle": 1,
+              "ellipse": 0,
+              "line": 2,
+              "polyline": 0,
+              "polygon": 0,
+              "path": 0
+            },
+            "preset_shapes": 1,
+            "preset_names": {
+              "snipRoundRect": 1
+            },
+            "page_frame_elements": 1,
+            "marker_uses": {
+              "start": 0,
+              "mid": 0,
+              "end": 0
+            }
+          },
+          "native_objects": {
+            "chart": 0,
+            "table": 0,
+            "formula_block": 0,
+            "formula_inline": 0,
+            "other": 0
+          }
+        },
+        "fonts": [
+          "Calibri",
+          "Trebuchet MS"
+        ],
+        "text_elements": 23,
+        "tspan_elements": 2
+      },
+      "passed": true,
+      "source_sha256": "28c833008a55128839b14547ce6a1b4bc0e1ea3f115b09332cd02e70baaacf87"
+    },
+    {
+      "file": "02_business_problem.svg",
+      "path": "/home/vanii/Documents/Workspace/ktech/interview-path/interviewpath/demo-video-2min/ppt-master-projects/ai4biz_zenith_ppt169_20261111/svg_output/02_business_problem.svg",
+      "exists": true,
+      "errors": [],
+      "warnings": [],
+      "info": {
+        "viewbox": "0 0 1280 720",
+        "carrier_receipt": {
+          "text_elements": 23,
+          "images": {
+            "placements": 2,
+            "files": [
+              "ai_broken_funnel.png",
+              "hutech_logo.png"
+            ],
+            "max_frame_share": 0.1225
+          },
+          "icons": 5,
+          "effects": {
+            "inline_emphasis_runs": 0,
+            "gradient_uses": 1,
+            "filter_uses": 1,
+            "text_effects": 0
+          },
+          "geometry": {
+            "svg_elements": {
+              "rect": 15,
+              "circle": 0,
+              "ellipse": 0,
+              "line": 1,
+              "polyline": 0,
+              "polygon": 0,
+              "path": 0
+            },
+            "preset_shapes": 1,
+            "preset_names": {
+              "rightArrow": 1
+            },
+            "page_frame_elements": 1,
+            "marker_uses": {
+              "start": 0,
+              "mid": 0,
+              "end": 0
+            }
+          },
+          "native_objects": {
+            "chart": 0,
+            "table": 0,
+            "formula_block": 0,
+            "formula_inline": 0,
+            "other": 0
+          }
+        },
+        "fonts": [
+          "Calibri",
+          "Trebuchet MS"
+        ],
+        "text_elements": 23,
+        "tspan_elements": 5,
+        "contextual_values": {
+          "colors": [
+            "#CBD5E1",
+            "#FDE68A",
+            "#FECDD3",
+            "#FFF1F2"
+          ]
+        }
+      },
+      "passed": true,
+      "source_sha256": "fc596c0bcf9661efafb8711ba596b8a9f5498d986d67d7be72b1cfb9da3b8a6e"
+    },
+    {
+      "file": "03_target_users.svg",
+      "path": "/home/vanii/Documents/Workspace/ktech/interview-path/interviewpath/demo-video-2min/ppt-master-projects/ai4biz_zenith_ppt169_20261111/svg_output/03_target_users.svg",
+      "exists": true,
+      "errors": [],
+      "warnings": [],
+      "info": {
+        "viewbox": "0 0 1280 720",
+        "carrier_receipt": {
+          "text_elements": 29,
+          "images": {
+            "placements": 1,
+            "files": [
+              "hutech_logo.png"
+            ],
+            "max_frame_share": 0.0098
+          },
+          "icons": 5,
+          "effects": {
+            "inline_emphasis_runs": 0,
+            "gradient_uses": 0,
+            "filter_uses": 1,
+            "text_effects": 0
+          },
+          "geometry": {
+            "svg_elements": {
+              "rect": 20,
+              "circle": 4,
+              "ellipse": 0,
+              "line": 5,
+              "polyline": 0,
+              "polygon": 0,
+              "path": 0
+            },
+            "preset_shapes": 1,
+            "preset_names": {
+              "hexagon": 1
+            },
+            "page_frame_elements": 1,
+            "marker_uses": {
+              "start": 0,
+              "mid": 0,
+              "end": 0
+            }
+          },
+          "native_objects": {
+            "chart": 0,
+            "table": 0,
+            "formula_block": 0,
+            "formula_inline": 0,
+            "other": 0
+          }
+        },
+        "fonts": [
+          "Calibri",
+          "Trebuchet MS"
+        ],
+        "text_elements": 29,
+        "tspan_elements": 1,
+        "contextual_values": {
+          "colors": [
+            "#ECFDF5",
+            "#FFF1F2"
+          ]
+        }
+      },
+      "passed": true,
+      "source_sha256": "41b7799e729aa953666b9dd2fba7d752e421b926f616dbf03829591554d6fd2d"
+    },
+    {
+      "file": "04_business_insight.svg",
+      "path": "/home/vanii/Documents/Workspace/ktech/interview-path/interviewpath/demo-video-2min/ppt-master-projects/ai4biz_zenith_ppt169_20261111/svg_output/04_business_insight.svg",
+      "exists": true,
+      "errors": [],
+      "warnings": [],
+      "info": {
+        "viewbox": "0 0 1280 720",
+        "carrier_receipt": {
+          "text_elements": 31,
+          "images": {
+            "placements": 2,
+            "files": [
+              "ai_spoken_proof_scale.png",
+              "hutech_logo.png"
+            ],
+            "max_frame_share": 0.046
+          },
+          "icons": 6,
+          "effects": {
+            "inline_emphasis_runs": 4,
+            "gradient_uses": 0,
+            "filter_uses": 2,
+            "text_effects": 0
+          },
+          "geometry": {
+            "svg_elements": {
+              "rect": 13,
+              "circle": 0,
+              "ellipse": 0,
+              "line": 3,
+              "polyline": 0,
+              "polygon": 0,
+              "path": 0
+            },
+            "preset_shapes": 1,
+            "preset_names": {
+              "wedgeRoundRectCallout": 1
+            },
+            "page_frame_elements": 1,
+            "marker_uses": {
+              "start": 0,
+              "mid": 0,
+              "end": 2
+            }
+          },
+          "native_objects": {
+            "chart": 0,
+            "table": 0,
+            "formula_block": 0,
+            "formula_inline": 0,
+            "other": 0
+          }
+        },
+        "fonts": [
+          "Calibri",
+          "Trebuchet MS"
+        ],
+        "text_elements": 31,
+        "tspan_elements": 10,
+        "contextual_values": {
+          "colors": [
+            "#CBD5E1",
+            "#ECFDF5",
+            "#FECDD3",
+            "#FFF1F2",
+            "#FFFBEB"
+          ]
+        }
+      },
+      "passed": true,
+      "source_sha256": "6421391106acd05071658cc01877a2844c94f9f156f6b2edab4e45fa2259dc21"
+    },
+    {
+      "file": "05_proposed_solution.svg",
+      "path": "/home/vanii/Documents/Workspace/ktech/interview-path/interviewpath/demo-video-2min/ppt-master-projects/ai4biz_zenith_ppt169_20261111/svg_output/05_proposed_solution.svg",
+      "exists": true,
+      "errors": [],
+      "warnings": [],
+      "info": {
+        "viewbox": "0 0 1280 720",
+        "carrier_receipt": {
+          "text_elements": 37,
+          "images": {
+            "placements": 1,
+            "files": [
+              "hutech_logo.png"
+            ],
+            "max_frame_share": 0.0098
+          },
+          "icons": 6,
+          "effects": {
+            "inline_emphasis_runs": 1,
+            "gradient_uses": 1,
+            "filter_uses": 1,
+            "text_effects": 0
+          },
+          "geometry": {
+            "svg_elements": {
+              "rect": 9,
+              "circle": 0,
+              "ellipse": 0,
+              "line": 1,
+              "polyline": 0,
+              "polygon": 0,
+              "path": 0
+            },
+            "preset_shapes": 5,
+            "preset_names": {
+              "chevron": 4,
+              "homePlate": 1
+            },
+            "page_frame_elements": 1,
+            "marker_uses": {
+              "start": 0,
+              "mid": 0,
+              "end": 0
+            }
+          },
+          "native_objects": {
+            "chart": 0,
+            "table": 0,
+            "formula_block": 0,
+            "formula_inline": 0,
+            "other": 0
+          }
+        },
+        "fonts": [
+          "Calibri",
+          "Trebuchet MS"
+        ],
+        "text_elements": 37,
+        "tspan_elements": 6,
+        "contextual_values": {
+          "colors": [
+            "#ECFDF5",
+            "#FFFBEB"
+          ]
+        }
+      },
+      "passed": true,
+      "source_sha256": "45a029d951aa8a112911ae44a5a260863a44230cb8ff9afa944d374abe222501"
+    }
+  ]
+}

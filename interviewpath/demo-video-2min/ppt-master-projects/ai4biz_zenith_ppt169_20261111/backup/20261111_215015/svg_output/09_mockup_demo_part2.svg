@@ -1,0 +1,89 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" width="1280" height="720" data-pptx-page-role="content" font-family="Calibri">
+  <defs>
+    <filter id="softShadow" x="-15%" y="-20%" width="130%" height="150%">
+      <feDropShadow dx="0" dy="6" stdDeviation="8" flood-color="#0F172A" flood-opacity="0.08"/>
+    </filter>
+  </defs>
+
+  <rect id="page-bg" data-pptx-role="background" x="0" y="0" width="1280" height="720" fill="#FFFFFF"/>
+
+  <g id="header" data-pptx-bounds="56 32 988 94">
+    <rect x="56" y="34" width="236" height="28" rx="14" fill="#ECFDF5" stroke="#0D9488" stroke-width="1"/>
+    <text x="174" y="53" font-size="13" font-weight="bold" fill="#0D9488" text-anchor="middle">08 · MOCKUP / DEMO (2/2)</text>
+    <text x="56" y="104" font-family="Trebuchet MS" font-size="34" font-weight="bold" fill="#0F172A">Live MVP Demo (2/2): Voice AI, Gem &amp; Copilot</text>
+  </g>
+
+  <g id="brand-logo" data-pptx-bounds="1052 34 172 58">
+    <image href="../images/hutech_logo.png" x="1056" y="36" width="168" height="54" preserveAspectRatio="xMidYMid meet"/>
+  </g>
+
+  <g id="demo-card-2b" data-pptx-bounds="56 140 570 250">
+    <rect x="56" y="140" width="570" height="248" rx="16" fill="#F6F9FC" stroke="#E2E8F0" stroke-width="1.5" filter="url(#softShadow)"/>
+    <rect x="72" y="156" width="96" height="24" rx="12" fill="#ECFDF5" stroke="#0D9488" stroke-width="1"/>
+    <text x="120" y="173" font-size="13" font-weight="bold" fill="#0D9488" text-anchor="middle">SCENE 2B</text>
+    <text x="72" y="208" font-family="Trebuchet MS" font-size="18" font-weight="bold" fill="#0F172A">Recorded Voice
+      <tspan x="72" dy="22">AI Interview</tspan>
+    </text>
+    <text x="72" y="262" font-size="13" fill="#475569">Adaptive Q2 probes
+      <tspan x="72" dy="19">ISO 9001 change</tspan>
+      <tspan x="72" dy="19">control in real time.</tspan>
+    </text>
+    <text x="72" y="366" font-size="13" font-weight="bold" fill="#0D9488">✓ Spoken Proof</text>
+    <rect x="244" y="148" width="372" height="232" rx="8" fill="#FFFFFF" stroke="#CBD5E1" stroke-width="1"/>
+    <image href="../images/s2_live_ai_interview.png" x="246" y="149" width="368" height="230" preserveAspectRatio="xMidYMid meet"/>
+  </g>
+
+  <g id="demo-card-3" data-pptx-bounds="654 140 570 250">
+    <rect x="654" y="140" width="570" height="248" rx="16" fill="#FFFBEB" stroke="#D97706" stroke-width="1.5" filter="url(#softShadow)"/>
+    <rect x="670" y="156" width="96" height="24" rx="12" fill="#FFFFFF" stroke="#D97706" stroke-width="1"/>
+    <text x="718" y="173" font-size="13" font-weight="bold" fill="#D97706" text-anchor="middle">SCENE 03</text>
+    <text x="670" y="208" font-family="Trebuchet MS" font-size="18" font-weight="bold" fill="#0F172A">2×2 Hidden Gem
+      <tspan x="670" dy="22">Matrix</tspan>
+    </text>
+    <text x="670" y="262" font-size="13" fill="#0F172A">Surfaces Hannah
+      <tspan x="670" dy="19">Park (<tspan font-family="Consolas" font-weight="bold" fill="#D97706">#A5</tspan>) despite</tspan>
+      <tspan x="670" dy="19">a brief paper CV.</tspan>
+    </text>
+    <text x="670" y="366" font-size="13" font-weight="bold" fill="#D97706">★ Track 1.1 Gem</text>
+    <rect x="842" y="148" width="372" height="232" rx="8" fill="#FFFFFF" stroke="#D97706" stroke-width="1"/>
+    <image href="../images/s3_hidden_gem_evidence.png" x="844" y="149" width="368" height="230" preserveAspectRatio="xMidYMid meet"/>
+  </g>
+
+  <g id="demo-card-4" data-pptx-bounds="56 408 570 250">
+    <rect x="56" y="408" width="570" height="248" rx="16" fill="#F6F9FC" stroke="#E2E8F0" stroke-width="1.5" filter="url(#softShadow)"/>
+    <rect x="72" y="424" width="96" height="24" rx="12" fill="#EEF5FC" stroke="#0066B3" stroke-width="1"/>
+    <text x="120" y="441" font-size="13" font-weight="bold" fill="#0066B3" text-anchor="middle">SCENE 04</text>
+    <text x="72" y="476" font-family="Trebuchet MS" font-size="18" font-weight="bold" fill="#0F172A">30-60-90 Day
+      <tspan x="72" dy="22">Probation Plan</tspan>
+    </text>
+    <text x="72" y="530" font-size="13" fill="#475569">1-click HR approval
+      <tspan x="72" dy="19">turns skill gaps into</tspan>
+      <tspan x="72" dy="19">Day-1 milestones.</tspan>
+    </text>
+    <text x="72" y="634" font-size="13" font-weight="bold" fill="#0066B3">✓ Zero Reset</text>
+    <rect x="244" y="416" width="372" height="232" rx="8" fill="#FFFFFF" stroke="#CBD5E1" stroke-width="1"/>
+    <image href="../images/s4_onboarding_roadmap.png" x="246" y="417" width="368" height="230" preserveAspectRatio="xMidYMid meet"/>
+  </g>
+
+  <g id="demo-card-5" data-pptx-bounds="654 408 570 250">
+    <rect x="654" y="408" width="570" height="248" rx="16" fill="#ECFDF5" stroke="#059669" stroke-width="1.5" filter="url(#softShadow)"/>
+    <rect x="670" y="424" width="96" height="24" rx="12" fill="#FFFFFF" stroke="#059669" stroke-width="1"/>
+    <text x="718" y="441" font-size="13" font-weight="bold" fill="#059669" text-anchor="middle">SCENE 05</text>
+    <text x="670" y="476" font-family="Trebuchet MS" font-size="18" font-weight="bold" fill="#0F172A">Conflict-Aware
+      <tspan x="670" dy="22">Policy Copilot</tspan>
+    </text>
+    <text x="670" y="530" font-size="13" fill="#0F172A">Cites exact clauses
+      <tspan x="670" dy="19">&amp; flags handbook</tspan>
+      <tspan x="670" dy="19">conflicts safely.</tspan>
+    </text>
+    <text x="670" y="634" font-size="13" font-weight="bold" fill="#059669">✓ Track 1.4 Live</text>
+    <rect x="842" y="416" width="372" height="232" rx="8" fill="#FFFFFF" stroke="#059669" stroke-width="1"/>
+    <image href="../images/s5_policy_copilot.png" x="844" y="417" width="368" height="230" preserveAspectRatio="xMidYMid meet"/>
+  </g>
+
+  <g id="footer" data-pptx-bounds="56 676 1168 28">
+    <line x1="56" y1="678" x2="1224" y2="678" stroke="#E2E8F0" stroke-width="1"/>
+    <text x="56" y="696" font-size="13" fill="#475569">Team Zenith (HUTECH University) · InterviewPath · AI4Biz 2026 — Track 1: HR &amp; Recruitment</text>
+    <text x="1224" y="696" font-size="13" font-weight="bold" fill="#0066B3" text-anchor="end">09 / 11</text>
+  </g>
+</svg>

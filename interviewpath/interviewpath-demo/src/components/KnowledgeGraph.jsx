@@ -70,6 +70,7 @@ function KnowledgeGraph({ graph, selectedNode, onSelectNode }) {
 
   const drawNode = useCallback(
     (node, ctx, globalScale) => {
+      if (!Number.isFinite(node.x) || !Number.isFinite(node.y)) return;
       const selected = selectedId === node.id;
       const connected = connectedNodeIds.has(node.id);
       const hovered = hoveredNodeId === node.id;

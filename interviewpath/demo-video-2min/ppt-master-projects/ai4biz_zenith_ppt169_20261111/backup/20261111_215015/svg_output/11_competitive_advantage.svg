@@ -1,0 +1,156 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" width="1280" height="720" data-pptx-page-role="ending" font-family="Calibri">
+  <defs>
+    <filter id="softShadow" x="-15%" y="-20%" width="130%" height="150%">
+      <feDropShadow dx="0" dy="6" stdDeviation="8" flood-color="#0F172A" flood-opacity="0.08"/>
+    </filter>
+  </defs>
+
+  <rect id="page-bg" data-pptx-role="background" x="0" y="0" width="1280" height="720" fill="#FFFFFF"/>
+
+  <g id="header" data-pptx-bounds="56 32 988 94">
+    <rect x="56" y="34" width="248" height="28" rx="14" fill="#EEF5FC" stroke="#0066B3" stroke-width="1"/>
+    <text x="180" y="53" font-size="13" font-weight="bold" fill="#0066B3" text-anchor="middle">10 · COMPETITIVE ADVANTAGE</text>
+    <text x="56" y="104" font-family="Trebuchet MS" font-size="34" font-weight="bold" fill="#0F172A">Why Enterprises Choose InterviewPath Over Legacy ATS</text>
+  </g>
+
+  <g id="brand-logo" data-pptx-bounds="1052 34 172 58">
+    <image href="../images/hutech_logo.png" x="1056" y="36" width="168" height="54" preserveAspectRatio="xMidYMid meet"/>
+  </g>
+
+  <g id="comp-matrix" data-pptx-bounds="56 138 1168 416">
+    <rect x="56" y="140" width="1168" height="412" rx="14" fill="#FFFFFF" stroke="#CBD5E1" stroke-width="1.5"/>
+
+    <rect x="58" y="252" width="1164" height="60" fill="#F6F9FC"/>
+    <rect x="58" y="372" width="1164" height="60" fill="#F6F9FC"/>
+    <rect x="58" y="492" width="1164" height="58" fill="#F6F9FC"/>
+
+    <rect x="916" y="140" width="308" height="412" rx="14" fill="#ECFDF5" fill-opacity="0.88" stroke="#0D9488" stroke-width="2" filter="url(#softShadow)"/>
+
+    <g stroke="#E2E8F0" stroke-width="1">
+      <line x1="428" y1="140" x2="428" y2="552"/>
+      <line x1="672" y1="140" x2="672" y2="552"/>
+      <line x1="56" y1="192" x2="1224" y2="192" stroke="#CBD5E1"/>
+      <line x1="56" y1="252" x2="1224" y2="252"/>
+      <line x1="56" y1="312" x2="1224" y2="312"/>
+      <line x1="56" y1="372" x2="1224" y2="372"/>
+      <line x1="56" y1="432" x2="1224" y2="432"/>
+      <line x1="56" y1="492" x2="1224" y2="492"/>
+    </g>
+
+    <g id="matrix-headers" font-size="13" font-weight="bold">
+      <text x="76" y="171" fill="#475569">ENTERPRISE CAPABILITY</text>
+      <text x="550" y="171" fill="#475569" text-anchor="middle">LEGACY KEYWORD ATS</text>
+      <text x="794" y="171" fill="#475569" text-anchor="middle">POINT AI INTERVIEW TOOLS</text>
+      <rect x="934" y="152" width="272" height="28" rx="14" fill="#0D9488"/>
+      <text x="1070" y="171" fill="#FFFFFF" text-anchor="middle">INTERVIEWPATH · TEAM ZENITH</text>
+    </g>
+
+    <g id="matrix-row-1">
+      <text x="76" y="227" font-size="16" font-weight="bold" fill="#0F172A">01 · Graph-Grounded JD Studio</text>
+      <rect x="448" y="206" width="204" height="32" rx="16" fill="#FFF1F2" stroke="#FECDD3" stroke-width="1"/>
+      <use data-icon="phosphor-duotone/x-circle" x="460" y="212" width="20" height="20" fill="#E11D48"/>
+      <text x="488" y="227" font-size="14" font-weight="bold" fill="#E11D48">Manual Word Copy</text>
+
+      <rect x="692" y="206" width="204" height="32" rx="16" fill="#FFF1F2" stroke="#FECDD3" stroke-width="1"/>
+      <use data-icon="phosphor-duotone/x-circle" x="704" y="212" width="20" height="20" fill="#E11D48"/>
+      <text x="732" y="227" font-size="14" font-weight="bold" fill="#E11D48">None</text>
+
+      <rect x="934" y="206" width="272" height="32" rx="16" fill="#FFFFFF" stroke="#059669" stroke-width="1.5"/>
+      <use data-icon="phosphor-duotone/check-circle" x="946" y="212" width="20" height="20" fill="#059669"/>
+      <text x="974" y="227" font-size="14" font-weight="bold" fill="#0F172A">Auto JD + Policy Check</text>
+    </g>
+
+    <g id="matrix-row-2">
+      <text x="76" y="287" font-size="16" font-weight="bold" fill="#0F172A">02 · Channel Quality Attribution</text>
+      <rect x="448" y="266" width="204" height="32" rx="16" fill="#FFFBEB" stroke="#FDE68A" stroke-width="1"/>
+      <use data-icon="phosphor-duotone/warning" x="460" y="272" width="20" height="20" fill="#D97706"/>
+      <text x="488" y="287" font-size="14" font-weight="bold" fill="#D97706">Vanity Clicks Only</text>
+
+      <rect x="692" y="266" width="204" height="32" rx="16" fill="#FFF1F2" stroke="#FECDD3" stroke-width="1"/>
+      <use data-icon="phosphor-duotone/x-circle" x="704" y="272" width="20" height="20" fill="#E11D48"/>
+      <text x="732" y="287" font-size="14" font-weight="bold" fill="#E11D48">None</text>
+
+      <rect x="934" y="266" width="272" height="32" rx="16" fill="#FFFFFF" stroke="#059669" stroke-width="1.5"/>
+      <use data-icon="phosphor-duotone/check-circle" x="946" y="272" width="20" height="20" fill="#059669"/>
+      <text x="974" y="287" font-size="14" font-weight="bold" fill="#0F172A">Verified Pass-Rate ROI</text>
+    </g>
+
+    <g id="matrix-row-3">
+      <text x="76" y="347" font-size="16" font-weight="bold" fill="#0F172A">03 · Spoken Proof (&quot;Hidden Gem&quot; 2×2)</text>
+      <rect x="448" y="326" width="204" height="32" rx="16" fill="#FFF1F2" stroke="#FECDD3" stroke-width="1"/>
+      <use data-icon="phosphor-duotone/x-circle" x="460" y="332" width="20" height="20" fill="#E11D48"/>
+      <text x="488" y="347" font-size="14" font-weight="bold" fill="#E11D48">Keyword Auto-Reject</text>
+
+      <rect x="692" y="326" width="204" height="32" rx="16" fill="#FFFBEB" stroke="#FDE68A" stroke-width="1"/>
+      <use data-icon="phosphor-duotone/warning" x="704" y="332" width="20" height="20" fill="#D97706"/>
+      <text x="732" y="347" font-size="14" font-weight="bold" fill="#D97706">Generic Q&amp;A Score</text>
+
+      <rect x="934" y="326" width="272" height="32" rx="16" fill="#FFFFFF" stroke="#059669" stroke-width="1.5"/>
+      <use data-icon="phosphor-duotone/check-circle" x="946" y="332" width="20" height="20" fill="#059669"/>
+      <text x="974" y="347" font-size="14" font-weight="bold" fill="#0F172A">2×2 Matrix + Exact Quotes</text>
+    </g>
+
+    <g id="matrix-row-4">
+      <text x="76" y="407" font-size="16" font-weight="bold" fill="#0F172A">04 · Human-in-the-Loop Override</text>
+      <rect x="448" y="386" width="204" height="32" rx="16" fill="#FFF1F2" stroke="#FECDD3" stroke-width="1"/>
+      <use data-icon="phosphor-duotone/x-circle" x="460" y="392" width="20" height="20" fill="#E11D48"/>
+      <text x="488" y="407" font-size="14" font-weight="bold" fill="#E11D48">Rigid Auto-Filter</text>
+
+      <rect x="692" y="386" width="204" height="32" rx="16" fill="#FFF1F2" stroke="#FECDD3" stroke-width="1"/>
+      <use data-icon="phosphor-duotone/x-circle" x="704" y="392" width="20" height="20" fill="#E11D48"/>
+      <text x="732" y="407" font-size="14" font-weight="bold" fill="#E11D48">Black-Box Cutoff</text>
+
+      <rect x="934" y="386" width="272" height="32" rx="16" fill="#FFFFFF" stroke="#059669" stroke-width="1.5"/>
+      <use data-icon="phosphor-duotone/check-circle" x="946" y="392" width="20" height="20" fill="#059669"/>
+      <text x="974" y="407" font-size="14" font-weight="bold" fill="#0F172A">1-Click Magic-Link Invite</text>
+    </g>
+
+    <g id="matrix-row-5">
+      <text x="76" y="467" font-size="16" font-weight="bold" fill="#0F172A">05 · 30-60-90 Probation Roadmap</text>
+      <rect x="448" y="446" width="204" height="32" rx="16" fill="#FFF1F2" stroke="#FECDD3" stroke-width="1"/>
+      <use data-icon="phosphor-duotone/x-circle" x="460" y="452" width="20" height="20" fill="#E11D48"/>
+      <text x="488" y="467" font-size="14" font-weight="bold" fill="#E11D48">Disconnected Docs</text>
+
+      <rect x="692" y="446" width="204" height="32" rx="16" fill="#FFF1F2" stroke="#FECDD3" stroke-width="1"/>
+      <use data-icon="phosphor-duotone/x-circle" x="704" y="452" width="20" height="20" fill="#E11D48"/>
+      <text x="732" y="467" font-size="14" font-weight="bold" fill="#E11D48">Ends at Job Offer</text>
+
+      <rect x="934" y="446" width="272" height="32" rx="16" fill="#FFFFFF" stroke="#059669" stroke-width="1.5"/>
+      <use data-icon="phosphor-duotone/check-circle" x="946" y="452" width="20" height="20" fill="#059669"/>
+      <text x="974" y="467" font-size="14" font-weight="bold" fill="#0F172A">Built from Interview Gaps</text>
+    </g>
+
+    <g id="matrix-row-6">
+      <text x="76" y="527" font-size="16" font-weight="bold" fill="#0F172A">06 · Conflict-Aware Policy Copilot</text>
+      <rect x="448" y="506" width="204" height="32" rx="16" fill="#FFFBEB" stroke="#FDE68A" stroke-width="1"/>
+      <use data-icon="phosphor-duotone/warning" x="460" y="512" width="20" height="20" fill="#D97706"/>
+      <text x="488" y="527" font-size="14" font-weight="bold" fill="#D97706">Static PDF Files</text>
+
+      <rect x="692" y="506" width="204" height="32" rx="16" fill="#FFF1F2" stroke="#FECDD3" stroke-width="1"/>
+      <use data-icon="phosphor-duotone/x-circle" x="704" y="512" width="20" height="20" fill="#E11D48"/>
+      <text x="732" y="527" font-size="14" font-weight="bold" fill="#E11D48">None</text>
+
+      <rect x="934" y="506" width="272" height="32" rx="16" fill="#FFFFFF" stroke="#059669" stroke-width="1.5"/>
+      <use data-icon="phosphor-duotone/check-circle" x="946" y="512" width="20" height="20" fill="#059669"/>
+      <text x="974" y="527" font-size="14" font-weight="bold" fill="#0F172A">Cited + SOURCES DISAGREE</text>
+    </g>
+  </g>
+
+  <g id="closing-banner" data-pptx-bounds="54 566 1172 98">
+    <g id="p11-closing-plaque" data-pptx-authoring="preset" data-pptx-object="shape" data-pptx-prst="snipRoundRect" data-pptx-frame="56 568 1168 92" fill="#EEF5FC" stroke="#0066B3" stroke-width="1.5">
+      <path d="M 71.33 568 L 1208.67 568 L 1224 583.33 L 1224 660 L 56 660 L 56 583.33 A 15.33 15.33 0 0 1 71.33 568 Z"/>
+    </g>
+    <use data-icon="phosphor-duotone/sparkle" x="76" y="592" width="44" height="44" fill="#0066B3"/>
+    <text x="136" y="605" font-family="Trebuchet MS" font-size="18" font-weight="bold" fill="#0F172A">Stop Filtering Paper Claims. Start Hiring &amp; Onboarding on Verified Proof.</text>
+    <text x="136" y="638" font-size="16" fill="#475569"><tspan font-weight="bold" fill="#0066B3">Team Zenith · HUTECH University</tspan> — Lưu Gia Bảo · Tạ Hoàng Thành · Nguyễn Phương Quang</text>
+    <rect x="936" y="592" width="268" height="44" rx="22" fill="#0066B3"/>
+    <use data-icon="phosphor-duotone/check-circle" x="954" y="602" width="24" height="24" fill="#FFFFFF"/>
+    <text x="986" y="619" font-size="14" font-weight="bold" fill="#FFFFFF">Live MVP Ready for Q&amp;A</text>
+  </g>
+
+  <g id="footer" data-pptx-bounds="56 676 1168 28">
+    <line x1="56" y1="678" x2="1224" y2="678" stroke="#E2E8F0" stroke-width="1"/>
+    <text x="56" y="696" font-size="13" fill="#475569">Team Zenith (HUTECH University) · InterviewPath · AI4Biz 2026 — Track 1: HR &amp; Recruitment</text>
+    <text x="1224" y="696" font-size="13" font-weight="bold" fill="#0066B3" text-anchor="end">11 / 11</text>
+  </g>
+</svg>

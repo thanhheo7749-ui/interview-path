@@ -1,0 +1,118 @@
+{
+  "roles": {
+    "body": {
+      "family": "Calibri",
+      "size": 24.0,
+      "weight": "normal",
+      "cjk_chars_per_100px": 3.9,
+      "latin_chars_per_100px": 9.7,
+      "caps_chars_per_100px": 8.3,
+      "digits_chars_per_100px": 7.8,
+      "citation_chars_per_100px": 9.3,
+      "script_clusters_per_100px": {},
+      "longest_planned_line": {
+        "px": 1202.6,
+        "slide": "P06",
+        "text": "Internal Policy Copilot: Employee Query…"
+      }
+    },
+    "title": {
+      "family": "Trebuchet MS",
+      "size": 36.0,
+      "weight": "bold",
+      "cjk_chars_per_100px": 2.6,
+      "latin_chars_per_100px": 5.6,
+      "caps_chars_per_100px": 4.8,
+      "digits_chars_per_100px": 4.5,
+      "citation_chars_per_100px": 5.3,
+      "script_clusters_per_100px": {},
+      "longest_planned_line": {
+        "px": 1103.9,
+        "slide": "P09",
+        "text": "Live MVP Walkthrough (2/2): Voice AI, H…"
+      }
+    },
+    "subtitle": {
+      "family": "Trebuchet MS",
+      "size": 26.0,
+      "weight": "normal",
+      "cjk_chars_per_100px": 3.6,
+      "latin_chars_per_100px": 8.0,
+      "caps_chars_per_100px": 7.0,
+      "digits_chars_per_100px": 6.9,
+      "citation_chars_per_100px": 7.7,
+      "script_clusters_per_100px": {},
+      "longest_planned_line": {
+        "px": 1795.1,
+        "slide": "P04",
+        "text": "Cross-referencing paper resumes against…"
+      }
+    },
+    "annotation": {
+      "family": "Calibri",
+      "size": 16.0,
+      "weight": "normal",
+      "cjk_chars_per_100px": 5.9,
+      "latin_chars_per_100px": 14.5,
+      "caps_chars_per_100px": 12.4,
+      "digits_chars_per_100px": 11.6,
+      "citation_chars_per_100px": 13.9,
+      "script_clusters_per_100px": {},
+      "longest_planned_line": null
+    },
+    "card_title": {
+      "family": "Trebuchet MS",
+      "size": 20.0,
+      "weight": "bold",
+      "cjk_chars_per_100px": 4.7,
+      "latin_chars_per_100px": 10.1,
+      "caps_chars_per_100px": 8.7,
+      "digits_chars_per_100px": 8.1,
+      "citation_chars_per_100px": 9.5,
+      "script_clusters_per_100px": {},
+      "longest_planned_line": null
+    },
+    "cover_title": {
+      "family": "Trebuchet MS",
+      "size": 54.0,
+      "weight": "bold",
+      "cjk_chars_per_100px": 1.7,
+      "latin_chars_per_100px": 3.7,
+      "caps_chars_per_100px": 3.2,
+      "digits_chars_per_100px": 3.0,
+      "citation_chars_per_100px": 3.5,
+      "script_clusters_per_100px": {},
+      "longest_planned_line": null
+    },
+    "footnote": {
+      "family": "Calibri",
+      "size": 13.0,
+      "weight": "normal",
+      "cjk_chars_per_100px": 7.2,
+      "latin_chars_per_100px": 17.8,
+      "caps_chars_per_100px": 15.2,
+      "digits_chars_per_100px": 14.2,
+      "citation_chars_per_100px": 17.0,
+      "script_clusters_per_100px": {},
+      "longest_planned_line": null
+    },
+    "hero_number": {
+      "family": "Calibri",
+      "size": 46.0,
+      "weight": "bold",
+      "cjk_chars_per_100px": 2.1,
+      "latin_chars_per_100px": 4.9,
+      "caps_chars_per_100px": 4.2,
+      "digits_chars_per_100px": 4.0,
+      "citation_chars_per_100px": 4.8,
+      "script_clusters_per_100px": {},
+      "longest_planned_line": null
+    }
+  },
+  "script_samples": {},
+  "source": "spec_lock.md",
+  "generated_at": "2026-11-11T14:23:46Z",
+  "notes": [
+    "rates for card_title, cover_title, hero_number, title are measured at bold weight"
+  ]
+}

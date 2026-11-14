@@ -443,15 +443,15 @@ def post_reset_candidate_credentials(
             company_id,
             user.id,
             "invited",
-            "vi",
-            f"Thông tin tài khoản & Link phỏng vấn AI — {job.title}",
+            "en",
+            f"Candidate Account & AI Interview Link — {job.title}",
             (
-                f"Xin chào {application.candidate_name or email},\n\n"
-                f"Hệ thống đã khởi tạo tài khoản ứng viên của bạn cho vị trí {job.title}:\n"
-                f"• Cổng đăng nhập: {login_url}\n"
-                f"• Email đăng nhập: {email}\n"
-                f"• Mật khẩu: {new_password}\n\n"
-                f"Hoặc bấm trực tiếp vào đường dẫn Magic Link (1-Click vào thẳng phòng phỏng vấn AI không cần mật khẩu):\n"
+                f"Hello {application.candidate_name or email},\n\n"
+                f"Your candidate account has been provisioned for the {job.title} role:\n"
+                f"• Login Portal: {login_url}\n"
+                f"• Account Email: {email}\n"
+                f"• Default Password: {new_password}\n\n"
+                f"Or click your 1-Click Magic Link to enter the AI interview room directly without a password:\n"
                 f"{claim_url}"
             ),
             application_id=application.id,

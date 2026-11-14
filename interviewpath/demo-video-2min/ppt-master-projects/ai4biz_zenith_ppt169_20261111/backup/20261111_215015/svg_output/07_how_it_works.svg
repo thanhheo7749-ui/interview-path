@@ -1,0 +1,164 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" width="1280" height="720" data-pptx-page-role="content" font-family="Calibri">
+  <defs>
+    <marker id="flowArrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <polygon points="0,1 10,5 0,9" fill="#0066B3"/>
+    </marker>
+    <marker id="flowArrowTeal" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <polygon points="0,1 10,5 0,9" fill="#0D9488"/>
+    </marker>
+  </defs>
+
+  <rect id="page-bg" data-pptx-role="background" x="0" y="0" width="1280" height="720" fill="#FFFFFF"/>
+
+  <g id="header" data-pptx-bounds="56 32 988 94">
+    <rect x="56" y="34" width="204" height="28" rx="14" fill="#EEF5FC" stroke="#0066B3" stroke-width="1"/>
+    <text x="158" y="53" font-size="13" font-weight="bold" fill="#0066B3" text-anchor="middle">07 · HOW IT WORKS</text>
+    <text x="56" y="104" font-family="Trebuchet MS" font-size="36" font-weight="bold" fill="#0F172A">End-to-End Execution Across 5 Connected Stages</text>
+  </g>
+
+  <g id="brand-logo" data-pptx-bounds="1052 34 172 58">
+    <image href="../images/hutech_logo.png" x="1056" y="36" width="168" height="54" preserveAspectRatio="xMidYMid meet"/>
+  </g>
+
+  <g id="col-headers" data-pptx-bounds="56 140 1168 34">
+    <rect x="56" y="140" width="186" height="32" rx="8" fill="#F6F9FC"/>
+    <text x="149" y="161" font-size="13" font-weight="bold" fill="#475569" text-anchor="middle">STAGE</text>
+    <rect x="262" y="140" width="286" height="32" rx="8" fill="#F6F9FC"/>
+    <text x="405" y="161" font-size="13" font-weight="bold" fill="#475569" text-anchor="middle">TRIGGER INPUT</text>
+    <rect x="580" y="140" width="324" height="32" rx="8" fill="#EEF5FC"/>
+    <text x="742" y="161" font-size="13" font-weight="bold" fill="#0066B3" text-anchor="middle">WHITE-BOX AI PROCESSING CORE</text>
+    <rect x="936" y="140" width="288" height="32" rx="8" fill="#ECFDF5"/>
+    <text x="1080" y="161" font-size="13" font-weight="bold" fill="#059669" text-anchor="middle">AUDITABLE DELIVERABLE</text>
+  </g>
+
+  <g id="lane-1" data-pptx-bounds="56 182 1168 80">
+    <g id="p07-lane1-tag" data-pptx-authoring="preset" data-pptx-object="shape" data-pptx-prst="homePlate" data-pptx-frame="56 184 186 76" data-pptx-av-adj="val 22000" fill="#0066B3" stroke="none">
+      <path d="M 56 184 L 225.28 184 L 242 222 L 225.28 260 L 56 260 Z"/>
+    </g>
+    <text x="140" y="217" font-size="13" font-weight="bold" fill="#EEF5FC" text-anchor="middle">STAGE 01</text>
+    <text x="140" y="239" font-family="Trebuchet MS" font-size="18" font-weight="bold" fill="#FFFFFF" text-anchor="middle">Setup &amp; JD</text>
+
+    <rect x="262" y="184" width="286" height="76" rx="12" fill="#F6F9FC" stroke="#E2E8F0" stroke-width="1"/>
+    <text x="280" y="216" font-size="16" font-weight="bold" fill="#0F172A">Handbooks + Role Brief</text>
+    <text x="280" y="240" font-size="13" fill="#475569">PDF rules, Spring Boot, SQL &amp; ISO 9001</text>
+
+    <line x1="552" y1="222" x2="576" y2="222" stroke="#0066B3" stroke-width="2" marker-end="url(#flowArrow)"/>
+
+    <rect x="580" y="184" width="324" height="76" rx="12" fill="#EEF5FC" stroke="#0066B3" stroke-width="1.5"/>
+    <use data-icon="phosphor-duotone/brain" x="596" y="206" width="32" height="32" fill="#0066B3"/>
+    <text x="638" y="216" font-size="16" font-weight="bold" fill="#0066B3">Knowledge Graph &amp; JD Studio</text>
+    <text x="638" y="240" font-size="13" fill="#0F172A">Extracts must-have nodes &amp; bias check</text>
+
+    <line x1="908" y1="222" x2="932" y2="222" stroke="#0D9488" stroke-width="2" marker-end="url(#flowArrowTeal)"/>
+
+    <rect x="936" y="184" width="288" height="76" rx="12" fill="#FFFFFF" stroke="#059669" stroke-width="1.5"/>
+    <text x="954" y="216" font-size="16" font-weight="bold" fill="#059669">✓ Policy-Checked JD</text>
+    <text x="954" y="240" font-size="13" fill="#475569">+ Multi-channel ROI tracker active</text>
+  </g>
+
+  <g id="lane-2" data-pptx-bounds="56 278 1168 80">
+    <g id="p07-lane2-tag" data-pptx-authoring="preset" data-pptx-object="shape" data-pptx-prst="homePlate" data-pptx-frame="56 280 186 76" data-pptx-av-adj="val 22000" fill="#0D9488" stroke="none">
+      <path d="M 56 280 L 225.28 280 L 242 318 L 225.28 356 L 56 356 Z"/>
+    </g>
+    <text x="140" y="313" font-size="13" font-weight="bold" fill="#ECFDF5" text-anchor="middle">STAGE 02</text>
+    <text x="140" y="335" font-family="Trebuchet MS" font-size="18" font-weight="bold" fill="#FFFFFF" text-anchor="middle">Voice Screen</text>
+
+    <rect x="262" y="280" width="286" height="76" rx="12" fill="#F6F9FC" stroke="#E2E8F0" stroke-width="1"/>
+    <text x="280" y="312" font-size="16" font-weight="bold" fill="#0F172A">Marcus CV (<tspan font-family="Consolas" fill="#0066B3">#A6</tspan>) + Voice</text>
+    <text x="280" y="336" font-size="13" fill="#475569">HR overrides CV hold via 1-click link</text>
+
+    <line x1="552" y1="318" x2="576" y2="318" stroke="#0066B3" stroke-width="2" marker-end="url(#flowArrow)"/>
+
+    <rect x="580" y="280" width="324" height="76" rx="12" fill="#ECFDF5" stroke="#0D9488" stroke-width="1.5"/>
+    <use data-icon="phosphor-duotone/microphone" x="596" y="302" width="32" height="32" fill="#0D9488"/>
+    <text x="638" y="312" font-size="16" font-weight="bold" fill="#0D9488">Adaptive Voice AI Interviewer</text>
+    <text x="638" y="336" font-size="13" fill="#0F172A">Asks live ISO 9001 change-control Q2</text>
+
+    <line x1="908" y1="318" x2="932" y2="318" stroke="#0D9488" stroke-width="2" marker-end="url(#flowArrowTeal)"/>
+
+    <rect x="936" y="280" width="288" height="76" rx="12" fill="#FFFFFF" stroke="#059669" stroke-width="1.5"/>
+    <text x="954" y="312" font-size="16" font-weight="bold" fill="#059669">✓ Recorded Audio Proof</text>
+    <text x="954" y="336" font-size="13" fill="#475569">Timestamped transcript &amp; skill score</text>
+  </g>
+
+  <g id="lane-3" data-pptx-bounds="56 374 1168 80">
+    <g id="p07-lane3-tag" data-pptx-authoring="preset" data-pptx-object="shape" data-pptx-prst="homePlate" data-pptx-frame="56 376 186 76" data-pptx-av-adj="val 22000" fill="#D97706" stroke="none">
+      <path d="M 56 376 L 225.28 376 L 242 414 L 225.28 452 L 56 452 Z"/>
+    </g>
+    <text x="140" y="409" font-size="13" font-weight="bold" fill="#FFFBEB" text-anchor="middle">STAGE 03</text>
+    <text x="140" y="431" font-family="Trebuchet MS" font-size="18" font-weight="bold" fill="#FFFFFF" text-anchor="middle">2x2 Calibrate</text>
+
+    <rect x="262" y="376" width="286" height="76" rx="12" fill="#F6F9FC" stroke="#E2E8F0" stroke-width="1"/>
+    <text x="280" y="408" font-size="16" font-weight="bold" fill="#0F172A">Hannah CV (<tspan font-family="Consolas" fill="#D97706">#A5</tspan>) + Proof</text>
+    <text x="280" y="432" font-size="13" fill="#475569">Concise resume + strong spoken logic</text>
+
+    <line x1="552" y1="414" x2="576" y2="414" stroke="#0066B3" stroke-width="2" marker-end="url(#flowArrow)"/>
+
+    <rect x="580" y="376" width="324" height="76" rx="12" fill="#FFFBEB" stroke="#D97706" stroke-width="1.5"/>
+    <use data-icon="phosphor-duotone/sketch-logo" x="596" y="398" width="32" height="32" fill="#D97706"/>
+    <text x="638" y="408" font-size="16" font-weight="bold" fill="#D97706">2x2 Evidence Matrix Engine</text>
+    <text x="638" y="432" font-size="13" fill="#0F172A">Plots Paper CV Fit × Spoken Proof</text>
+
+    <line x1="908" y1="414" x2="932" y2="414" stroke="#0D9488" stroke-width="2" marker-end="url(#flowArrowTeal)"/>
+
+    <rect x="936" y="376" width="288" height="76" rx="12" fill="#FFFFFF" stroke="#D97706" stroke-width="1.5"/>
+    <text x="954" y="408" font-size="16" font-weight="bold" fill="#D97706">★ Hidden Gem Surfaced</text>
+    <text x="954" y="432" font-size="13" fill="#475569">+ Citation-backed Round-2 manager brief</text>
+  </g>
+
+  <g id="lane-4" data-pptx-bounds="56 470 1168 80">
+    <g id="p07-lane4-tag" data-pptx-authoring="preset" data-pptx-object="shape" data-pptx-prst="homePlate" data-pptx-frame="56 472 186 76" data-pptx-av-adj="val 22000" fill="#0066B3" stroke="none">
+      <path d="M 56 472 L 225.28 472 L 242 510 L 225.28 548 L 56 548 Z"/>
+    </g>
+    <text x="140" y="505" font-size="13" font-weight="bold" fill="#EEF5FC" text-anchor="middle">STAGE 04</text>
+    <text x="140" y="527" font-family="Trebuchet MS" font-size="18" font-weight="bold" fill="#FFFFFF" text-anchor="middle">Onboard Plan</text>
+
+    <rect x="262" y="472" width="286" height="76" rx="12" fill="#F6F9FC" stroke="#E2E8F0" stroke-width="1"/>
+    <text x="280" y="504" font-size="16" font-weight="bold" fill="#0F172A">HR Marks 'Hired' + Gaps</text>
+    <text x="280" y="528" font-size="13" fill="#475569">Remaining ISO / stack gap nodes kept</text>
+
+    <line x1="552" y1="510" x2="576" y2="510" stroke="#0066B3" stroke-width="2" marker-end="url(#flowArrow)"/>
+
+    <rect x="580" y="472" width="324" height="76" rx="12" fill="#EEF5FC" stroke="#0066B3" stroke-width="1.5"/>
+    <use data-icon="phosphor-duotone/git-branch" x="596" y="494" width="32" height="32" fill="#0066B3"/>
+    <text x="638" y="504" font-size="16" font-weight="bold" fill="#0066B3">30-60-90 Roadmap Generator</text>
+    <text x="638" y="528" font-size="13" fill="#0F172A">Maps interview gaps to probation tasks</text>
+
+    <line x1="908" y1="510" x2="932" y2="510" stroke="#0D9488" stroke-width="2" marker-end="url(#flowArrowTeal)"/>
+
+    <rect x="936" y="472" width="288" height="76" rx="12" fill="#FFFFFF" stroke="#059669" stroke-width="1.5"/>
+    <text x="954" y="504" font-size="16" font-weight="bold" fill="#059669">✓ Personalized Day-1 Plan</text>
+    <text x="954" y="528" font-size="13" fill="#475569">1-click HR approval into Employee App</text>
+  </g>
+
+  <g id="lane-5" data-pptx-bounds="56 566 1168 80">
+    <g id="p07-lane5-tag" data-pptx-authoring="preset" data-pptx-object="shape" data-pptx-prst="homePlate" data-pptx-frame="56 568 186 76" data-pptx-av-adj="val 22000" fill="#059669" stroke="none">
+      <path d="M 56 568 L 225.28 568 L 242 606 L 225.28 644 L 56 644 Z"/>
+    </g>
+    <text x="140" y="601" font-size="13" font-weight="bold" fill="#ECFDF5" text-anchor="middle">STAGE 05</text>
+    <text x="140" y="623" font-family="Trebuchet MS" font-size="18" font-weight="bold" fill="#FFFFFF" text-anchor="middle">Policy Copilot</text>
+
+    <rect x="262" y="568" width="286" height="76" rx="12" fill="#F6F9FC" stroke="#E2E8F0" stroke-width="1"/>
+    <text x="280" y="600" font-size="16" font-weight="bold" fill="#0F172A">New-Hire Policy Question</text>
+    <text x="280" y="624" font-size="13" fill="#475569">e.g. Annual leave carryover rules</text>
+
+    <line x1="552" y1="606" x2="576" y2="606" stroke="#0066B3" stroke-width="2" marker-end="url(#flowArrow)"/>
+
+    <rect x="580" y="568" width="324" height="76" rx="12" fill="#ECFDF5" stroke="#059669" stroke-width="1.5"/>
+    <use data-icon="phosphor-duotone/shield-check" x="596" y="590" width="32" height="32" fill="#059669"/>
+    <text x="638" y="600" font-size="16" font-weight="bold" fill="#059669">Multi-Doc RAG + Conflict Check</text>
+    <text x="638" y="624" font-size="13" fill="#0F172A">Verifies clauses across PDF versions</text>
+
+    <line x1="908" y1="606" x2="932" y2="606" stroke="#0D9488" stroke-width="2" marker-end="url(#flowArrowTeal)"/>
+
+    <rect x="936" y="568" width="288" height="76" rx="12" fill="#FFFFFF" stroke="#059669" stroke-width="1.5"/>
+    <text x="954" y="600" font-size="16" font-weight="bold" fill="#059669">✓ Cited Answer or Alert</text>
+    <text x="954" y="624" font-size="13" fill="#D97706" font-weight="bold">Flags 'SOURCES DISAGREE' safely</text>
+  </g>
+
+  <g id="footer" data-pptx-bounds="56 676 1168 28">
+    <line x1="56" y1="678" x2="1224" y2="678" stroke="#E2E8F0" stroke-width="1"/>
+    <text x="56" y="696" font-size="13" fill="#475569">Team Zenith (HUTECH University) · InterviewPath · AI4Biz 2026 — Track 1: HR &amp; Recruitment</text>
+    <text x="1224" y="696" font-size="13" font-weight="bold" fill="#0066B3" text-anchor="end">07 / 11</text>
+  </g>
+</svg>

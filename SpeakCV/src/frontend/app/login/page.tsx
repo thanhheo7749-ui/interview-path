@@ -37,7 +37,7 @@ export default function LoginPage() {
       // Save token to Context — AuthContext.login() handles navigation
       login(data.access_token, data.user_name, data.role || "user");
     } catch (err: any) {
-      setError(err.message || "Sai email hoặc mật khẩu!");
+      setError(err.message || "Invalid email or password!");
     } finally {
       setLoading(false);
     }
@@ -52,12 +52,12 @@ export default function LoginPage() {
         // AuthContext.login() handles navigation based on role
         login(data.access_token, data.user_name, data.role || "user");
       } catch (err: any) {
-        setError(err.message || "Lỗi đăng nhập qua Google!");
+        setError(err.message || "Google sign-in error!");
         setLoading(false);
       }
     },
     onError: () => {
-      setError("Đăng nhập Google thất bại!");
+      setError("Google sign-in failed!");
     },
   });
 
@@ -67,12 +67,12 @@ export default function LoginPage() {
         href="/"
         className="absolute top-6 left-6 text-theme-text-secondary hover:text-theme-text flex items-center gap-2 font-bold transition-colors bg-theme-surface/70 hover:bg-theme-surface px-4 py-2 rounded-xl"
       >
-        <ArrowLeft size={20} /> Thoát ra
+        <ArrowLeft size={20} /> Back
       </Link>
 
       <div className="bg-theme-primary w-full max-w-md rounded-3xl border border-theme-border p-8 shadow-2xl relative z-10">
         <h2 className="text-3xl font-bold text-theme-text mb-6 text-center">
-          Đăng Nhập
+          Sign In
         </h2>
 
         <form onSubmit={handleSubmit} className="space-y-5">
@@ -92,7 +92,7 @@ export default function LoginPage() {
 
           <div>
             <label className="block text-xs font-bold text-theme-muted mb-2 uppercase">
-              Mật khẩu
+              Password
             </label>
             <input
               type="password"
@@ -120,14 +120,14 @@ export default function LoginPage() {
             ) : (
               <LogIn size={20} />
             )}
-            {loading ? "Đang xử lý..." : "Đăng Nhập"}
+            {loading ? "Signing in..." : "Sign In"}
           </button>
         </form>
 
         <div className="mt-6 flex items-center justify-between">
           <span className="border-b border-theme-border flex-grow"></span>
           <span className="text-theme-muted text-xs px-2 uppercase font-semibold">
-            Hoặc tiếp tục với
+            Or continue with
           </span>
           <span className="border-b border-theme-border flex-grow"></span>
         </div>
@@ -161,12 +161,12 @@ export default function LoginPage() {
         </button>
 
         <p className="text-center text-theme-text-secondary text-sm mt-8">
-          Chưa có tài khoản?{" "}
+          Don&apos;t have an account?{" "}
           <Link
             href="/register"
             className="text-blue-400 hover:text-blue-300 font-bold hover:underline"
           >
-            Đăng ký ngay
+            Create an account
           </Link>
         </p>
       </div>

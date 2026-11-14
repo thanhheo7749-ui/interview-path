@@ -1,0 +1,118 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" width="1280" height="720" data-pptx-page-role="content" font-family="Calibri">
+  <defs>
+    <filter id="softShadow" x="-15%" y="-20%" width="130%" height="150%">
+      <feDropShadow dx="0" dy="6" stdDeviation="8" flood-color="#0F172A" flood-opacity="0.08"/>
+    </filter>
+    <linearGradient id="foundationGrad" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#EEF5FC"/>
+      <stop offset="100%" stop-color="#ECFDF5"/>
+    </linearGradient>
+  </defs>
+
+  <rect id="page-bg" data-pptx-role="background" x="0" y="0" width="1280" height="720" fill="#FFFFFF"/>
+
+  <g id="header" data-pptx-bounds="56 32 988 94">
+    <rect x="56" y="34" width="228" height="28" rx="14" fill="#EEF5FC" stroke="#0066B3" stroke-width="1"/>
+    <text x="170" y="53" font-size="13" font-weight="bold" fill="#0066B3" text-anchor="middle">05 · PROPOSED SOLUTION</text>
+    <text x="56" y="104" font-family="Trebuchet MS" font-size="36" font-weight="bold" fill="#0F172A">Closed-Loop AI Pipeline: From Handbook to Day 90</text>
+  </g>
+
+  <g id="brand-logo" data-pptx-bounds="1052 34 172 58">
+    <image href="../images/hutech_logo.png" x="1056" y="36" width="168" height="54" preserveAspectRatio="xMidYMid meet"/>
+  </g>
+
+  <g id="stage-01" data-pptx-bounds="56 168 220 340">
+    <g id="p05-stage1-plate" data-pptx-authoring="preset" data-pptx-object="shape" data-pptx-prst="homePlate" data-pptx-frame="56 172 220 56" data-pptx-av-adj="val 25000" fill="#0066B3" stroke="none">
+      <path d="M 56 172 L 262 172 L 276 200 L 262 228 L 56 228 Z"/>
+    </g>
+    <text x="158" y="206" font-size="16" font-weight="bold" fill="#FFFFFF" text-anchor="middle">01 · GRAPH &amp; JD</text>
+    <rect x="56" y="242" width="220" height="262" rx="14" fill="#F6F9FC" stroke="#E2E8F0" stroke-width="1"/>
+    <use data-icon="phosphor-duotone/file-text" x="146" y="264" width="40" height="40" fill="#0066B3"/>
+    <text x="166" y="334" font-size="13" font-weight="bold" fill="#475569" text-anchor="middle">INPUT</text>
+    <text x="166" y="356" font-size="16" fill="#0F172A" text-anchor="middle">Handbooks &amp; Rules</text>
+    <text x="166" y="392" font-size="24" font-weight="bold" fill="#0066B3" text-anchor="middle">↓</text>
+    <text x="166" y="424" font-size="13" font-weight="bold" fill="#0066B3" text-anchor="middle">VERIFIED OUTPUT</text>
+    <text x="166" y="452" font-family="Trebuchet MS" font-size="18" font-weight="bold" fill="#0F172A" text-anchor="middle">Policy-Checked
+      <tspan x="166" dy="24">Job Description</tspan>
+    </text>
+  </g>
+
+  <g id="stage-02" data-pptx-bounds="293 168 220 340">
+    <g id="p05-stage2-chev" data-pptx-authoring="preset" data-pptx-object="shape" data-pptx-prst="chevron" data-pptx-frame="293 172 220 56" data-pptx-av-adj="val 25000" fill="#0066B3" stroke="none">
+      <path d="M 293 172 L 499 172 L 513 200 L 499 228 L 293 228 L 307 200 Z"/>
+    </g>
+    <text x="403" y="206" font-size="16" font-weight="bold" fill="#FFFFFF" text-anchor="middle">02 · CHANNEL ROI</text>
+    <rect x="293" y="242" width="220" height="262" rx="14" fill="#F6F9FC" stroke="#E2E8F0" stroke-width="1"/>
+    <use data-icon="phosphor-duotone/chart-bar" x="383" y="264" width="40" height="40" fill="#0066B3"/>
+    <text x="403" y="334" font-size="13" font-weight="bold" fill="#475569" text-anchor="middle">INPUT</text>
+    <text x="403" y="356" font-size="16" fill="#0F172A" text-anchor="middle">Boards &amp; Referrals</text>
+    <text x="403" y="392" font-size="24" font-weight="bold" fill="#0066B3" text-anchor="middle">↓</text>
+    <text x="403" y="424" font-size="13" font-weight="bold" fill="#0066B3" text-anchor="middle">VERIFIED OUTPUT</text>
+    <text x="403" y="452" font-family="Trebuchet MS" font-size="18" font-weight="bold" fill="#0F172A" text-anchor="middle">Pass-Rate ROI
+      <tspan x="403" dy="24">Attribution</tspan>
+    </text>
+  </g>
+
+  <g id="stage-03" data-pptx-bounds="530 168 220 340">
+    <g id="p05-stage3-chev" data-pptx-authoring="preset" data-pptx-object="shape" data-pptx-prst="chevron" data-pptx-frame="530 172 220 56" data-pptx-av-adj="val 25000" fill="#0D9488" stroke="none">
+      <path d="M 530 172 L 736 172 L 750 200 L 736 228 L 530 228 L 544 200 Z"/>
+    </g>
+    <text x="640" y="206" font-size="16" font-weight="bold" fill="#FFFFFF" text-anchor="middle">03 · VOICE AI</text>
+    <rect x="530" y="242" width="220" height="262" rx="14" fill="#ECFDF5" stroke="#0D9488" stroke-width="1.5" filter="url(#softShadow)"/>
+    <use data-icon="phosphor-duotone/microphone" x="620" y="264" width="40" height="40" fill="#0D9488"/>
+    <text x="640" y="334" font-size="13" font-weight="bold" fill="#0D9488" text-anchor="middle">INPUT</text>
+    <text x="640" y="356" font-size="16" fill="#0F172A" text-anchor="middle">CV + Spoken Audio</text>
+    <text x="640" y="392" font-size="24" font-weight="bold" fill="#0D9488" text-anchor="middle">↓</text>
+    <text x="640" y="424" font-size="13" font-weight="bold" fill="#0D9488" text-anchor="middle">VERIFIED OUTPUT</text>
+    <text x="640" y="452" font-family="Trebuchet MS" font-size="18" font-weight="bold" fill="#0F172A" text-anchor="middle">Adaptive Q&amp;A
+      <tspan x="640" dy="24">&amp; Quote Proof</tspan>
+    </text>
+  </g>
+
+  <g id="stage-04" data-pptx-bounds="767 168 220 340">
+    <g id="p05-stage4-chev" data-pptx-authoring="preset" data-pptx-object="shape" data-pptx-prst="chevron" data-pptx-frame="767 172 220 56" data-pptx-av-adj="val 25000" fill="#D97706" stroke="none">
+      <path d="M 767 172 L 973 172 L 987 200 L 973 228 L 767 228 L 781 200 Z"/>
+    </g>
+    <text x="877" y="206" font-size="16" font-weight="bold" fill="#FFFFFF" text-anchor="middle">04 · HIDDEN GEM</text>
+    <rect x="767" y="242" width="220" height="262" rx="14" fill="#FFFBEB" stroke="#D97706" stroke-width="1.5"/>
+    <use data-icon="phosphor-duotone/sketch-logo" x="857" y="264" width="40" height="40" fill="#D97706"/>
+    <text x="877" y="334" font-size="13" font-weight="bold" fill="#D97706" text-anchor="middle">INPUT</text>
+    <text x="877" y="356" font-size="16" fill="#0F172A" text-anchor="middle">CV × Voice Matrix</text>
+    <text x="877" y="392" font-size="24" font-weight="bold" fill="#D97706" text-anchor="middle">↓</text>
+    <text x="877" y="424" font-size="13" font-weight="bold" fill="#D97706" text-anchor="middle">VERIFIED OUTPUT</text>
+    <text x="877" y="452" font-family="Trebuchet MS" font-size="18" font-weight="bold" fill="#0F172A" text-anchor="middle">2x2 Calibration
+      <tspan x="877" dy="24">&amp; Round-2 Brief</tspan>
+    </text>
+  </g>
+
+  <g id="stage-05" data-pptx-bounds="1004 168 220 340">
+    <g id="p05-stage5-chev" data-pptx-authoring="preset" data-pptx-object="shape" data-pptx-prst="chevron" data-pptx-frame="1004 172 220 56" data-pptx-av-adj="val 25000" fill="#059669" stroke="none">
+      <path d="M 1004 172 L 1210 172 L 1224 200 L 1210 228 L 1004 228 L 1018 200 Z"/>
+    </g>
+    <text x="1114" y="206" font-size="16" font-weight="bold" fill="#FFFFFF" text-anchor="middle">05 · DAY-90 &amp; RAG</text>
+    <rect x="1004" y="242" width="220" height="262" rx="14" fill="#F6F9FC" stroke="#E2E8F0" stroke-width="1"/>
+    <use data-icon="phosphor-duotone/chats" x="1094" y="264" width="40" height="40" fill="#059669"/>
+    <text x="1114" y="334" font-size="13" font-weight="bold" fill="#475569" text-anchor="middle">INPUT</text>
+    <text x="1114" y="356" font-size="16" fill="#0F172A" text-anchor="middle">Hired + Gap Nodes</text>
+    <text x="1114" y="392" font-size="24" font-weight="bold" fill="#059669" text-anchor="middle">↓</text>
+    <text x="1114" y="424" font-size="13" font-weight="bold" fill="#059669" text-anchor="middle">VERIFIED OUTPUT</text>
+    <text x="1114" y="452" font-family="Trebuchet MS" font-size="18" font-weight="bold" fill="#0F172A" text-anchor="middle">30-60-90 Plan
+      <tspan x="1114" dy="24">&amp; Cited Copilot</tspan>
+    </text>
+  </g>
+
+  <g id="foundation-bar" data-pptx-bounds="56 528 1168 128">
+    <rect x="56" y="532" width="1168" height="120" rx="16" fill="url(#foundationGrad)" stroke="#0066B3" stroke-width="1.5"/>
+    <use data-icon="phosphor-duotone/brain" x="84" y="568" width="48" height="48" fill="#0066B3"/>
+    <text x="150" y="578" font-family="Trebuchet MS" font-size="24" font-weight="bold" fill="#0066B3">Living Company Knowledge Graph · Single Source of Truth</text>
+    <text x="150" y="610" font-size="16" fill="#0F172A">Day-90 probation outcomes feed back into hiring criteria — <tspan fill="#0D9488" font-weight="bold">zero memory loss from JD to Employee.</tspan></text>
+    <rect x="944" y="566" width="256" height="52" rx="26" fill="#FFFFFF" stroke="#0D9488" stroke-width="1.5"/>
+    <text x="1072" y="597" font-size="16" font-weight="bold" fill="#0D9488" text-anchor="middle">✓ Human-in-the-Loop HR</text>
+  </g>
+
+  <g id="footer" data-pptx-bounds="56 676 1168 28">
+    <line x1="56" y1="678" x2="1224" y2="678" stroke="#E2E8F0" stroke-width="1"/>
+    <text x="56" y="696" font-size="13" fill="#475569">Team Zenith (HUTECH University) · InterviewPath · AI4Biz 2026 — Track 1: HR &amp; Recruitment</text>
+    <text x="1224" y="696" font-size="13" font-weight="bold" fill="#0066B3" text-anchor="end">05 / 11</text>
+  </g>
+</svg>

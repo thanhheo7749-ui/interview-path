@@ -227,7 +227,7 @@ function CandidateDetailPanel({ companyId, appId, onClose, onChanged }) {
                     <KeyRound size={14} />
                   </div>
                   <h3 className="text-xs font-extrabold uppercase tracking-wider text-emerald-900">
-                    Tài khoản Thí sinh Tự động tạo (Vòng 1 AI Interview)
+                    {t('board.accountSectionTitle', { defaultValue: 'Auto-Provisioned Candidate Account (Round 1 AI Interview)' })}
                   </h3>
                 </div>
                 {detail.claim_token && (
@@ -242,7 +242,9 @@ function CandidateDetailPanel({ companyId, appId, onClose, onChanged }) {
                       className="inline-flex items-center gap-1 rounded-lg bg-emerald-700 px-2.5 py-1 text-[11px] font-bold text-white hover:bg-emerald-800"
                     >
                       {copiedField === 'magic' ? <Check size={12} /> : <Copy size={12} />}
-                      {copiedField === 'magic' ? 'Đã copy Magic Link!' : 'Copy Magic Link 1-Click'}
+                      {copiedField === 'magic'
+                        ? t('board.copiedMagicLink', { defaultValue: 'Copied Magic Link!' })
+                        : t('board.copyMagicLink', { defaultValue: 'Copy 1-Click Magic Link' })}
                     </button>
                     <a
                       href={`${CANDIDATE_PORTAL_URL}/claim/${detail.claim_token}`}
@@ -251,21 +253,25 @@ function CandidateDetailPanel({ companyId, appId, onClose, onChanged }) {
                       className="inline-flex items-center gap-1 rounded-lg border border-emerald-300 bg-white px-2.5 py-1 text-[11px] font-bold text-emerald-800 hover:bg-emerald-100"
                     >
                       <ExternalLink size={12} />
-                      Mở phòng thi
+                      {t('board.openInterviewRoom', { defaultValue: 'Open Interview Room' })}
                     </a>
                   </div>
                 )}
               </div>
               <div className="mt-2.5 flex flex-wrap items-center gap-4 text-xs text-slate-700">
                 <div className="flex items-center gap-1.5">
-                  <span className="font-semibold text-slate-500">Tài khoản:</span>
+                  <span className="font-semibold text-slate-500">
+                    {t('board.accountEmailLabel', { defaultValue: 'Account:' })}
+                  </span>
                   <code className="rounded bg-white px-2 py-0.5 font-mono font-bold text-slate-900">
                     {detail.candidate_email}
                   </code>
                 </div>
                 {detail.default_password && (
                   <div className="flex items-center gap-1.5">
-                    <span className="font-semibold text-slate-500">Mật khẩu mặc định:</span>
+                    <span className="font-semibold text-slate-500">
+                      {t('board.defaultPasswordLabel', { defaultValue: 'Default Password:' })}
+                    </span>
                     <code className="rounded bg-white px-2 py-0.5 font-mono font-bold text-emerald-800">
                       {showPw ? detail.default_password : '••••••••••'}
                     </code>
@@ -302,10 +308,10 @@ function CandidateDetailPanel({ companyId, appId, onClose, onChanged }) {
                   </div>
                   <div>
                     <h3 className="text-sm font-extrabold text-slate-900">
-                      {t('board.cvSectionTitle', { defaultValue: 'Hồ sơ CV ứng viên (Candidate CV)' })}
+                      {t('board.cvSectionTitle', { defaultValue: 'Candidate Resume (CV)' })}
                     </h3>
                     <p className="text-[11px] font-medium text-slate-500">
-                      {detail.cv_suffix ? `Định dạng gốc: ${detail.cv_suffix.toUpperCase()}` : 'CV Text'}
+                      {detail.cv_suffix ? `Original format: ${detail.cv_suffix.toUpperCase()}` : 'CV Text'}
                     </p>
                   </div>
                 </div>
@@ -317,8 +323,8 @@ function CandidateDetailPanel({ companyId, appId, onClose, onChanged }) {
                   >
                     {showFullCv ? <EyeOff size={14} /> : <Eye size={14} />}
                     {showFullCv
-                      ? t('board.hideCv', { defaultValue: 'Thu gọn CV' })
-                      : t('board.viewCv', { defaultValue: 'Xem toàn bộ CV' })}
+                      ? t('board.hideCv', { defaultValue: 'Collapse CV' })
+                      : t('board.viewCv', { defaultValue: 'View Full CV' })}
                   </button>
                   {detail.has_cv_file && (
                     <button
@@ -327,7 +333,7 @@ function CandidateDetailPanel({ companyId, appId, onClose, onChanged }) {
                       className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-blue-700"
                     >
                       <Download size={14} />
-                      {t('board.downloadCv', { defaultValue: 'Tải CV gốc' })}
+                      {t('board.downloadCv', { defaultValue: 'Download Original CV' })}
                     </button>
                   )}
                 </div>

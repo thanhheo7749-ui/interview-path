@@ -1,0 +1,150 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" width="1280" height="720" data-pptx-page-role="content" font-family="Calibri">
+  <defs>
+    <filter id="softShadow" x="-15%" y="-20%" width="130%" height="150%">
+      <feDropShadow dx="0" dy="6" stdDeviation="10" flood-color="#0F172A" flood-opacity="0.07"/>
+    </filter>
+  </defs>
+
+  <rect id="page-bg" data-pptx-role="background" x="0" y="0" width="1280" height="720" fill="#FFFFFF"/>
+
+  <g id="header" data-pptx-bounds="68 32 944 114">
+    <rect x="68" y="36" width="292" height="28" rx="14" fill="#EFF6FF"/>
+    <text x="214" y="55" font-size="13" font-weight="bold" fill="#2563EB" letter-spacing="1" text-anchor="middle">09 · FEASIBILITY &amp; BUSINESS VALUE</text>
+    <text x="68" y="102" font-family="Trebuchet MS" font-size="38" font-weight="bold" fill="#0F172A">78% Fewer Admin Hours via a Live Docker MVP</text>
+    <text x="68" y="132" font-size="17" fill="#64748B">Modular 4-container deployment ready for immediate pilot at $0.12 AI cost per candidate.</text>
+  </g>
+
+  <g id="brand-logo" data-pptx-bounds="1036 38 176 58">
+    <image href="../images/hutech_logo.png" x="1040" y="40" width="172" height="54" preserveAspectRatio="xMidYMid meet"/>
+  </g>
+
+  <g id="roi-dumbbell" data-pptx-bounds="68 158 588 494">
+    <rect x="68" y="160" width="584" height="490" rx="20" fill="#F8FAFC" stroke="#E2E8F0" stroke-width="1.5" filter="url(#softShadow)"/>
+    <text x="92" y="198" font-family="Trebuchet MS" font-size="20" font-weight="bold" fill="#0F172A">HR Effort per Hire: 32.5h → 5.5h</text>
+    <rect x="488" y="178" width="140" height="26" rx="13" fill="#FFFFFF" stroke="#CBD5E1" stroke-width="1"/>
+    <text x="558" y="196" font-size="12" font-weight="bold" fill="#64748B" text-anchor="middle">Scenario data</text>
+
+    <circle cx="100" cy="230" r="7" fill="#059669"/>
+    <text x="114" y="235" font-size="13" font-weight="bold" fill="#059669">InterviewPath AI (5.5h total)</text>
+    <circle cx="328" cy="230" r="7" fill="#EF4444"/>
+    <text x="342" y="235" font-size="13" font-weight="bold" fill="#EF4444">Manual Process (32.5h total)</text>
+
+    <g id="roi-dumbbell-chartArea">
+      <line x1="236" y1="268" x2="236" y2="536" stroke="#CBD5E1" stroke-width="1.5"/>
+      <line x1="332" y1="268" x2="332" y2="536" stroke="#E2E8F0" stroke-width="1" stroke-dasharray="4,4"/>
+      <line x1="428" y1="268" x2="428" y2="536" stroke="#E2E8F0" stroke-width="1" stroke-dasharray="4,4"/>
+      <line x1="524" y1="268" x2="524" y2="536" stroke="#E2E8F0" stroke-width="1" stroke-dasharray="4,4"/>
+      <line x1="620" y1="268" x2="620" y2="536" stroke="#E2E8F0" stroke-width="1" stroke-dasharray="4,4"/>
+      <line x1="236" y1="536" x2="620" y2="536" stroke="#CBD5E1" stroke-width="1.5"/>
+
+      <text x="236" y="560" font-size="13" fill="#64748B" text-anchor="middle">0</text>
+      <text x="332" y="560" font-size="13" fill="#64748B" text-anchor="middle">4</text>
+      <text x="428" y="560" font-size="13" fill="#64748B" text-anchor="middle">8</text>
+      <text x="524" y="560" font-size="13" fill="#64748B" text-anchor="middle">12</text>
+      <text x="620" y="560" font-size="13" fill="#64748B" text-anchor="middle">16</text>
+      <text x="428" y="586" font-size="12" font-weight="bold" fill="#64748B" letter-spacing="1" text-anchor="middle">HOURS SPENT PER ROLE HIRED</text>
+
+      <!-- chart-plot-area: object=roi-dumbbell | 236,268,620,536 -->
+
+      <text x="222" y="308" font-size="15" font-weight="bold" fill="#0F172A" text-anchor="end">JD &amp; Policy</text>
+      <line x1="255.2" y1="302" x2="380" y2="302" stroke="#93C5FD" stroke-width="4" stroke-dasharray="6,4"/>
+      <circle cx="255.2" cy="302" r="8" fill="#059669"/>
+      <circle cx="380" cy="302" r="8" fill="#EF4444"/>
+      <text x="255.2" y="286" font-size="13" font-weight="bold" fill="#059669" text-anchor="middle">0.8h</text>
+      <text x="396" y="307" font-size="13" font-weight="bold" fill="#EF4444">6.0h</text>
+
+      <text x="222" y="376" font-size="15" font-weight="bold" fill="#0F172A" text-anchor="end">CV + Screen</text>
+      <line x1="296" y1="370" x2="572" y2="370" stroke="#93C5FD" stroke-width="4" stroke-dasharray="6,4"/>
+      <circle cx="296" cy="370" r="8" fill="#059669"/>
+      <circle cx="572" cy="370" r="8" fill="#EF4444"/>
+      <text x="296" y="354" font-size="13" font-weight="bold" fill="#059669" text-anchor="middle">2.5h</text>
+      <text x="588" y="375" font-size="13" font-weight="bold" fill="#EF4444">14.0h</text>
+
+      <text x="222" y="444" font-size="15" font-weight="bold" fill="#0F172A" text-anchor="end">Round-2 Brief</text>
+      <line x1="252.8" y1="438" x2="344" y2="438" stroke="#93C5FD" stroke-width="4" stroke-dasharray="6,4"/>
+      <circle cx="252.8" cy="438" r="8" fill="#059669"/>
+      <circle cx="344" cy="438" r="8" fill="#EF4444"/>
+      <text x="252.8" y="422" font-size="13" font-weight="bold" fill="#059669" text-anchor="middle">0.7h</text>
+      <text x="360" y="443" font-size="13" font-weight="bold" fill="#EF4444">4.5h</text>
+
+      <text x="222" y="512" font-size="15" font-weight="bold" fill="#0F172A" text-anchor="end">Day-90 &amp; RAG</text>
+      <line x1="272" y1="506" x2="428" y2="506" stroke="#93C5FD" stroke-width="4" stroke-dasharray="6,4"/>
+      <circle cx="272" cy="506" r="8" fill="#059669"/>
+      <circle cx="428" cy="506" r="8" fill="#EF4444"/>
+      <text x="272" y="490" font-size="13" font-weight="bold" fill="#059669" text-anchor="middle">1.5h</text>
+      <text x="444" y="511" font-size="13" font-weight="bold" fill="#EF4444">8.0h</text>
+    </g>
+
+    <rect x="92" y="602" width="536" height="32" rx="16" fill="#ECFDF5"/>
+    <text x="360" y="623" font-size="13" font-weight="bold" fill="#059669" text-anchor="middle">✓ Saves 27.0 active HR &amp; engineering hours on every hire</text>
+  </g>
+
+  <g id="kpi-1" data-pptx-bounds="676 158 168 152">
+    <rect x="676" y="160" width="168" height="148" rx="18" fill="#F0FDF4" stroke="#059669" stroke-width="2"/>
+    <text x="760" y="218" font-family="Trebuchet MS" font-size="42" font-weight="bold" fill="#059669" text-anchor="middle">-78%</text>
+    <text x="760" y="254" font-size="16" font-weight="bold" fill="#0F172A" text-anchor="middle">Admin Hours</text>
+    <text x="760" y="278" font-size="13" fill="#64748B" text-anchor="middle">Saved per hire</text>
+  </g>
+
+  <g id="kpi-2" data-pptx-bounds="860 158 168 152">
+    <rect x="860" y="160" width="168" height="148" rx="18" fill="#FBF7FF" stroke="#7C3AED" stroke-width="2"/>
+    <text x="944" y="218" font-family="Trebuchet MS" font-size="42" font-weight="bold" fill="#7C3AED" text-anchor="middle">3.2×</text>
+    <text x="944" y="254" font-size="16" font-weight="bold" fill="#0F172A" text-anchor="middle">Hidden Gems</text>
+    <text x="944" y="278" font-size="13" fill="#64748B" text-anchor="middle">Surfaced early</text>
+  </g>
+
+  <g id="kpi-3" data-pptx-bounds="1044 158 168 152">
+    <rect x="1044" y="160" width="168" height="148" rx="18" fill="#EFF6FF" stroke="#2563EB" stroke-width="2"/>
+    <text x="1128" y="218" font-family="Trebuchet MS" font-size="42" font-weight="bold" fill="#2563EB" text-anchor="middle">$0.12</text>
+    <text x="1128" y="254" font-size="16" font-weight="bold" fill="#0F172A" text-anchor="middle">AI Cost / Cand.</text>
+    <text x="1128" y="278" font-size="13" fill="#64748B" text-anchor="middle">Voice + RAG API</text>
+  </g>
+
+  <g id="docker-stack" data-pptx-bounds="676 324 536 328">
+    <rect x="676" y="326" width="536" height="324" rx="20" fill="#FFFFFF" stroke="#CBD5E1" stroke-width="1.5" filter="url(#softShadow)"/>
+    <rect x="700" y="346" width="488" height="44" rx="22" fill="#0F172A" stroke="#3B82F6" stroke-width="1.5"/>
+    <use data-icon="simple-icons/docker" x="724" y="356" width="24" height="24" fill="#60A5FA"/>
+    <text x="960" y="374" font-size="15" font-weight="bold" fill="#FFFFFF" text-anchor="middle">100% Built 4-Container Docker MVP</text>
+
+    <line x1="816" y1="504" x2="816" y2="528" stroke="#93C5FD" stroke-width="2.5" stroke-dasharray="5,4"/>
+    <line x1="1072" y1="504" x2="1072" y2="528" stroke="#93C5FD" stroke-width="2.5" stroke-dasharray="5,4"/>
+    <line x1="934" y1="580" x2="954" y2="580" stroke="#6EE7B7" stroke-width="2.5" stroke-dasharray="5,4"/>
+
+    <g id="svc-1">
+      <rect x="700" y="408" width="234" height="96" rx="14" fill="#F8FAFC" stroke="#E2E8F0" stroke-width="1"/>
+      <use data-icon="simple-icons/react" x="718" y="424" width="24" height="24" fill="#2563EB"/>
+      <text x="752" y="442" font-family="Consolas" font-size="15" font-weight="bold" fill="#2563EB">:5174</text>
+      <text x="718" y="470" font-family="Trebuchet MS" font-size="17" font-weight="bold" fill="#0F172A">HR Workspace</text>
+      <text x="718" y="490" font-size="12" fill="#64748B">React + Vite Graph UI</text>
+    </g>
+
+    <g id="svc-2">
+      <rect x="954" y="408" width="234" height="96" rx="14" fill="#F8FAFC" stroke="#E2E8F0" stroke-width="1"/>
+      <use data-icon="simple-icons/nextdotjs" x="972" y="424" width="24" height="24" fill="#0F172A"/>
+      <text x="1006" y="442" font-family="Consolas" font-size="15" font-weight="bold" fill="#7C3AED">:3001</text>
+      <text x="972" y="470" font-family="Trebuchet MS" font-size="17" font-weight="bold" fill="#0F172A">Candidate &amp; Staff</text>
+      <text x="972" y="490" font-size="12" fill="#64748B">Next.js Voice &amp; Copilot</text>
+    </g>
+
+    <g id="svc-3">
+      <rect x="700" y="528" width="234" height="100" rx="14" fill="#FBF7FF" stroke="#7C3AED" stroke-width="1.5"/>
+      <use data-icon="simple-icons/fastapi" x="718" y="544" width="24" height="24" fill="#7C3AED"/>
+      <text x="752" y="562" font-family="Consolas" font-size="15" font-weight="bold" fill="#7C3AED">:8001</text>
+      <text x="718" y="590" font-family="Trebuchet MS" font-size="17" font-weight="bold" fill="#0F172A">FastAPI AI Core</text>
+      <text x="718" y="612" font-size="12" fill="#475569">Voice Prober + Cited RAG</text>
+    </g>
+
+    <g id="svc-4">
+      <rect x="954" y="528" width="234" height="100" rx="14" fill="#F0FDF4" stroke="#059669" stroke-width="1.5"/>
+      <use data-icon="simple-icons/mysql" x="972" y="544" width="24" height="24" fill="#059669"/>
+      <text x="1006" y="562" font-family="Consolas" font-size="15" font-weight="bold" fill="#059669">:3307</text>
+      <text x="972" y="590" font-family="Trebuchet MS" font-size="17" font-weight="bold" fill="#0F172A">MySQL 8 Memory</text>
+      <text x="972" y="612" font-size="12" fill="#475569">Knowledge Graph &amp; Logs</text>
+    </g>
+  </g>
+
+  <g id="footer" data-pptx-role="footer" data-pptx-bounds="68 664 1144 36">
+    <text x="68" y="688" font-size="13" fill="#94A3B8">Team Zenith (HUTECH University) · InterviewPath · AI4Biz 2026</text>
+    <text x="1212" y="688" font-size="18" font-weight="bold" fill="#64748B" text-anchor="end">10</text>
+  </g>
+</svg>

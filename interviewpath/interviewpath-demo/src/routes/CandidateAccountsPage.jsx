@@ -45,12 +45,12 @@ function CandidateAccountRow({ item, companyId, onReload }) {
 
   const copyFullPackage = () => {
     const pkg = [
-      `Ứng viên: ${item.candidate_name || item.alias} (${item.alias})`,
-      `Vị trí: ${item.job_title}`,
-      `Cổng đăng nhập vòng 1 AI: ${loginUrl}`,
-      `Email tài khoản: ${item.candidate_email || 'Chưa có'}`,
-      `Mật khẩu mặc định: ${item.default_password || 'N/A'}`,
-      `Link vào thẳng phòng thi (1-Click Magic Link): ${magicLink}`,
+      `Candidate: ${item.candidate_name || item.alias} (${item.alias})`,
+      `Position: ${item.job_title}`,
+      `Round 1 AI Login Portal: ${loginUrl}`,
+      `Account Email: ${item.candidate_email || 'N/A'}`,
+      `Default Password: ${item.default_password || 'N/A'}`,
+      `1-Click Magic Link (Direct Interview Room): ${magicLink}`,
     ].join('\n');
     copyText('pkg', pkg);
   };
@@ -145,7 +145,7 @@ function CandidateAccountRow({ item, companyId, onReload }) {
               </button>
             </div>
             <div className="flex items-center gap-1.5 text-xs">
-              <span className="font-semibold text-slate-500">Mật khẩu:</span>
+              <span className="font-semibold text-slate-500">Password:</span>
               <code className="rounded bg-blue-50 px-1.5 py-0.5 font-mono text-xs font-bold text-blue-800">
                 {showPw ? item.default_password : '••••••••••'}
               </code>
@@ -153,7 +153,7 @@ function CandidateAccountRow({ item, companyId, onReload }) {
                 type="button"
                 onClick={() => setShowPw((v) => !v)}
                 className="rounded p-1 text-slate-400 hover:bg-slate-200 hover:text-slate-700"
-                title={showPw ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
+                title={showPw ? 'Hide password' : 'Show password'}
               >
                 {showPw ? <EyeOff size={13} /> : <Eye size={13} />}
               </button>
@@ -161,7 +161,7 @@ function CandidateAccountRow({ item, companyId, onReload }) {
                 type="button"
                 onClick={() => copyText('pw', item.default_password)}
                 className="rounded p-1 text-slate-400 hover:bg-slate-200 hover:text-slate-700"
-                title="Copy mật khẩu"
+                title="Copy password"
               >
                 {copiedKey === 'pw' ? <Check size={13} className="text-emerald-600" /> : <Copy size={13} />}
               </button>
@@ -169,7 +169,7 @@ function CandidateAccountRow({ item, companyId, onReload }) {
           </div>
         ) : (
           <span className="inline-flex items-center gap-1 rounded-lg bg-rose-50 px-2.5 py-1 text-xs font-bold text-rose-700">
-            Chưa có Email trong CV (Cần bổ sung trên Board)
+            Missing Email in CV (Fill on Board)
           </span>
         )}
       </td>
@@ -184,17 +184,17 @@ function CandidateAccountRow({ item, companyId, onReload }) {
                 className="inline-flex items-center gap-1 rounded-lg border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-bold text-blue-700 hover:bg-blue-100"
               >
                 {copiedKey === 'magic' ? <Check size={13} /> : <Copy size={13} />}
-                {copiedKey === 'magic' ? 'Đã copy Magic Link!' : 'Copy Magic Link 1-Click'}
+                {copiedKey === 'magic' ? 'Copied Magic Link!' : 'Copy 1-Click Magic Link'}
               </button>
               <a
                 href={magicLink}
                 target="_blank"
                 rel="noreferrer"
                 className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-bold text-slate-700 hover:bg-slate-100"
-                title="Mở thử phòng chờ phỏng vấn AI của thí sinh này"
+                title="Open candidate AI interview waiting room"
               >
                 <ExternalLink size={13} />
-                Vào phòng thi
+                Open Room
               </a>
             </div>
             <div className="flex flex-wrap items-center gap-1.5">
@@ -204,7 +204,7 @@ function CandidateAccountRow({ item, companyId, onReload }) {
                 className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-bold text-slate-700 hover:bg-slate-100"
               >
                 {copiedKey === 'pkg' ? <Check size={12} className="text-emerald-600" /> : <Copy size={12} />}
-                {copiedKey === 'pkg' ? 'Đã copy trọn bộ!' : 'Copy trọn bộ TK + Link'}
+                {copiedKey === 'pkg' ? 'Copied Package!' : 'Copy Full Account + Link'}
               </button>
               <button
                 type="button"
@@ -213,25 +213,25 @@ function CandidateAccountRow({ item, companyId, onReload }) {
                 className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-bold text-slate-700 hover:bg-slate-100"
               >
                 <KeyRound size={12} />
-                Đặt lại MK / Gửi mail
+                Reset PW / Send Mail
               </button>
               <Link
                 to={`/jobs/${item.job_id}/board`}
                 className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-bold text-slate-600 hover:bg-slate-100"
               >
-                Xem trên Board
+                View on Board
               </Link>
             </div>
             {copiedKey === 'sent' && (
               <p className="text-[11px] font-bold text-emerald-700">
-                ✓ Đã cập nhật mật khẩu & gửi Email kèm Magic Link tới hộp thư ứng viên!
+                ✓ Updated password & sent Email with Magic Link to candidate inbox!
               </p>
             )}
             {editingPw && (
               <form onSubmit={handleResetAndSend} className="mt-2 flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white p-2">
                 <input
                   type="text"
-                  placeholder={item.default_password || 'Mật khẩu mới...'}
+                  placeholder={item.default_password || 'New password...'}
                   value={customPw}
                   onChange={(e) => setCustomPw(e.target.value)}
                   className="w-36 rounded-lg border border-slate-200 px-2 py-1 text-xs"
@@ -242,7 +242,7 @@ function CandidateAccountRow({ item, companyId, onReload }) {
                   className="inline-flex items-center gap-1 rounded-lg bg-blue-600 px-2.5 py-1 text-xs font-bold text-white hover:bg-blue-700"
                 >
                   <Mail size={12} />
-                  {busy ? 'Đang gửi...' : 'Lưu & Gửi mail'}
+                  {busy ? 'Sending...' : 'Save & Send Mail'}
                 </button>
               </form>
             )}
@@ -252,7 +252,7 @@ function CandidateAccountRow({ item, companyId, onReload }) {
             to={`/jobs/${item.job_id}/board`}
             className="inline-flex items-center gap-1 rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-amber-700"
           >
-            Bổ sung Email trên Board
+            Fill Email on Board
           </Link>
         )}
       </td>
@@ -324,12 +324,12 @@ function CandidateAccountsPage() {
             OMNI-CHANNEL AUTO-PROVISIONING
           </p>
           <h1 className="mt-1 text-2xl font-extrabold tracking-tight text-slate-950">
-            {t('candidateAccounts.title', { defaultValue: 'Quản lý Tài khoản Thí sinh ( Tự động tạo từ CV )' })}
+            {t('candidateAccounts.title', { defaultValue: 'Candidate Accounts (Auto-Provisioned from CV)' })}
           </h1>
           <p className="mt-1 max-w-3xl text-sm text-slate-600">
             {t('candidateAccounts.subtitle', {
               defaultValue:
-                'Khi ứng viên nộp CV hoặc HR tải lên CV đa kênh (.pdf / .docx / .zip), hệ thống tự động trích xuất Email để khởi tạo Tài khoản Thí sinh (kèm Mật khẩu mặc định & 1-Click Magic Link) phục vụ Vòng 1 Phỏng vấn với AI.',
+                'When candidates apply or HR uploads multi-channel CVs (.pdf / .docx / .zip), the system automatically extracts Email to provision a Candidate Account (with Default Password & 1-Click Magic Link) for Round 1 AI Interviews.',
             })}
           </p>
         </div>
@@ -339,7 +339,7 @@ function CandidateAccountsPage() {
           className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-bold text-slate-700 shadow-card hover:bg-slate-50"
         >
           <RefreshCw size={15} />
-          Làm mới danh sách
+          Refresh List
         </button>
       </div>
 
@@ -348,38 +348,38 @@ function CandidateAccountsPage() {
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-card">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Tổng hồ sơ CV</span>
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Total CVs</span>
             <Users size={18} className="text-slate-400" />
           </div>
           <p className="mt-2 text-2xl font-extrabold text-slate-950">{stats.total}</p>
-          <p className="mt-1 text-xs text-slate-500">Từ tất cả các kênh tuyển dụng</p>
+          <p className="mt-1 text-xs text-slate-500">Across all recruitment channels</p>
         </div>
 
         <div className="rounded-2xl border border-emerald-200 bg-emerald-50/50 p-5 shadow-card">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-emerald-700">Đã tự động tạo Tài khoản</span>
+            <span className="text-xs font-bold uppercase tracking-wider text-emerald-700">Auto-Provisioned Accounts</span>
             <UserCheck size={18} className="text-emerald-600" />
           </div>
           <p className="mt-2 text-2xl font-extrabold text-emerald-900">{stats.created}</p>
-          <p className="mt-1 text-xs text-emerald-700">Có sẵn Email + Mật khẩu + Magic Link</p>
+          <p className="mt-1 text-xs text-emerald-700">Ready with Email + Password + Magic Link</p>
         </div>
 
         <div className="rounded-2xl border border-blue-200 bg-blue-50/50 p-5 shadow-card">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-blue-700">Đủ điều kiện Vòng 1 AI</span>
+            <span className="text-xs font-bold uppercase tracking-wider text-blue-700">Eligible for Round 1 AI</span>
             <ShieldCheck size={18} className="text-blue-600" />
           </div>
           <p className="mt-2 text-2xl font-extrabold text-blue-900">{stats.invitedOrDone}</p>
-          <p className="mt-1 text-xs text-blue-700">Đã mở phòng phỏng vấn AI</p>
+          <p className="mt-1 text-xs text-blue-700">AI interview room opened</p>
         </div>
 
         <div className="rounded-2xl border border-amber-200 bg-amber-50/50 p-5 shadow-card">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-amber-800">CV thiếu Email</span>
+            <span className="text-xs font-bold uppercase tracking-wider text-amber-800">CVs Missing Email</span>
             <Mail size={18} className="text-amber-600" />
           </div>
           <p className="mt-2 text-2xl font-extrabold text-amber-900">{stats.missing}</p>
-          <p className="mt-1 text-xs text-amber-800">Chờ HR nhập bổ sung Email để tạo TK</p>
+          <p className="mt-1 text-xs text-amber-800">Awaiting HR email entry to create account</p>
         </div>
       </div>
 
@@ -389,7 +389,7 @@ function CandidateAccountsPage() {
             <Search size={16} className=" absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
               type="search"
-              placeholder="Tìm theo họ tên, email, SĐT, mã #A1, nguồn TopCV/ITviec..."
+              placeholder="Search by name, email, phone, alias #A1, channel..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2 pl-9 pr-3 text-xs font-medium text-slate-900 outline-none focus:border-blue-500 focus:bg-white"
@@ -397,7 +397,7 @@ function CandidateAccountsPage() {
           </div>
           <div className="flex items-center gap-2">
             <label htmlFor="job-filter" className="text-xs font-bold text-slate-600">
-              Vị trí:
+              Position:
             </label>
             <select
               id="job-filter"
@@ -405,7 +405,7 @@ function CandidateAccountsPage() {
               onChange={(e) => setSelectedJobId(e.target.value)}
               className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-800"
             >
-              <option value="">Tất cả vị trí ({jobs.length})</option>
+              <option value="">All positions ({jobs.length})</option>
               {jobs.map((j) => (
                 <option key={j.id} value={j.id}>
                   {j.title}
@@ -416,18 +416,18 @@ function CandidateAccountsPage() {
         </div>
 
         {loading ? (
-          <p className="p-8 text-center text-sm text-slate-500">Đang tải danh sách tài khoản thí sinh...</p>
+          <p className="p-8 text-center text-sm text-slate-500">Loading candidate accounts...</p>
         ) : filtered.length === 0 ? (
-          <p className="p-8 text-center text-sm text-slate-500">Không tìm thấy tài khoản thí sinh nào phù hợp.</p>
+          <p className="p-8 text-center text-sm text-slate-500">No matching candidate accounts found.</p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-slate-50 text-[11px] font-extrabold uppercase tracking-wider text-slate-500">
-                  <th className="px-4 py-3">Thí sinh & Nguồn CV</th>
-                  <th className="px-4 py-3">Vị trí & Trạng thái</th>
-                  <th className="px-4 py-3">Tài khoản Tự động tạo (Cổng 3001)</th>
-                  <th className="px-4 py-3">Link Vòng 1 AI & Thao tác</th>
+                  <th className="px-4 py-3">Candidate & Channel</th>
+                  <th className="px-4 py-3">Position & Stage</th>
+                  <th className="px-4 py-3">Auto-Provisioned Account (Port 3001)</th>
+                  <th className="px-4 py-3">Round 1 AI Link & Actions</th>
                 </tr>
               </thead>
               <tbody>

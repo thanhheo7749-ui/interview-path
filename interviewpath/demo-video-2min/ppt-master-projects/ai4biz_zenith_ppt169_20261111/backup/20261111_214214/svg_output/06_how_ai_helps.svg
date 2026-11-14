@@ -1,0 +1,173 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" width="1280" height="720" data-pptx-page-role="content" font-family="Calibri">
+  <defs>
+    <filter id="softShadow" x="-15%" y="-20%" width="130%" height="150%">
+      <feDropShadow dx="0" dy="6" stdDeviation="8" flood-color="#0F172A" flood-opacity="0.08"/>
+    </filter>
+  </defs>
+
+  <rect id="page-bg" data-pptx-role="background" x="0" y="0" width="1280" height="720" fill="#FFFFFF"/>
+
+  <g id="header" data-pptx-bounds="56 32 988 94">
+    <rect x="56" y="34" width="196" height="28" rx="14" fill="#EEF5FC" stroke="#0066B3" stroke-width="1"/>
+    <text x="154" y="53" font-size="13" font-weight="bold" fill="#0066B3" text-anchor="middle">06 · HOW AI HELPS</text>
+    <text x="56" y="104" font-family="Trebuchet MS" font-size="36" font-weight="bold" fill="#0F172A">4 White-Box AI Engines Mapped 1:1 to Track 1</text>
+  </g>
+
+  <g id="brand-logo" data-pptx-bounds="1052 34 172 58">
+    <image href="../images/hutech_logo.png" x="1056" y="36" width="168" height="54" preserveAspectRatio="xMidYMid meet"/>
+  </g>
+
+  <g id="engine-card-1" data-pptx-bounds="56 142 570 248">
+    <rect x="56" y="142" width="570" height="246" rx="16" fill="#F6F9FC" stroke="#0D9488" stroke-width="1.5" filter="url(#softShadow)"/>
+    <rect x="74" y="158" width="108" height="26" rx="13" fill="#ECFDF5" stroke="#0D9488" stroke-width="1"/>
+    <text x="128" y="176" font-size="13" font-weight="bold" fill="#0D9488" text-anchor="middle">TRACK 1.1</text>
+    <use data-icon="phosphor-duotone/microphone" x="194" y="155" width="30" height="30" fill="#0D9488"/>
+    <text x="234" y="178" font-family="Trebuchet MS" font-size="20" font-weight="bold" fill="#0F172A">AI CV &amp; Adaptive Voice Probing</text>
+
+    <rect x="74" y="210" width="146" height="156" rx="12" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="1"/>
+    <text x="147" y="240" font-size="13" font-weight="bold" fill="#475569" text-anchor="middle">INPUT</text>
+    <text x="147" y="274" font-size="16" font-weight="bold" fill="#0F172A" text-anchor="middle">Paper CV +
+      <tspan x="147" dy="22">Spoken Audio</tspan>
+    </text>
+    <text x="147" y="338" font-size="13" fill="#475569" text-anchor="middle">24/7 Magic Link</text>
+
+    <g id="p06-arr-1a" data-pptx-authoring="preset" data-pptx-object="shape" data-pptx-prst="rightArrow" data-pptx-frame="226 279 22 22" fill="#0D9488" stroke="none">
+      <path d="M 226 284.5 L 237 284.5 L 237 279 L 248 290 L 237 301 L 237 295.5 L 226 295.5 Z"/>
+    </g>
+
+    <rect x="254" y="210" width="186" height="156" rx="12" fill="#ECFDF5" stroke="#0D9488" stroke-width="1.5"/>
+    <text x="347" y="240" font-size="13" font-weight="bold" fill="#0D9488" text-anchor="middle">AI MECHANISM</text>
+    <text x="347" y="272" font-size="16" font-weight="bold" fill="#0F172A" text-anchor="middle">Claim Parser &amp;
+      <tspan x="347" dy="22">Adaptive Follow-Up</tspan>
+    </text>
+    <text x="347" y="338" font-size="13" fill="#0D9488" font-weight="bold" text-anchor="middle">Probes missing skills</text>
+
+    <g id="p06-arr-1b" data-pptx-authoring="preset" data-pptx-object="shape" data-pptx-prst="rightArrow" data-pptx-frame="446 279 22 22" fill="#0D9488" stroke="none">
+      <path d="M 446 284.5 L 457 284.5 L 457 279 L 468 290 L 457 301 L 457 295.5 L 446 295.5 Z"/>
+    </g>
+
+    <rect x="474" y="210" width="134" height="156" rx="12" fill="#FFFFFF" stroke="#0D9488" stroke-width="1"/>
+    <text x="541" y="240" font-size="13" font-weight="bold" fill="#059669" text-anchor="middle">OUTPUT</text>
+    <text x="541" y="274" font-size="16" font-weight="bold" fill="#0F172A" text-anchor="middle">2x2 Matrix &amp;
+      <tspan x="541" dy="22">Hidden Gems</tspan>
+    </text>
+    <text x="541" y="338" font-size="13" fill="#059669" font-weight="bold" text-anchor="middle">✓ Quote-cited</text>
+  </g>
+
+  <g id="engine-card-2" data-pptx-bounds="654 142 570 248">
+    <rect x="654" y="142" width="570" height="246" rx="16" fill="#F6F9FC" stroke="#E2E8F0" stroke-width="1.5"/>
+    <rect x="672" y="158" width="108" height="26" rx="13" fill="#EEF5FC" stroke="#0066B3" stroke-width="1"/>
+    <text x="726" y="176" font-size="13" font-weight="bold" fill="#0066B3" text-anchor="middle">TRACK 1.2</text>
+    <use data-icon="phosphor-duotone/file-text" x="792" y="155" width="30" height="30" fill="#0066B3"/>
+    <text x="832" y="178" font-family="Trebuchet MS" font-size="20" font-weight="bold" fill="#0F172A">AI JD &amp; Hiring Content Studio</text>
+
+    <rect x="672" y="210" width="146" height="156" rx="12" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="1"/>
+    <text x="745" y="240" font-size="13" font-weight="bold" fill="#475569" text-anchor="middle">INPUT</text>
+    <text x="745" y="274" font-size="16" font-weight="bold" fill="#0F172A" text-anchor="middle">Role Brief +
+      <tspan x="745" dy="22">Company Graph</tspan>
+    </text>
+    <text x="745" y="338" font-size="13" fill="#475569" text-anchor="middle">Stack &amp; ISO nodes</text>
+
+    <g id="p06-arr-2a" data-pptx-authoring="preset" data-pptx-object="shape" data-pptx-prst="rightArrow" data-pptx-frame="824 279 22 22" fill="#0066B3" stroke="none">
+      <path d="M 824 284.5 L 835 284.5 L 835 279 L 846 290 L 835 301 L 835 295.5 L 824 295.5 Z"/>
+    </g>
+
+    <rect x="852" y="210" width="186" height="156" rx="12" fill="#EEF5FC" stroke="#0066B3" stroke-width="1.5"/>
+    <text x="945" y="240" font-size="13" font-weight="bold" fill="#0066B3" text-anchor="middle">AI MECHANISM</text>
+    <text x="945" y="272" font-size="16" font-weight="bold" fill="#0F172A" text-anchor="middle">Graph Grounding &amp;
+      <tspan x="945" dy="22">Policy Bias Audit</tspan>
+    </text>
+    <text x="945" y="338" font-size="13" fill="#0066B3" font-weight="bold" text-anchor="middle">Must-have alignment</text>
+
+    <g id="p06-arr-2b" data-pptx-authoring="preset" data-pptx-object="shape" data-pptx-prst="rightArrow" data-pptx-frame="1044 279 22 22" fill="#0066B3" stroke="none">
+      <path d="M 1044 284.5 L 1055 284.5 L 1055 279 L 1066 290 L 1055 301 L 1055 295.5 L 1044 295.5 Z"/>
+    </g>
+
+    <rect x="1072" y="210" width="134" height="156" rx="12" fill="#FFFFFF" stroke="#0066B3" stroke-width="1"/>
+    <text x="1139" y="240" font-size="13" font-weight="bold" fill="#059669" text-anchor="middle">OUTPUT</text>
+    <text x="1139" y="274" font-size="16" font-weight="bold" fill="#0F172A" text-anchor="middle">Compliant JD
+      <tspan x="1139" dy="22">&amp; Rubric</tspan>
+    </text>
+    <text x="1139" y="338" font-size="13" fill="#059669" font-weight="bold" text-anchor="middle">✓ Ready in 2m</text>
+  </g>
+
+  <g id="engine-card-3" data-pptx-bounds="56 412 570 248">
+    <rect x="56" y="412" width="570" height="246" rx="16" fill="#F6F9FC" stroke="#E2E8F0" stroke-width="1.5"/>
+    <rect x="74" y="428" width="108" height="26" rx="13" fill="#FFFBEB" stroke="#D97706" stroke-width="1"/>
+    <text x="128" y="446" font-size="13" font-weight="bold" fill="#D97706" text-anchor="middle">TRACK 1.3</text>
+    <use data-icon="phosphor-duotone/chart-bar" x="194" y="425" width="30" height="30" fill="#D97706"/>
+    <text x="234" y="448" font-family="Trebuchet MS" font-size="20" font-weight="bold" fill="#0F172A">Sourcing Channel Quality AI</text>
+
+    <rect x="74" y="480" width="146" height="156" rx="12" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="1"/>
+    <text x="147" y="510" font-size="13" font-weight="bold" fill="#475569" text-anchor="middle">INPUT</text>
+    <text x="147" y="544" font-size="16" font-weight="bold" fill="#0F172A" text-anchor="middle">Multi-Board
+      <tspan x="147" dy="22">Funnel Logs</tspan>
+    </text>
+    <text x="147" y="608" font-size="13" fill="#475569" text-anchor="middle">LinkedIn, TopCV, Uni</text>
+
+    <g id="p06-arr-3a" data-pptx-authoring="preset" data-pptx-object="shape" data-pptx-prst="rightArrow" data-pptx-frame="226 549 22 22" fill="#D97706" stroke="none">
+      <path d="M 226 554.5 L 237 554.5 L 237 549 L 248 560 L 237 571 L 237 565.5 L 226 565.5 Z"/>
+    </g>
+
+    <rect x="254" y="480" width="186" height="156" rx="12" fill="#FFFBEB" stroke="#D97706" stroke-width="1.5"/>
+    <text x="347" y="510" font-size="13" font-weight="bold" fill="#D97706" text-anchor="middle">AI MECHANISM</text>
+    <text x="347" y="542" font-size="16" font-weight="bold" fill="#0F172A" text-anchor="middle">Verified Pass-Rate
+      <tspan x="347" dy="22">&amp; Cost Attribution</tspan>
+    </text>
+    <text x="347" y="608" font-size="13" fill="#D97706" font-weight="bold" text-anchor="middle">Quality over clicks</text>
+
+    <g id="p06-arr-3b" data-pptx-authoring="preset" data-pptx-object="shape" data-pptx-prst="rightArrow" data-pptx-frame="446 549 22 22" fill="#D97706" stroke="none">
+      <path d="M 446 554.5 L 457 554.5 L 457 549 L 468 560 L 457 571 L 457 565.5 L 446 565.5 Z"/>
+    </g>
+
+    <rect x="474" y="480" width="134" height="156" rx="12" fill="#FFFFFF" stroke="#D97706" stroke-width="1"/>
+    <text x="541" y="510" font-size="13" font-weight="bold" fill="#059669" text-anchor="middle">OUTPUT</text>
+    <text x="541" y="544" font-size="16" font-weight="bold" fill="#0F172A" text-anchor="middle">Ranked Budget
+      <tspan x="541" dy="22">Allocation</tspan>
+    </text>
+    <text x="541" y="608" font-size="13" fill="#059669" font-weight="bold" text-anchor="middle">✓ Cut waste</text>
+  </g>
+
+  <g id="engine-card-4" data-pptx-bounds="654 412 570 248">
+    <rect x="654" y="412" width="570" height="246" rx="16" fill="#F6F9FC" stroke="#E2E8F0" stroke-width="1.5"/>
+    <rect x="672" y="428" width="108" height="26" rx="13" fill="#ECFDF5" stroke="#059669" stroke-width="1"/>
+    <text x="726" y="446" font-size="13" font-weight="bold" fill="#059669" text-anchor="middle">TRACK 1.4</text>
+    <use data-icon="phosphor-duotone/chats" x="792" y="425" width="30" height="30" fill="#059669"/>
+    <text x="832" y="448" font-family="Trebuchet MS" font-size="20" font-weight="bold" fill="#0F172A">Policy &amp; Onboarding Copilot</text>
+
+    <rect x="672" y="480" width="146" height="156" rx="12" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="1"/>
+    <text x="745" y="510" font-size="13" font-weight="bold" fill="#475569" text-anchor="middle">INPUT</text>
+    <text x="745" y="544" font-size="16" font-weight="bold" fill="#0F172A" text-anchor="middle">Staff Query +
+      <tspan x="745" dy="22">Policy PDFs</tspan>
+    </text>
+    <text x="745" y="608" font-size="13" fill="#475569" text-anchor="middle">+ Interview gaps</text>
+
+    <g id="p06-arr-4a" data-pptx-authoring="preset" data-pptx-object="shape" data-pptx-prst="rightArrow" data-pptx-frame="824 549 22 22" fill="#059669" stroke="none">
+      <path d="M 824 554.5 L 835 554.5 L 835 549 L 846 560 L 835 571 L 835 565.5 L 824 565.5 Z"/>
+    </g>
+
+    <rect x="852" y="480" width="186" height="156" rx="12" fill="#ECFDF5" stroke="#059669" stroke-width="1.5"/>
+    <text x="945" y="510" font-size="13" font-weight="bold" fill="#059669" text-anchor="middle">AI MECHANISM</text>
+    <text x="945" y="542" font-size="16" font-weight="bold" fill="#0F172A" text-anchor="middle">Cited RAG +
+      <tspan x="945" dy="22">Conflict Detector</tspan>
+    </text>
+    <text x="945" y="608" font-size="13" fill="#059669" font-weight="bold" text-anchor="middle">Zero hallucination</text>
+
+    <g id="p06-arr-4b" data-pptx-authoring="preset" data-pptx-object="shape" data-pptx-prst="rightArrow" data-pptx-frame="1044 549 22 22" fill="#059669" stroke="none">
+      <path d="M 1044 554.5 L 1055 554.5 L 1055 549 L 1066 560 L 1055 571 L 1055 565.5 L 1044 565.5 Z"/>
+    </g>
+
+    <rect x="1072" y="480" width="134" height="156" rx="12" fill="#FFFFFF" stroke="#059669" stroke-width="1"/>
+    <text x="1139" y="510" font-size="13" font-weight="bold" fill="#059669" text-anchor="middle">OUTPUT</text>
+    <text x="1139" y="544" font-size="16" font-weight="bold" fill="#0F172A" text-anchor="middle">30-60-90 Plan
+      <tspan x="1139" dy="22">&amp; Conflict Alert</tspan>
+    </text>
+    <text x="1139" y="608" font-size="13" fill="#D97706" font-weight="bold" text-anchor="middle">⚠ Flags drift</text>
+  </g>
+
+  <g id="footer" data-pptx-bounds="56 676 1168 28">
+    <line x1="56" y1="678" x2="1224" y2="678" stroke="#E2E8F0" stroke-width="1"/>
+    <text x="56" y="696" font-size="13" fill="#475569">Team Zenith (HUTECH University) · InterviewPath · AI4Biz 2026 — Track 1: HR &amp; Recruitment</text>
+    <text x="1224" y="696" font-size="13" font-weight="bold" fill="#0066B3" text-anchor="end">06 / 11</text>
+  </g>
+</svg>

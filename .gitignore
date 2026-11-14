@@ -35,11 +35,16 @@ SpeakCV/backups/
 
 .omx/
 **/.claude/worktrees/
+**/.claude/agent-memory/
 .superpowers/
 .playwright-mcp/
 *.sql
 .venv/
 storage/
+
+# Graphify local output
+**/graphify-out/
+.graphify*
 
 # Company Brain evaluation reports are generated. The team commits a chosen one deliberately with git add -f.
 SpeakCV/src/backend/eval/reports/*
