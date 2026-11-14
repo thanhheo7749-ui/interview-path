@@ -15,7 +15,7 @@
 [![Playwright](https://img.shields.io/badge/E2E_%26_Eval-Playwright_%2B_Pytest-2EAD33?style=flat-square&logo=playwright&logoColor=white)](./Makefile)
 [![Locales](https://img.shields.io/badge/i18n-EN_%C2%B7_VI_%C2%B7_KO-7C3AED?style=flat-square)](#)
 
-[**🎬 Product Demo Video**](#-product-walkthrough-video) · [**✨ Key Capabilities**](#-key-capabilities) · [**📸 Product Tour**](#-product-tour) · [**🏗️ Architecture**](#️-architecture--monorepo-layout) · [**🚀 Quick Start (Zero API Keys)**](#-quick-start-docker) · [**🧪 Evaluation Suite**](#-evaluation--verification-suite)
+[**🎬 Product Demo Video**](#-product-walkthrough-video) · [**✨ Key Capabilities**](#-key-capabilities) · [**📸 Product Tour**](#-product-tour) · [**🏗️ Architecture**](#️-system-architecture) · [**🚀 Quick Start (Zero API Keys)**](#-quick-start-docker) · [**🧪 Evaluation Suite**](#-evaluation--verification-suite)
 
 </div>
 
@@ -122,7 +122,7 @@ Click the preview below (or open [**`interviewpath_hr_recruitment_2m30s.mp4`**](
 
 ---
 
-## 🏗️ Architecture & Monorepo Layout
+## 🏗️ System Architecture
 
 ```mermaid
 flowchart LR
@@ -150,28 +150,6 @@ flowchart LR
     API --> Mail
     Brain --> Gateway
     Gateway --> Vendors
-```
-
-```text
-interview-path/
-├── SpeakCV/
-│   └── src/
-│       ├── backend/                 # FastAPI service, Company Brain, hiring engine, Alembic migrations & CLI
-│       │   ├── app/
-│       │   │   ├── ai/              # Multi-vendor AI gateway, cost ledger & deterministic 'fake' provider
-│       │   │   ├── brain/           # Knowledge graph extraction, embeddings, RAG & conflict detection
-│       │   │   ├── hiring/          # CV parsing, Round-1 voice sessions, 2×2 calibration & retention
-│       │   │   ├── insights/        # Channel attribution & deterministic hiring funnel simulator
-│       │   │   └── routers/         # REST API endpoints (HR board, jobs, candidate portal, copilot)
-│       │   ├── eval/                # Reproducible benchmarks (brain, discrimination guard, plans, STT)
-│       │   └── seed/                # Two full sample companies (daehan-precision & sori-labs) + ground truth
-│       └── frontend/                # Next.js 16 Candidate Portal (apply, Fit Compass, voice room) & Employee Copilot
-├── interviewpath/
-│   ├── interviewpath-demo/          # React + Vite HR & Hiring Manager Workspace + Playwright E2E suite
-│   └── demo-video-2min/             # Recorded product walkthroughs, deterministic demo seeds & visual assets
-├── docker-compose.yml               # Local 5-container stack (backend, 2 frontends, MySQL 8.0, Mailpit)
-├── docker-compose.prod.yml          # Production Caddy + Docker deployment config
-└── Makefile                         # One-command workflows for Docker, seeding, tests & AI evaluations
 ```
 
 ---
