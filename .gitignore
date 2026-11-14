@@ -46,6 +46,22 @@ storage/
 **/graphify-out/
 .graphify*
 
+# Local presentation drafts, video workspaces & internal agent notes
+interviewpath/demo-video-2min/
+interviewpath/interviewpath_slide/
+interviewpath/img/
+interviewpath/index_copy.html
+interviewpath/index_v4.html
+interviewpath/interviewpath_visual_deck*.html
+interviewpath/script*.md
+plans/
+docs/superpowers/
+docs/CODEX_VPS_DEPLOY.md
+**/.claude/
+SpeakCV/openspec/
+SpeakCV/implementations/
+SpeakCV/docs/superpowers/
+
 # Company Brain evaluation reports are generated. The team commits a chosen one deliberately with git add -f.
 SpeakCV/src/backend/eval/reports/*
 !SpeakCV/src/backend/eval/reports/.gitkeep

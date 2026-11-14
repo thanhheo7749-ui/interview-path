@@ -35,16 +35,16 @@ Most hiring stacks treat recruitment as disconnected, disposable steps: JDs are 
 
 ## 🎬 Product Walkthrough Video
 
-Click the preview below (or open [**`interviewpath_hr_recruitment_2m30s.mp4`**](./interviewpath/demo-video-2min/v4-hr-recruitment-2m30s/interviewpath_hr_recruitment_2m30s.mp4)) to watch the complete **2m 32s end-to-end product walkthrough** running against a live multi-container local stack:
+Click the preview below (or open [**`product-walkthrough.mp4`**](./docs/assets/product-walkthrough.mp4)) to watch the complete **2m 32s end-to-end product walkthrough** running against a live multi-container local stack:
 
 <div align="center">
-  <a href="./interviewpath/demo-video-2min/v4-hr-recruitment-2m30s/interviewpath_hr_recruitment_2m30s.mp4">
+  <a href="./docs/assets/product-walkthrough.mp4">
     <img src="./docs/assets/video-preview.png" alt="Watch the 2m32s InterviewPath Product Walkthrough Video" width="92%" />
   </a>
   <p>
-    ▶️ <a href="./interviewpath/demo-video-2min/v4-hr-recruitment-2m30s/interviewpath_hr_recruitment_2m30s.mp4"><strong>Watch Full Product Demo Video (MP4 · 2m 32s)</strong></a>
+    ▶️ <a href="./docs/assets/product-walkthrough.mp4"><strong>Watch Full Product Demo Video (MP4 · 2m 32s)</strong></a>
     &nbsp;·&nbsp;
-    📄 <a href="./interviewpath/demo-video-2min/v4-hr-recruitment-2m30s/VOICEOVER_SCRIPT_EN.md"><strong>Timecoded Walkthrough Transcript</strong></a>
+    📄 <a href="./docs/assets/walkthrough-transcript.md"><strong>Timecoded Walkthrough Transcript</strong></a>
   </p>
 </div>
 
@@ -80,41 +80,41 @@ Click the preview below (or open [**`interviewpath_hr_recruitment_2m30s.mp4`**](
 <table>
   <tr>
     <td width="50%" valign="top">
-      <img src="./interviewpath/demo-video-2min/ppt-master-projects/ai4biz_zenith_ppt169_20261111/images/s1_knowledge_graph.png" alt="Living Company Knowledge Graph" />
+      <img src="./docs/assets/tour-01-knowledge-graph.png" alt="Living Company Knowledge Graph" />
       <p align="center"><strong>1. Living Company Knowledge Graph</strong><br/><sub>Interactive force-directed graph linking policies, engineering standards, and role requirements back to source clauses.</sub></p>
     </td>
     <td width="50%" valign="top">
-      <img src="./interviewpath/demo-video-2min/ppt-master-projects/ai4biz_zenith_ppt169_20261111/images/s1_jd_studio.png" alt="AI JD Studio" />
+      <img src="./docs/assets/tour-02-jd-studio.png" alt="AI JD Studio" />
       <p align="center"><strong>2. Graph-Grounded JD Studio</strong><br/><sub>Drafts requirement cards from approved company nodes with built-in bias and policy checks.</sub></p>
     </td>
   </tr>
   <tr>
     <td width="50%" valign="top">
-      <img src="./interviewpath/demo-video-2min/ppt-master-projects/ai4biz_zenith_ppt169_20261111/images/s1_channel_intel.png" alt="Channel Attribution Analytics" />
+      <img src="./docs/assets/tour-03-channel-attribution.png" alt="Channel Attribution Analytics" />
       <p align="center"><strong>3. Sourcing Channel Attribution</strong><br/><sub>Tracks funnel conversion, verified skill pass rates, and Hidden Gems across recruitment channels.</sub></p>
     </td>
     <td width="50%" valign="top">
-      <img src="./interviewpath/demo-video-2min/ppt-master-projects/ai4biz_zenith_ppt169_20261111/images/s2_cv_screening_board.png" alt="Candidate Screening Board" />
+      <img src="./docs/assets/tour-04-cv-board.png" alt="Candidate Screening Board" />
       <p align="center"><strong>4. Candidate Board & 1-Click Override</strong><br/><sub>Inspect parsed CVs, copy instant Magic Links, and invite held candidates into Round-1 spoken screening.</sub></p>
     </td>
   </tr>
   <tr>
     <td width="50%" valign="top">
-      <img src="./interviewpath/demo-video-2min/ppt-master-projects/ai4biz_zenith_ppt169_20261111/images/s2_live_ai_interview.png" alt="Recorded Spoken AI Interview" />
+      <img src="./docs/assets/tour-05-voice-interview.png" alt="Recorded Spoken AI Interview" />
       <p align="center"><strong>5. Adaptive Spoken AI Interview Room</strong><br/><sub>Browser-recorded technical Q&A with adaptive follow-up questions on architecture and ISO change control.</sub></p>
     </td>
     <td width="50%" valign="top">
-      <img src="./interviewpath/demo-video-2min/ppt-master-projects/ai4biz_zenith_ppt169_20261111/images/s3_hidden_gem_evidence.png" alt="2x2 Evidence Calibration Matrix" />
+      <img src="./docs/assets/tour-06-evidence-matrix.png" alt="2x2 Evidence Calibration Matrix" />
       <p align="center"><strong>6. 2×2 Evidence Calibration Matrix</strong><br/><sub>Cross-plots paper CV fit against spoken interview proof to spotlight high-signal Hidden Gems.</sub></p>
     </td>
   </tr>
   <tr>
     <td width="50%" valign="top">
-      <img src="./interviewpath/demo-video-2min/ppt-master-projects/ai4biz_zenith_ppt169_20261111/images/s4_onboarding_roadmap.png" alt="30-60-90 Day Probation Plan" />
+      <img src="./docs/assets/tour-07-onboarding-plan.png" alt="30-60-90 Day Probation Plan" />
       <p align="center"><strong>7. 30-60-90 Day Probation Plan</strong><br/><sub>Auto-drafts role-specific Day 30 / 60 / 90 milestones from team knowledge nodes and interview gaps.</sub></p>
     </td>
     <td width="50%" valign="top">
-      <img src="./interviewpath/demo-video-2min/ppt-master-projects/ai4biz_zenith_ppt169_20261111/images/s5_policy_copilot.png" alt="Conflict-Aware Internal Policy Copilot" />
+      <img src="./docs/assets/tour-08-policy-copilot.png" alt="Conflict-Aware Internal Policy Copilot" />
       <p align="center"><strong>8. Conflict-Aware Policy Copilot</strong><br/><sub>Answers employee questions with exact citations and flags <code>SOURCES DISAGREE</code> when handbooks conflict.</sub></p>
     </td>
   </tr>
